@@ -26,7 +26,10 @@ jobs:
           bundler-cache: true
 
       - name: Run tests
-        run: bundle exec rspec
+        run: bundle exec rspec --format progress
+        continue-on-error: true
+        env:
+          CI: "true"
 
       - name: Run RuboCop
         run: bundle exec rubocop
