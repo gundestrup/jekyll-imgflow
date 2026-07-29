@@ -1,0 +1,145 @@
+#!/usr/bin/env ruby
+
+# frozen_string_literal: true
+
+require "optparse"
+require_relative "../lib/jekyll-imgflow/picture_tag_preset_migrator"
+
+# Command-line tool for migrating Jekyll Picture Tag presets to ImgFlow
+class PresetMigrationCLI
+  def initialize
+    @options = {
+      site_source: ".",
+      preview: false,
+      verbose: false
+    }
+  end
+
+  def run(args)
+    parse_options(args)
+
+    unless Dir.exist?(@options[:site_source])
+      puts "❌ Error: Site source directory '#{@options[:site_source]}' does not exist"
+      exit 1
+    end
+
+    migrator = JekyllImgFlow::PictureTagPresetMigrator.new(@options[:site_source])
+
+    if @options[:preview]
+      preview_migration(migrator)
+    else
+      perform_migration(migrator)
+    end
+  end
+
+  private
+
+  def parse_options(args)
+    parser = OptionParser.new do |opts|
+      opts.banner = "Usage: #{$PROGRAM_NAME} [options]"
+
+      opts.on("-s", "--source DIR", "Jekyll site source directory (default: .)") do |dir|
+        @options[:site_source] = dir
+      end
+
+      opts.on("-p", "--preview", "Preview what would be migrated without making changes") do
+        @options[:preview] = true
+      end
+
+      opts.on("-v", "--verbose", "Verbose output") do
+        @options[:verbose] = true
+      end
+
+      opts.on("-h", "--help", "Show this help message") do
+        puts opts
+        exit
+      end
+    end
+
+    parser.parse!(args)
+  end
+
+  def preview_migration(migrator)
+    puts "🔍 Previewing Picture Tag preset migration..."
+    puts "Site source: #{@options[:site_source]}"
+    puts
+
+    results = migrator.preview_migration
+
+    if results[:found].empty?
+      puts "ℹ️  No Picture Tag presets found in #{JekyllImgFlow::PictureTagPresetMigrator::PICTURE_TAG_CONFIG}"
+      return
+    end
+
+    puts "📋 Found #{results[:found].length} Picture Tag presets:"
+    results[:found].each { |name| puts "  - #{name}" }
+    puts
+
+    if results[:convertible].any?
+      puts "✅ #{results[:convertible].length} presets can be migrated:"
+      results[:convertible].each do |preset|
+        puts "  - #{preset[:name]}"
+        if @options[:verbose]
+          puts "    Preview:"
+          puts "    #{YAML.dump(preset[:preview]).lines.map { |l| "      #{l}" }.join}"
+        end
+      end
+      puts
+    end
+
+    if results[:non_convertible].any?
+      puts "⚠️  #{results[:non_convertible].length} presets cannot be automatically migrated:"
+      results[:non_convertible].each do |preset|
+        puts "  - #{preset[:name]} (#{preset[:reason]})"
+      end
+      puts
+    end
+
+    puts "💡 Run without --preview to perform the migration"
+  end
+
+  def perform_migration(migrator)
+    puts "🚀 Migrating Picture Tag presets to ImgFlow..."
+    puts "Site source: #{@options[:site_source]}"
+    puts
+
+    results = migrator.migrate_presets
+
+    if results[:migrated].empty? && results[:skipped].empty? && results[:errors].empty?
+      puts "ℹ️  No Picture Tag presets found to migrate"
+      return
+    end
+
+    if results[:migrated].any?
+      puts "✅ Successfully migrated #{results[:migrated].length} presets:"
+      results[:migrated].each do |name|
+        puts "  - #{name} → #{JekyllImgFlow::PictureTagPresetMigrator::IMGFLOW_PRESETS_DIR}/#{name}.yml"
+      end
+      puts
+    end
+
+    if results[:skipped].any?
+      puts "⏭️  Skipped #{results[:skipped].length} presets:"
+      results[:skipped].each do |preset|
+        puts "  - #{preset[:name]} (#{preset[:reason]})"
+      end
+      puts
+    end
+
+    if results[:errors].any?
+      puts "❌ Failed to migrate #{results[:errors].length} presets:"
+      results[:errors].each do |preset|
+        puts "  - #{preset[:name]}: #{preset[:error]}"
+      end
+      puts
+    end
+
+    return if results[:migrated].none?
+
+    puts "🎉 Migration complete! Your Picture Tag presets are now available as ImgFlow presets."
+    puts "💡 You can now use them with: {% imgflow image.jpg preset:name %}"
+  end
+end
+
+# Run the CLI
+PresetMigrationCLI.new.run(ARGV) if __FILE__ == $PROGRAM_NAME

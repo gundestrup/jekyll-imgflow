@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-03-27T11:27:56+01:00",
+  "picture_library": "default",
+  "test_images_count": 1,
+  "test_sizes": [
+    400,
+    800,
+    1200,
+    1600
+  ],
+  "output_formats": [
+    "webp",
+    "avif",
+    "jpg",
+    "png"
+  ],
+  "providers": {
+    "sharp": {
+      "build_time": 42.1,
+      "images_generated": 122,
+      "total_output_size": 58134872,
+      "total_input_size": 18627545
+    },
+    "imgproxy": {
+      "build_time": 1.27,
+      "images_generated": 0,
+      "total_output_size": 0,
+      "total_input_size": 18627545
+    },
+    "imagemagick": {
+      "build_time": 136.21,
+      "images_generated": 122,
+      "total_output_size": 59110177,
+      "total_input_size": 18627545
+    },
+    "libvips": {
+      "build_time": 858.31,
+      "images_generated": 110,
+      "total_output_size": 598732358,
+      "total_input_size": 18627545
+    },
+    "weserv": {
+      "build_time": 3.54,
+      "images_generated": 0,
+      "total_output_size": 0,
+      "total_input_size": 18627545
+    },
+    "flyimg": {
+      "build_time": 1.48,
+      "images_generated": 0,
+      "total_output_size": 0,
+      "total_input_size": 18627545
+    }
+  }
+}

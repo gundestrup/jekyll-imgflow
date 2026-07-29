@@ -1,0 +1,42 @@
+# Base Docker Compose configuration for ImgFlow
+# This file contains shared services that both test and production environments inherit
+# Reduces code duplication and ensures consistency across environments
+
+services:
+  # Imgproxy HTTP service (official image with built-in server)
+  imgproxy:
+    image: darthsim/imgproxy:latest
+    environment:
+      - IMGPROXY_BIND_ADDRESS=:8080
+      - IMGPROXY_LOCAL_STORAGE_ENABLED=${IMGPROXY_LOCAL_STORAGE_ENABLED:-false}
+      - IMGPROXY_ALLOWED_SOURCES=${IMGPROXY_ALLOWED_SOURCES:-*}
+      - IMGPROXY_MAX_SRC_RESOLUTION=${IMGPROXY_MAX_SRC_RESOLUTION:-50}
+      - IMGPROXY_MAX_SRC_FILE_SIZE=${IMGPROXY_MAX_SRC_FILE_SIZE:-50000000}
+      - IMGPROXY_QUALITY=${IMGPROXY_QUALITY:-85}
+      - IMGPROXY_FORMATS=${IMGPROXY_FORMATS:-jpg,jpeg,png,webp,avif}
+      - IMGPROXY_LOCAL_FILESYSTEM_ROOT=${IMGPROXY_LOCAL_FILESYSTEM_ROOT:-/app/images}
+      - IMGPROXY_ALLOW_SOURCES=${IMGPROXY_ALLOW_SOURCES:-local}
+    volumes:
+      - ${IMGPROXY_VOLUME_SOURCE:-./assets/images}:/app/images
+    restart: unless-stopped
+    networks:
+      - imgflow-network
+
+  # Weserv Images HTTP service (official image)
+  weserv:
+    image: ghcr.io/weserv/images:5.x
+    restart: unless-stopped
+    networks:
+      - imgflow-network
+
+  # Flyimg HTTP service (official image)
+  flyimg:
+    image: flyimg/flyimg:latest
+    restart: unless-stopped
+    shm_size: 1gb
+    networks:
+      - imgflow-network
+
+networks:
+  imgflow-network:
+    driver: bridge

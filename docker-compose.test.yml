@@ -1,0 +1,42 @@
+# Test Docker Compose configuration for ImgFlow
+# Inherits from docker-compose.base.yml and adds test-specific settings
+
+include:
+  - docker-compose.base.yml
+
+services:
+  imgproxy:
+    container_name: imgflow-imgproxy-test
+    ports:
+      - "${IMGPROXY_PORT:-33001}:8080"
+    volumes:
+      - ./spec/fixtures/originals:/app/images
+
+  weserv:
+    container_name: imgflow-weserv-test
+    ports:
+      - "${WESERV_PORT:-33007}:80"
+    volumes:
+      - ./spec/fixtures/originals:/images
+    # weserv denies requests to private/loopback IPs by default (SSRF protection),
+    # and resolves hostnames via Google DNS (8.8.8.8), which cannot resolve
+    # host.docker.internal (a Docker-injected /etc/hosts-only entry). Tests must
+    # reach the host's WEBrick server via host.docker.internal, so both
+    # restrictions are relaxed for the test container only.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        sed -i '/weserv_deny_ip/d' /etc/nginx/nginx.conf &&
+        sed -i 's/resolver 8.8.8.8/resolver 127.0.0.11/' /etc/nginx/imagesweserv*.conf &&
+        exec nginx -g 'daemon off;'
+
+  flyimg:
+    container_name: imgflow-flyimg-test
+    ports:
+      - "${FLYIMG_PORT:-33008}:80"
+    volumes:
+      - ./spec/fixtures/originals:/images
+
+networks:
+  imgflow-test:
+    driver: bridge

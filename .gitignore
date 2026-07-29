@@ -1,0 +1,47 @@
+# Gem development
+/pkg/
+*.gem
+
+# Ruby
+.bundle/
+.bundle/
+.ruby-version
+.ruby-gemset
+
+# Jekyll
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+
+# Test coverage
+/coverage/
+
+# Logs
+*.log
+test_logs/
+
+# Temporary files
+*.tmp
+.DS_Store
+tmp/
+
+# Editor / IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+
+# AI tooling config (local)
+.devin/
+.windsurfrules
+CLAUDE.md
+
+# Ruby LSP cache
+.ruby-lsp/
+
+# rbenv gemset (local)
+.rbenv-gemsets
+
+# Internal review notes
+docs/readme.todo.errors.md

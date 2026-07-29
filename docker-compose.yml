@@ -1,0 +1,20 @@
+# Production Docker Compose configuration for ImgFlow
+# Inherits from docker-compose.base.yml and adds production-specific settings
+
+include:
+  - docker-compose.base.yml
+
+services:
+  imgproxy:
+    container_name: imgflow-imgproxy
+    ports:
+      - "${IMGPROXY_PORT:-33001}:8080"
+    volumes:
+      - ${IMGPROXY_VOLUME_SOURCE:-./assets/images}:/app/images
+
+  image_compressor:
+    container_name: imgflow-image-compressor
+    ports:
+      - "${IMAGECOMPRESSOR_PORT:-33006}:5000"
+    volumes:
+      - ./assets/images:/images

@@ -1,0 +1,161 @@
+# frozen_string_literal: true
+
+# Target Ruby version — must be set first so plugins and cops know the target
+AllCops:
+  ParserEngine: parser_prism
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  ActiveSupportExtensionsEnabled: true
+  Exclude:
+    - 'tmp/**/*'
+    - 'vendor/**/*'
+    - 'spec/fixtures/**/*'
+    - '*.gem'
+    - 'Gemfile.lock'
+    - 'AI_INSTRUCTIONS.md'
+    - 'docs/**/*'
+    - '**/*.md'
+    - 'scripts/test_html_generator.rb'
+  SuggestExtensions: false
+
+# Plugins — loaded after AllCops so they pick up TargetRubyVersion
+require:
+  - rubocop-markdown
+
+plugins:
+  - rubocop-performance
+  - rubocop-rake
+  - rubocop-rspec
+
+# Style cops
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/StringLiterals:
+  Enabled: true
+  EnforcedStyle: double_quotes
+
+# "ruby19" style = modern Ruby 3.x syntax: { key: value }
+# (named after Ruby 1.9 which introduced it; this IS the current best practice)
+Style/HashSyntax:
+  Enabled: true
+  EnforcedStyle: ruby19
+  EnforcedShorthandSyntax: either
+
+Style/Documentation:
+  Enabled: false
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Metrics/MethodLength:
+  Max: 65
+
+Metrics/ClassLength:
+  Max: 250
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/BlockLength:
+  Max: 60
+  Exclude:
+    - 'spec/**/*'
+    - 'Rakefile'
+    - 'jekyll-imgflow.gemspec'
+
+Metrics/CyclomaticComplexity:
+  Max: 30
+  Exclude:
+    - 'lib/jekyll/imgflow/generator.rb'
+
+Metrics/ModuleLength:
+  Max: 500
+
+Metrics/PerceivedComplexity:
+  Max: 30
+  Exclude:
+    - 'lib/jekyll-imgflow.rb'
+
+Naming/FileName:
+  Enabled: false
+
+Layout/LineLength:
+  Max: 180
+  Exclude:
+    - 'spec/support/test_pictures.rb'
+    - 'Rakefile'
+    - 'scripts/**/*'
+
+Metrics/ParameterLists:
+  Max: 8
+
+Gemspec/DevelopmentDependencies:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Max: 20
+
+RSpec/ExampleLength:
+  Max: 100
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 25
+
+RSpec/InstanceVariable:
+  Enabled: false
+
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/BeforeAfterAll:
+  Enabled: false
+
+RSpec/ContextWording:
+  Enabled: false
+
+RSpec/SpecFilePathFormat:
+  Enabled: false
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/NestedGroups:
+  Max: 5
+
+RSpec/DescribeClass:
+  Enabled: false
+
+RSpec/SubjectStub:
+  Enabled: false
+
+RSpec/AnyInstance:
+  Enabled: false
+
+RSpec/ExpectActual:
+  Enabled: false
+
+RSpec/IteratedExpectation:
+  Enabled: false
+
+RSpec/NoExpectationExample:
+  Enabled: false
+
+RSpec/OverwritingSetup:
+  Enabled: false
+
+RSpec/RepeatedExampleGroupDescription:
+  Enabled: false
+
+RSpec/UnspecifiedException:
+  Enabled: false
+
+RSpec/LeakyLocalVariable:
+  Enabled: false
+
+RSpec/StubbedMock:
+  Enabled: false
+
+RSpec/DescribeMethod:
+  Enabled: false

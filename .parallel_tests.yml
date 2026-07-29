@@ -1,0 +1,40 @@
+# Parallel Tests Configuration for ImgFlow
+# This file configures how parallel_tests runs RSpec tests
+
+# Pattern for test files (default: spec/**{,/*/**}/*_spec.rb)
+test_options:
+  # Run RSpec with custom options
+  rspec:
+    # Format for output (progress for parallel, documentation for single)
+    format: progress
+    # Color output
+    color: true
+    # Fail fast
+    fail_fast: false
+    # Random order (disabled for consistency)
+    order: defined
+    # Profile examples (disabled for parallel)
+    profile: false
+
+# Number of parallel processes (default: number of CPUs)
+# Set to n-1 cores to leave one core free for system
+processes: 3
+
+# Load balance test groups by runtime
+# This helps distribute tests evenly across processes
+load_balancer: runtime
+
+# Group test files by directory structure
+# This groups related tests together
+group_by: filesize
+
+# Silence RSpec output for non-failing processes
+# Only shows output from failing processes
+serialize_stdout: true
+
+# Environment variables for parallel processes
+# Each process gets its own test database/log
+env:
+  PARALLEL: "true"
+  TEST_ENV_NUMBER: "<%= ENV['TEST_ENV_NUMBER'] %>"
+  SIMPLECOV: "true"

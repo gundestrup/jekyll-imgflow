@@ -1,0 +1,67 @@
+# Shared image configuration for both ImgFlow and Picture Tag
+shared_images_configs:
+  # Input sources (original images)
+  originals: "assets/images/originals"
+
+  # Output destination (optimized images)
+  output: "assets/images/optimized"
+  
+  # Standardized formats for both plugins
+  input_formats:
+    - jpg
+    - jpeg
+    - png
+    - webp
+    - avif
+    - gif
+    - tiff
+    - tif
+    - svg
+  formats:
+    - webp
+    - avif
+    - jpg
+    - png
+  
+  # Standardized sizes for both plugins
+  sizes:
+    sm: 400
+    md: 800
+    lg: 1200
+    xl: 2000
+
+# ImgFlow configuration (inherits from shared_images_configs, override here)
+imgflow:
+  quality: 85
+  backend_priority:
+    - sharp
+    - imgproxy
+    - imagemagick
+    - libvips
+    - weserv
+    - flyimg
+  imgproxy_url: "http://192.168.1.50:8080"
+  sharp_url: "http://192.168.1.51:3000"
+
+# jekyll_picture_tag configuration
+picture:
+  # Use same source as ImgFlow originals for alignment
+  source: "assets/images/originals"
+  # Use same output as ImgFlow for alignment
+  output: "assets/images/optimized"
+  # Enable Picture Tag to work with ImgFlow
+  disabled: true
+  # Ignore missing images to avoid errors
+  # ignore_missing_images: true
+  presets:
+    default:
+      formats:
+        - webp
+        - avif
+        - jpg
+        - png
+      widths:
+        - 400
+        - 800
+        - 1200
+        - 2000

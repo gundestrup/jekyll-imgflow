@@ -1,0 +1,47 @@
+---
+# Reek configuration file
+# https://github.com/troessner/reek/blob/master/docs/Configuration.md
+
+exclude_paths:
+  - lib/jekyll/imgflow/version.rb
+  - lib/jekyll-imgflow.rb
+
+detectors:
+  IrresponsibleModule:
+    enabled: false
+    
+  DuplicateMethodCall:
+    enabled: true
+    max_calls: 3
+    
+  FeatureEnvy:
+    enabled: true
+    exclude:
+      - "Jekyll::ImgFlow::Generator#generate"
+      
+  UtilityFunction:
+    enabled: false
+    
+  NestedIterators:
+    enabled: true
+    exclude:
+      - "Jekyll::ImgFlow::Generator#generate"
+      
+  LongParameterList:
+    enabled: true
+    max_params: 5
+    
+  ControlParameter:
+    enabled: true
+    
+  DataClump:
+    enabled: true
+    
+  ClassVariable:
+    enabled: true
+    
+  BooleanParameter:
+    enabled: false
+    
+  Attribute:
+    enabled: false

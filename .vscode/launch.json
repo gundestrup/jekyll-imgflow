@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "rdbg",
+      "request": "launch",
+      "name": "Debug Current RSpec File",
+      "command": "bundle exec rspec ${file}",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "rdbg",
+      "request": "launch",
+      "name": "Debug Full RSpec Suite",
+      "command": "bundle exec rspec",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
