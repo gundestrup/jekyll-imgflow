@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
@@ -26,4 +25,10 @@ jobs:
         run: gem build jekyll-imgflow.gemspec
 
       - name: Publish to RubyGems
-        uses: rubygems/release-gem@v1
+        env:
+          RUBYGEMS_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+        run: |
+          mkdir -p $HOME/.gem
+          echo -e "---\n:rubygems_api_key: ${RUBYGEMS_API_KEY}" > $HOME/.gem/credentials
+          chmod 600 $HOME/.gem/credentials
+          gem push jekyll-imgflow-*.gem
