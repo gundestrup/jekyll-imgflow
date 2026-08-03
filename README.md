@@ -2,6 +2,11 @@
 
 A [Jekyll](https://jekyllrb.com/) plugin for automatic image optimization with multiple providers and formats.
 
+[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundestrup/jekyll-imgflow)
+[![Status](https://img.shields.io/badge/status-active-success)](https://github.com/gundestrup/jekyll-imgflow)
+[![codecov](https://codecov.io/gh/gundestrup/jekyll-imgflow/branch/main/graph/badge.svg)](https://codecov.io/gh/gundestrup/jekyll-imgflow)
+[![License](https://img.shields.io/github/license/gundestrup/jekyll-imgflow)](LICENSE)
+
 ## 🚀 Quick Start
 
 ```bash
