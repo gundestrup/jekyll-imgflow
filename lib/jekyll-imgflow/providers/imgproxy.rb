@@ -60,7 +60,6 @@ module JekyllImgFlow
               crop_height = opts[:calculated_height]
 
               operations << "g:sm"
-              operations << "c:#{crop_width}:#{crop_height}"
             else
               # Use basic cropping with explicit coordinates
               if operation[:ratio]
@@ -77,8 +76,8 @@ module JekyllImgFlow
               # imgproxy crop format: c:width:height:gravity
               # Use nowe (north-west) gravity with x/y offsets for pixel-precise cropping
               operations << "g:nowe:#{crop_x}:#{crop_y}"
-              operations << "c:#{crop_width}:#{crop_height}"
             end
+            operations << "c:#{crop_width}:#{crop_height}"
 
           when :quality
             imgproxy_quality = translate_quality_to_imgproxy(operation[:quality])

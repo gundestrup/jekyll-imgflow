@@ -10,15 +10,13 @@ require_relative "support/test_pictures"
 # Auto-start test logging for all test runs
 TestLogger.auto_start
 
-SimpleCov.start
+SimpleCov.start do
+  skip "/spec/"
+end
 
 # Constants for performance optimization
 HTTP_API_PROVIDERS = %w[Imgproxy Weserv Flyimg].freeze
 CLI_TOOLS = %w[Sharp Imagemagick Libvips].freeze
-
-SimpleCov.start do
-  add_filter "/spec/"
-end
 
 # Add lib to load path
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
@@ -75,7 +73,7 @@ PREBUILT_SITES = {}.freeze
 class TestSiteRegistry
   include Singleton
 
-  attr_accessor :prebuilt_sites
+  attr_accessor :prebuilt_sites, :test_file_server
 
   def initialize
     @prebuilt_sites = {}
@@ -1264,7 +1262,7 @@ RSpec.configure do |config|
 
       project_root = File.expand_path("..", __dir__)
 
-      $test_file_server = WEBrick::HTTPServer.new(
+      TestSiteRegistry.instance.test_file_server = WEBrick::HTTPServer.new(
         BindAddress: "0.0.0.0",
         Port: 4000,
         Logger: WEBrick::Log.new(File::NULL),
@@ -1272,7 +1270,7 @@ RSpec.configure do |config|
       )
 
       # Custom servlet: resolve URL path against candidate document roots
-      $test_file_server.mount_proc("/") do |req, res|
+      TestSiteRegistry.instance.test_file_server.mount_proc("/") do |req, res|
         path = req.path_info
         # Candidate roots: project root, filesystem root, /tmp,
         # and all subdirs of tmp/tests (for jekyll_integration_spec test sites)
@@ -1297,7 +1295,7 @@ RSpec.configure do |config|
         end
       end
 
-      Thread.new { $test_file_server.start }
+      Thread.new { TestSiteRegistry.instance.test_file_server.start }
       sleep 1
     end
 
@@ -1344,9 +1342,9 @@ RSpec.configure do |config|
 
   # Comprehensive cleanup after entire test suite
   config.after(:suite) do
-    if $test_file_server
-      $test_file_server.shutdown
-      $test_file_server = nil
+    if TestSiteRegistry.instance.test_file_server
+      TestSiteRegistry.instance.test_file_server.shutdown
+      TestSiteRegistry.instance.test_file_server = nil
     end
     cleanup_all_test_artifacts
   end

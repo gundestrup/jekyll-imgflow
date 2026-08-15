@@ -7,7 +7,7 @@
 
 Jekyll ImgFlow is a Jekyll plugin for automatic image optimization with multiple providers (Sharp, ImageMagick, LibVips, Imgproxy, Weserv, Flyimg) and formats (WebP, AVIF, JPG, PNG). It generates responsive images during Jekyll build and render time.
 
-- **Language:** Ruby 3.3+
+- **Language:** Ruby 3.4+
 - **Framework:** Jekyll 4.x plugin (Liquid tags + build hooks)
 - **Gem:** `jekyll-imgflow` v0.1.0
 - **License:** AGPL-3.0-or-later
@@ -82,7 +82,7 @@ See [docs/parallel_testing.md](docs/parallel_testing.md) for parallel test setup
 
 | Tool | Config | Purpose |
 | --- | --- | --- |
-| RuboCop | `.rubocop.yml` | Code style (Ruby 3.3, double quotes, max line 100) |
+| RuboCop | `.rubocop.yml` | Code style (Ruby 3.4, double quotes, max line 100) |
 | Reek | `.reek.yml` | Code smell detection |
 | RSpec | `.rspec` / `.rspec_parallel` | Test framework with coverage |
 | SimpleCov | (in spec_helper) | Coverage reporting |

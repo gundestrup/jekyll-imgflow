@@ -568,8 +568,7 @@ RSpec.describe JekyllImgFlow::BatchManager, :unit do
       task = create_batch_task("test.jpg", "/input.jpg", "/output.jpg")
       batch_manager.add_task(task)
 
-      allow(operation_processor).to receive(:needs_processing?).and_return(true)
-      allow(operation_processor).to receive(:process_operation).and_return("/output.jpg")
+      allow(operation_processor).to receive_messages(needs_processing?: true, process_operation: "/output.jpg")
 
       result = batch_manager.process_all(parallel: true)
       expect(result[:completed]).to eq(1)

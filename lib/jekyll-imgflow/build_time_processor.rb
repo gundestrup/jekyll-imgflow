@@ -109,6 +109,7 @@ module JekyllImgFlow
       input_formats = @config.input_formats
 
       Dir.glob(File.join(originals_dir, "**", "*.{#{input_formats.join(',')}}"))
+         .reject { |path| AnimatedGifDetector.animated?(path) }
     end
 
     # Check if image needs processing

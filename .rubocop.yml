@@ -3,7 +3,7 @@
 # Target Ruby version — must be set first so plugins and cops know the target
 AllCops:
   ParserEngine: parser_prism
-  TargetRubyVersion: 3.3
+  TargetRubyVersion: 3.4
   NewCops: enable
   ActiveSupportExtensionsEnabled: true
   Exclude:

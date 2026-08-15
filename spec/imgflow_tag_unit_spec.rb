@@ -207,8 +207,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
     it "uses unknown page_path when page is nil" do
       context_no_page = Liquid::Context.new({}, {}, { site: site, page: nil })
 
-      allow(manifest).to receive(:version_exists?).and_return(false)
-      allow(manifest).to receive(:get_versions).and_return({})
+      allow(manifest).to receive_messages(version_exists?: false, get_versions: {})
       allow(operation_processor).to receive(:process_operation).and_return("/tmp/output.webp")
       allow(File).to receive(:file?).and_return(true)
       allow(tag).to receive(:resolve_image_path).and_return(fixture_image_path)
@@ -296,9 +295,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
     it "updates page usage and returns output path when version exists" do
       allow(tag).to receive(:resolve_image_path).and_return(fixture_image_path)
 
-      allow(config).to receive(:determine_version_type).and_return(:default)
-      allow(config).to receive(:formats).and_return(["webp"])
-      allow(config).to receive(:quality).and_return(85)
+      allow(config).to receive_messages(determine_version_type: :default, formats: ["webp"], quality: 85)
 
       allow(filename_generator).to receive(:generate_filename).and_return("test-800-hash.webp")
       allow(path_resolver).to receive(:resolve_output_path).and_return("/tmp/test_site/_site/assets/images/optimized/test-800-hash.webp")
@@ -355,8 +352,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       allow(filename_generator).to receive(:generate_filename).and_return("test-800-hash.webp")
       allow(path_resolver).to receive(:resolve_output_path).and_return("/tmp/test_site/_site/assets/images/optimized/test-800-hash.webp")
 
-      allow(manifest).to receive(:version_exists?).and_return(false)
-      allow(manifest).to receive(:get_versions).and_return({})
+      allow(manifest).to receive_messages(version_exists?: false, get_versions: {})
       allow(operation_processor).to receive(:process_operation).and_return("/tmp/test_site/assets/images/originals/test.jpg")
 
       allow(JekyllImgFlow::HtmlGenerator).to receive(:generate).and_return("<img>")
@@ -375,8 +371,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       allow(filename_generator).to receive(:generate_filename).and_return("test-800-hash.webp")
       allow(path_resolver).to receive(:resolve_output_path).and_return("/tmp/test_site/_site/assets/images/optimized/test-800-hash.webp")
 
-      allow(manifest).to receive(:version_exists?).and_return(false)
-      allow(manifest).to receive(:get_versions).and_return({})
+      allow(manifest).to receive_messages(version_exists?: false, get_versions: {})
       allow(operation_processor).to receive(:process_operation).and_return("/some/other/path/test.webp")
 
       allow(JekyllImgFlow::HtmlGenerator).to receive(:generate).and_return("<img>")

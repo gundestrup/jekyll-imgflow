@@ -151,6 +151,42 @@ RSpec.describe JekyllImgFlow::OperationProcessor, :unit do
       expected_default = TestPictures.expected_filename("mars-crater-large.jpg", :md, :jpg)
       expect(filename).to eq(expected_default)
     end
+
+    context "when input is an animated GIF" do
+      let(:original_name) { "ang-head-animation.gif" }
+      let(:input_path) do
+        File.expand_path("fixtures/originals/ang-head-animation.gif", __dir__)
+      end
+      let(:operation) do
+        { type: :resize, params: { width: 400, format: "webp", quality: 85 } }
+      end
+
+      it "copies the original instead of resizing" do
+        result = processor.process_operation(
+          original_name,
+          operation,
+          input_path
+        )
+
+        expect(result).to be_a(String)
+        expect(File.exist?(result)).to be true
+
+        # The output should be a byte-for-byte copy of the original GIF,
+        # preserving the animation (not a converted/resized webp).
+        expect(File.binread(result)).to eq(File.binread(input_path))
+      end
+
+      it "preserves the GIF magic header in the output" do
+        result = processor.process_operation(
+          original_name,
+          operation,
+          input_path
+        )
+
+        magic = File.binread(result, 6)
+        expect(magic).to match(/\AGIF8[79]a\z/)
+      end
+    end
   end
 
   describe "#needs_processing?" do

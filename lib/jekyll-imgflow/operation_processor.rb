@@ -53,8 +53,18 @@ module JekyllImgFlow
       # Ensure output directory exists before processing
       FileUtils.mkdir_p(File.dirname(actual_output_path))
 
-      # Process the operation (create the image)
-      process_single_operation(type, input_path, actual_output_path, params)
+      # Animated GIFs must not be resized or converted — the operation
+      # would destroy the animation. Copy the original file as-is so the
+      # manifest can track it and HTML references stay valid.
+      if AnimatedGifDetector.animated?(input_path)
+        Jekyll.logger.warn "🖼️  ImgFlow: Skipping resize for animated GIF " \
+                           "'#{original_name}' — copying original as-is to " \
+                           "preserve animation."
+        FileUtils.cp(input_path, actual_output_path)
+      else
+        # Process the operation (create the image)
+        process_single_operation(type, input_path, actual_output_path, params)
+      end
 
       # Register in manifest
       if @manifest
