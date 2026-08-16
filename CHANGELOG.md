@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [Unreleased]
+
+### Fixed
+- **Parallel test race condition in temp file cleanup** — `cleanup_temp_output_files` in `spec_helper.rb` deleted ALL `imgflow-out-*` files in `Dir.tmpdir` with no age check. In parallel mode, process 0's pre-suite cleanup could delete temp files being actively used by other processes, causing sharp to fail with "No input files". Fixed by only deleting files older than 1 hour.
+- **Parallel test race condition in temp file counting test** — `operation_processor_spec.rb` "cleans up temporary files" test compared global `imgflow-out-*` counts before/after processing. In parallel mode, other processes create/delete temp files between snapshots, causing false failures. Fixed by stubbing `PathResolver#temp_output_path` with a test-specific prefix so only this test's temp files are counted.
+
+
 ## [0.1.7] - 2026-08-16
 
 ### Added

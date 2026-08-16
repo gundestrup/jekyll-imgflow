@@ -100,13 +100,23 @@ RSpec.describe JekyllImgFlow::OperationProcessor, :unit do
         { type: :quality, params: { quality: 90 } }
       ]
 
-      # Get temp files before processing
-      temp_files_before = Dir.glob(File.join(Dir.tmpdir, "imgflow-out-*"))
+      # Use a unique prefix to track only temp files created by this test,
+      # avoiding race conditions with other parallel test processes.
+      # We monkey-patch PathResolver#temp_output_path to use a test-specific prefix.
+      test_prefix = "imgflow-test-#{Process.pid}-#{SecureRandom.hex(4)}-"
+      path_resolver = processor.instance_variable_get(:@path_resolver)
+
+      allow(path_resolver).to receive(:temp_output_path) do |format|
+        File.join(Dir.tmpdir, "#{test_prefix}#{SecureRandom.hex}.#{format}")
+      end
+
+      # Get temp files with our prefix before processing
+      temp_files_before = Dir.glob(File.join(Dir.tmpdir, "#{test_prefix}*"))
 
       processor.process_batch_operations(operations, input_path, final_output)
 
-      # Check that no new temp files were left behind
-      temp_files_after = Dir.glob(File.join(Dir.tmpdir, "imgflow-out-*"))
+      # Check that no new temp files with our prefix were left behind
+      temp_files_after = Dir.glob(File.join(Dir.tmpdir, "#{test_prefix}*"))
       new_temp_files = temp_files_after - temp_files_before
 
       expect(new_temp_files).to be_empty

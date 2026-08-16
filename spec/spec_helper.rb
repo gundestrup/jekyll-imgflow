@@ -240,13 +240,19 @@ def cleanup_prebuilt_sites
 end
 
 # Cleanup temporary output files from OperationProcessor
+# Only removes files older than 1 hour to avoid deleting temp files
+# being actively used by other parallel test processes.
 def cleanup_temp_output_files
   temp_dir = Dir.tmpdir
   temp_files = Dir.glob(File.join(temp_dir, "imgflow-out-*"))
 
   return if temp_files.empty?
 
+  cutoff = Time.now - 3600 # 1 hour ago
+
   temp_files.each do |file|
+    next if File.mtime(file) >= cutoff
+
     FileUtils.rm_f(file)
   rescue StandardError => e
     warn "Failed to remove #{file}: #{e.message}"
