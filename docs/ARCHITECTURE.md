@@ -739,7 +739,7 @@ Generated automatically for all images in originals folder.
 **Defined by:**
 
 - `config.sizes` (e.g., sm: 400, md: 800, lg: 1200)
-- `config.formats` (e.g., webp, avif, jpg)
+- `config.formats` (e.g., avif, webp, png, jpg)
 - `config.quality` (default: 85)
 
 **Example:**
@@ -964,13 +964,14 @@ imgflow:
     md: 800
     lg: 1200
   formats:
-    - webp
     - avif
+    - webp
+    - png
     - jpg
   backend_priority:
     - sharp
-    - imagemagick
     - libvips
+    - imagemagick
 ```
 
 ## ✅ Best Practices

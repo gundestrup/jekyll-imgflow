@@ -1,12 +1,14 @@
 # Shared image configuration for both ImgFlow and Picture Tag
+# Only `originals` and `output` are required — all other values have
+# sensible defaults built into the ImgFlow Config class.
 shared_images_configs:
   # Input sources (original images)
   originals: "assets/images/originals"
 
   # Output destination (optimized images)
   output: "assets/images/optimized"
-  
-  # Standardized formats for both plugins
+
+  # Standardized formats for both plugins (optional — defaults built in)
   input_formats:
     - jpg
     - jpeg
@@ -18,28 +20,42 @@ shared_images_configs:
     - tif
     - svg
   formats:
-    - webp
     - avif
-    - jpg
+    - webp
     - png
-  
-  # Standardized sizes for both plugins
+    - jpg
+
+  # Standardized sizes for both plugins (optional — defaults built in)
   sizes:
     sm: 400
     md: 800
     lg: 1200
     xl: 2000
 
-# ImgFlow configuration (inherits from shared_images_configs, override here)
+# ImgFlow configuration
+# Minimal config: just add `imgflow:` and override what you need.
+# Defaults: quality=85, backend_priority ordered by speed (see docs/providers.md)
+#
+#   imgflow:
+#     originals: "assets/images/originals"  # optional (default shown)
+#     output: "assets/images/optimized"     # optional (default shown)
+#
 imgflow:
   quality: 85
+  # Backend priority ordered by benchmark speed (fastest first):
+  # sharp (14s) → libvips (22s) → imagemagick (31s) → imgproxy (31s) → weserv (30s) → flyimg
   backend_priority:
     - sharp
-    - imgproxy
-    - imagemagick
     - libvips
+    - imagemagick
+    - imgproxy
     - weserv
     - flyimg
+  # Format used for the <img> fallback in <picture> elements.
+  # All other formats get <source> tags for browsers that support them.
+  # Default: jpg (change to png if you need transparency in the fallback)
+  fallback_format: jpg
+  # HTTP provider URLs (only needed if using those providers)
   imgproxy_url: "http://192.168.1.50:8080"
   sharp_url: "http://192.168.1.51:3000"
 

@@ -97,7 +97,7 @@ module Jekyll
                  end
 
                  filename = components[:filename_generator].generate_filename(input_path, params)
-                 output_path = components[:path_resolver].resolve_output_path(filename)
+                 output_path = components[:path_resolver].resolve_source_output_path(filename)
 
                  # Determine version type
                  version_type = determine_version_type(params, components[:config])

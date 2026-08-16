@@ -33,69 +33,75 @@ end
 
 ### 4. Add to _config.yml
 
+**Minimal config** — all you need is `originals` and `output`:
+
 ```yaml
-# Shared image configuration for both ImgFlow and Picture Tag
-shared_images_configs:
-  # Input sources (original images)
+imgflow:
   originals: "assets/images/originals"
-  
-  # Output destination (optimized images)
   output: "assets/images/optimized"
-  
-  # Standardized formats for both plugins
-  input_formats:
-    - jpg
-    - jpeg
-    - png
-    - webp
-    - avif
-    - gif
-    - tiff
-    - tif
-    - svg
+```
+
+That's it. Everything else has sensible defaults:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `quality` | `85` | JPEG/WebP quality (1-100) |
+| `backend_priority` | `sharp, libvips, imagemagick, imgproxy, weserv, flyimg` | Provider order (fastest first, see [providers.md](providers.md)) |
+| `formats` | `avif, webp, png, jpg` | Output formats (priority order — browser picks first supported) |
+| `fallback_format` | `jpg` | Format for `<img>` fallback in `<picture>` (all others get `<source>` tags) |
+| `sizes` | `sm: 400, md: 800, lg: 1200, xl: 2000` | Responsive widths in pixels |
+| `input_formats` | `jpg, jpeg, png, webp, avif, gif, tiff, tif, svg` | Accepted input formats |
+
+**Full config** (override any default):
+
+```yaml
+imgflow:
+  originals: "assets/images/originals"
+  output: "assets/images/optimized"
+  quality: 85
+  backend_priority:
+    - sharp
+    - libvips
+    - imagemagick
+    - imgproxy
+    - weserv
+    - flyimg
   formats:
-    - webp
     - avif
-    - jpg
+    - webp
     - png
-  
-  # Standardized sizes for both plugins
+    - jpg
   sizes:
     sm: 400
     md: 800
     lg: 1200
     xl: 2000
-
-# ImgFlow configuration (inherits from shared_images_configs, override here)
-imgflow:
-  quality: 85
-  backend_priority:
-    - imgproxy
-    - sharp
-    - imagemagick
-    - libvips
-    - weserv
-    - flyimg
-  imgproxy_url: "http://192.168.1.50:8080"
-  sharp_url: "http://192.168.1.51:3000"
-
-# Picture Tag configuration (uses same paths as shared_images_configs)
-picture:
-  source: "assets/images/originals"
-  output: "assets/images/optimized"
-  disabled: false
-  ignore_missing_images: true
-  presets:
-    default:
-      formats:
-        - webp
-        - avif
-        - jpg
-        - png
-      widths: [400, 800, 1200, 2000]
+  # HTTP provider URLs (only needed if using those providers)
+  imgproxy_url: "http://localhost:8080"
+  sharp_url: "http://localhost:3000"
 ```
 
-ImgFlow automatically merges `shared_images_configs` as defaults. You only need to specify `imgflow:` settings that are specific to ImgFlow (quality, backend priority, provider URLs). To override any shared value (e.g. a different output path), add it under `imgflow:`.
+**Backward compatibility** — if you use `shared_images_configs` (for
+jekyll_picture_tag alignment), ImgFlow still merges it as a base layer:
+
+```yaml
+shared_images_configs:
+  originals: "assets/images/originals"
+  output: "assets/images/optimized"
+
+imgflow:
+  quality: 90  # override only what you need
+```
+
+**Backend priority** is ordered by benchmark speed (see
+[providers.md](providers.md)):
+
+1. **Sharp** — fastest (Node.js/libvips, ~14s)
+2. **LibVips** — very fast CLI (~22s)
+3. **ImageMagick** — CLI (~31s)
+4. **Imgproxy** — HTTP API (~31s)
+5. **Weserv** — HTTP API (~30s)
+6. **Flyimg** — HTTP API (PHP/ImageMagick)
 
 ### 5. Install Image Processing Tools
 

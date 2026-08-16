@@ -44,8 +44,8 @@ module JekyllImgFlow
 
       # Generate filename using FilenameGenerator (JPT compatible)
       filename = @filename_generator.generate_filename(input_path, params)
-      # Write to _site during build (after Jekyll copies assets)
-      actual_output_path = @path_resolver.resolve_output_path(filename)
+      # Write to source directory so Jekyll copies files to _site during write phase
+      actual_output_path = @path_resolver.resolve_source_output_path(filename)
 
       # Determine version type
       version_type = determine_version_type(params)
@@ -68,8 +68,8 @@ module JekyllImgFlow
 
       # Register in manifest
       if @manifest
-        # Convert absolute path to relative for manifest storage
-        relative_path = actual_output_path.sub(@path_resolver.site_dest, "")
+        # Store relative path (with leading /) for manifest storage
+        relative_path = "/#{@path_resolver.resolve_relative_output_path(filename)}"
 
         provider_name = @provider.class.provider_name
         @manifest.register_version(
@@ -83,7 +83,41 @@ module JekyllImgFlow
         )
       end
 
+      # Register as Jekyll static file so Jekyll copies it to _site during
+      # the write phase. Without this, files created during pre_render (or
+      # during render via imgflow tags) are not picked up by Jekyll's static
+      # file reader, which runs before pre_render. This would leave _site
+      # without optimized images until a second build.
+      register_jekyll_static_file(actual_output_path)
+
       actual_output_path
+    end
+
+    # Register a generated file as a Jekyll::StaticFile so Jekyll copies it
+    # to _site during the write phase. No-op for mock/test sites.
+    # @param file_path [String] Absolute path to the generated file in source
+    def register_jekyll_static_file(file_path)
+      site = @config&.site
+      return unless site.is_a?(Jekyll::Site)
+
+      relative = file_path.delete_prefix("#{site.source}/")
+      return if relative == file_path # not under site source
+
+      add_static_file(site, relative) unless static_file_registered?(site, relative)
+    end
+
+    # @param site [Jekyll::Site] Jekyll site object
+    # @param relative [String] Path relative to site source
+    def static_file_registered?(site, relative)
+      site.static_files.any? { |sf| sf.relative_path == "/#{relative}" }
+    end
+
+    # @param site [Jekyll::Site] Jekyll site object
+    # @param relative [String] Path relative to site source
+    def add_static_file(site, relative)
+      site.static_files << Jekyll::StaticFile.new(
+        site, site.source, File.dirname(relative), File.basename(relative)
+      )
     end
 
     # Process multiple operations on an image in sequence (batch)

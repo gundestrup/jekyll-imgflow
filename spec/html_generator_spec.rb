@@ -28,7 +28,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
 
   # Use proper config with TestPictures formats
   let(:config) do
-    double("config", formats: %w[webp avif jpg])
+    double("config", formats: %w[avif webp png jpg], fallback_format: "jpg")
   end
 
   let(:attributes) do
@@ -56,16 +56,40 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
     end
 
     context "with picture format" do
-      it "generates picture element with sources" do
+      it "generates picture element with sources for all non-fallback formats" do
         html = JekyllImgFlow::HtmlGenerator.generate(test_results, attributes, "picture", context,
                                                      config)
 
         expect(html).to include("<picture")
         expect(html).to include('class="picture-wrapper"')
         expect(html).to include("<source")
+        # Modern formats get <source> tags
+        expect(html).to include("type=\"image/webp\"")
+        expect(html).to include("type=\"image/avif\"")
         expect(html).to include("type=\"image/png\"")
+        # jpg is the fallback format — should NOT get a <source> tag
+        expect(html).not_to include("type=\"image/jpeg\"")
         expect(html).to include("<img")
         expect(html).to include('class="responsive"')
+      end
+
+      it "emits <source> tags in priority order: avif, webp, png" do
+        html = JekyllImgFlow::HtmlGenerator.generate(test_results, attributes, "picture", context,
+                                                     config)
+
+        # The browser picks the first <source> it supports, so order matters:
+        # avif (best compression) → webp (wide support) → png (transparency)
+        avif_pos = html.index('type="image/avif"')
+        webp_pos = html.index('type="image/webp"')
+        png_pos = html.index('type="image/png"')
+
+        expect(avif_pos).not_to be_nil, "avif <source> not found"
+        expect(webp_pos).not_to be_nil, "webp <source> not found"
+        expect(png_pos).not_to be_nil, "png <source> not found"
+        expect(avif_pos).to be < webp_pos,
+                            "avif <source> must come before webp (avif at #{avif_pos}, webp at #{webp_pos})"
+        expect(webp_pos).to be < png_pos,
+                            "webp <source> must come before png (webp at #{webp_pos}, png at #{png_pos})"
       end
     end
 
@@ -92,19 +116,45 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
   describe "config integration" do
     context "with custom formats" do
       let(:custom_config) do
-        double("config", formats: %w[webp png])
+        double("config", formats: %w[avif webp png], fallback_format: "jpg")
       end
 
-      it "uses formats from config for fallback detection" do
+      it "uses fallback_format for <img> and other formats for <source>" do
         html = JekyllImgFlow::HtmlGenerator.generate(test_results, attributes, "picture", context,
                                                      custom_config)
 
         expect(html).to include("<picture")
-        # Should skip .webp and .png as fallback formats
-        expect(html).not_to include("type=\"image/webp\"")
-        expect(html).not_to include("type=\"image/png\"")
-        # Should include .avif as source
+        # Only jpg is the fallback format — all others get <source> tags
+        expect(html).to include("type=\"image/webp\"")
+        expect(html).to include("type=\"image/png\"")
         expect(html).to include("type=\"image/avif\"")
+        # jpg should NOT get a <source> tag — it's the <img> fallback
+        expect(html).not_to include("type=\"image/jpeg\"")
+      end
+    end
+
+    context "with png as fallback_format" do
+      let(:png_fallback_config) do
+        double("config", formats: %w[avif webp jpg png], fallback_format: "png")
+      end
+
+      it "uses png for <img> fallback and serves webp/avif/jpg via <source>" do
+        html = JekyllImgFlow::HtmlGenerator.generate(test_results, attributes, "picture", context,
+                                                     png_fallback_config)
+
+        expect(html).to include("<picture")
+        # webp, avif, jpg all get <source> tags
+        expect(html).to include("type=\"image/webp\"")
+        expect(html).to include("type=\"image/avif\"")
+        expect(html).to include("type=\"image/jpeg\"")
+        # png should NOT get a <source> tag — it's the <img> fallback
+        expect(html).not_to include("type=\"image/png\"")
+        # <img> should use a png file
+        expect(html).to include("src=\"assets/images/optimized/")
+        # Find the img src and verify it ends with .png
+        img_src = html.match(/<img src="([^"]+)"/)
+        expect(img_src).not_to be_nil
+        expect(img_src[1]).to end_with(".png")
       end
     end
   end
@@ -364,7 +414,8 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
 
     it "handles uppercase file extensions" do
       # Test with uppercase extensions - use config that allows webp as source
-      uppercase_config = double("config", formats: %w[jpg png]) # Only jpg/png as fallback
+      uppercase_config = double("config", formats: %w[avif webp png jpg],
+                                          fallback_format: "jpg")
       uppercase_results = [
         "/assets/images/optimized/test-image.WEBP",
         "/assets/images/optimized/test-image.AVIF",

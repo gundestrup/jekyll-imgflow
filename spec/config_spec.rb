@@ -18,12 +18,79 @@ RSpec.describe JekyllImgFlow::Config, :unit do
       expect(config.backend_priority).to eq(TEST_CONFIG["imgflow"]["backend_priority"])
     end
 
-    it "raises error when required config is missing" do
+    it "uses sensible defaults when config is empty" do
       empty_site = double("site", config: {})
+      cfg = described_class.new(empty_site)
 
-      expect do
-        described_class.new(empty_site)
-      end.to raise_error(ArgumentError, /No originals configured/)
+      expect(cfg.originals).to eq("assets/images/originals")
+      expect(cfg.output).to eq("assets/images/optimized")
+      expect(cfg.input_formats).to include("jpg", "png", "webp", "avif", "gif")
+      expect(cfg.formats).to eq(%w[avif webp png jpg])
+      expect(cfg.sizes).to eq({ "sm" => 400, "md" => 800, "lg" => 1200, "xl" => 2000 })
+      expect(cfg.quality).to eq(85)
+      expect(cfg.backend_priority).to eq(%w[sharp libvips imagemagick imgproxy weserv flyimg])
+      expect(cfg.fallback_format).to eq("jpg")
+    end
+
+    it "allows minimal config with only originals and output" do
+      minimal_site = double("site", config: {
+                              "imgflow" => {
+                                "originals" => "src/images",
+                                "output" => "dist/images"
+                              }
+                            })
+      cfg = described_class.new(minimal_site)
+
+      expect(cfg.originals).to eq("src/images")
+      expect(cfg.output).to eq("dist/images")
+      # Everything else uses defaults
+      expect(cfg.quality).to eq(85)
+      expect(cfg.formats).to eq(%w[avif webp png jpg])
+      expect(cfg.backend_priority.first).to eq("sharp")
+      expect(cfg.fallback_format).to eq("jpg")
+    end
+
+    it "allows imgflow overrides to take precedence over shared_images_configs" do
+      site_with_shared = double("site", config: {
+                                  "shared_images_configs" => {
+                                    "originals" => "shared/originals",
+                                    "output" => "shared/output",
+                                    "quality" => 70
+                                  },
+                                  "imgflow" => {
+                                    "output" => "custom/output"
+                                  }
+                                })
+      cfg = described_class.new(site_with_shared)
+
+      expect(cfg.originals).to eq("shared/originals") # from shared
+      expect(cfg.output).to eq("custom/output") # overridden by imgflow
+    end
+  end
+
+  describe "default constants" do
+    it "has default backend priority ordered by speed" do
+      expect(described_class::DEFAULT_BACKEND_PRIORITY).to eq(
+        %w[sharp libvips imagemagick imgproxy weserv flyimg]
+      )
+    end
+
+    it "has default sizes" do
+      expect(described_class::DEFAULT_SIZES).to eq(
+        { "sm" => 400, "md" => 800, "lg" => 1200, "xl" => 2000 }
+      )
+    end
+
+    it "has default formats" do
+      expect(described_class::DEFAULT_FORMATS).to eq(%w[avif webp png jpg])
+    end
+
+    it "has default quality" do
+      expect(described_class::DEFAULT_QUALITY).to eq(85)
+    end
+
+    it "has default fallback_format" do
+      expect(described_class::DEFAULT_FALLBACK_FORMAT).to eq("jpg")
     end
   end
 
@@ -44,6 +111,18 @@ RSpec.describe JekyllImgFlow::Config, :unit do
   describe "#backend_priority" do
     it "returns configured backend priority" do
       expect(config.backend_priority).to eq(TEST_CONFIG["imgflow"]["backend_priority"])
+    end
+
+    it "has sharp as first priority (fastest provider)" do
+      expect(config.backend_priority.first).to eq("sharp")
+    end
+
+    it "has libvips as second priority" do
+      expect(config.backend_priority[1]).to eq("libvips")
+    end
+
+    it "has imagemagick as third priority" do
+      expect(config.backend_priority[2]).to eq("imagemagick")
     end
   end
 

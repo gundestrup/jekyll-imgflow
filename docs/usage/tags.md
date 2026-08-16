@@ -38,3 +38,26 @@ module ImgFlow
   end
 end
 ```
+
+## Referencing Images
+
+Image references in `{% imgflow %}` tags use **exact filenames** relative to the
+`originals` directory:
+
+```liquid
+{% imgflow photo.jpg resize width:800 %}
+{% imgflow subfolder/banner.png format:webp %}
+{% imgflow /assets/images/originals/header.jpg optimize %}
+```
+
+### Limitations
+
+- **No fuzzy matching** — `photo.jpg` will not resolve to `photo.jpeg`.
+  The filename must match exactly.
+- **No autocomplete** — there is no editor integration to suggest available
+  image names while typing. Users must know the exact filename.
+- **Error on not found** — if the image doesn't exist, the build logs an error
+  and the tag outputs an HTML comment (`<!-- ImgFlow Error: ... -->`).
+
+Future versions may add "did you mean" suggestions when an image name is
+close to an existing file.

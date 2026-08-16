@@ -288,12 +288,15 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       # Orphan file: 800px width, default quality
       orphan_operations = { width: 800, format: "webp", quality: 85 }
       orphan_filename = filename_generator.generate_filename(original_name, orphan_operations)
-      @orphan_file = File.join(@site.dest, path_resolver.resolve_output_path(orphan_filename))
+      @orphan_file = path_resolver.resolve_source_output_path(orphan_filename)
+      # Manifest stores relative paths (with leading /) — match production behavior
+      @orphan_relative = "/#{path_resolver.resolve_relative_output_path(orphan_filename)}"
 
       # Used file: 800px width + quality 90 (different operations)
       used_operations = { width: 800, quality: 90, format: "webp" }
       used_filename = filename_generator.generate_filename(original_name, used_operations)
-      @used_file = File.join(@site.dest, path_resolver.resolve_output_path(used_filename))
+      @used_file = path_resolver.resolve_source_output_path(used_filename)
+      used_relative = "/#{path_resolver.resolve_relative_output_path(used_filename)}"
 
       # Ensure directories exist
       FileUtils.mkdir_p(File.dirname(@orphan_file))
@@ -305,7 +308,7 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       # Register the orphan file with no page usage (nil page_path)
       manifest_manager.register_version(
         original_name,
-        @orphan_file,
+        @orphan_relative,
         orphan_operations,
         :specialized,
         nil # No page usage = orphan
@@ -314,7 +317,7 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       # Register the used file with page usage
       manifest_manager.register_version(
         original_name,
-        @used_file,
+        used_relative,
         used_operations,
         :specialized,
         "page.html" # Has page usage = not orphan
@@ -326,7 +329,8 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
 
       expect(File.exist?(@orphan_file)).to be false
       expect(File.exist?(@used_file)).to be true
-      expect(cleaned).to include(@orphan_file)
+      # cleanup_orphans returns the relative path stored in the manifest
+      expect(cleaned).to include(@orphan_relative)
     end
 
     it "does not delete default versions" do
@@ -482,7 +486,7 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       # Setup: register a version and create the output file
       test_ops = { width: 800, format: "webp", quality: 85 }
       test_filename = filename_generator.generate_filename(test_image_name, test_ops)
-      test_path = path_resolver.resolve_output_path(test_filename)
+      test_path = path_resolver.resolve_source_output_path(test_filename)
       FileUtils.mkdir_p(File.dirname(test_path))
       FileUtils.touch(test_path)
       manifest_manager.register_version(test_image_name, test_path, test_ops, :default, nil)

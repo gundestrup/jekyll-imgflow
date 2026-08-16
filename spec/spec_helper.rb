@@ -770,8 +770,11 @@ module ProviderTestHelpers
       "baseurl" => options[:baseurl] || "",
       "source" => ".",
       "destination" => "_site",
-      "plugins" => ["jekyll-imgflow"],
-      "keep_files" => ["assets"]
+      "plugins" => ["jekyll-imgflow"]
+      # NOTE: Do NOT add keep_files: ["assets"] here — it masks the v0.1.6
+      # wipe bug by preserving optimized images in _site across builds.
+      # Without keep_files, Jekyll cleans _site on each build, which is the
+      # correct production behavior we want tests to verify against.
     }
 
     # Merge plugin configs first, then base config to override

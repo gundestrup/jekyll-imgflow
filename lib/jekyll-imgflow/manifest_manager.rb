@@ -114,7 +114,7 @@ module JekyllImgFlow
 
       # Get optimized directory path
       config = JekyllImgFlow::Config.new(@site)
-      optimized_dir = File.join(@site.dest, config.output)
+      optimized_dir = File.join(@site.source, config.output)
 
       # Safety guard: prevent deletion of _site itself
       raise "Refusing to delete optimized directory: path resolves to site dest or is empty" if optimized_dir == @site.dest || optimized_dir.empty?
@@ -261,12 +261,7 @@ module JekyllImgFlow
       cleaned = []
 
       orphans.each do |orphan|
-        output_file = if orphan["output"].start_with?("/")
-                        orphan["output"]
-                      else
-                        File.join(@site.dest,
-                                  orphan["output"])
-                      end
+        output_file = File.join(@site.source, orphan["output"])
         if File.exist?(output_file)
           File.delete(output_file)
           cleaned << orphan["output"]

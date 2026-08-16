@@ -2,10 +2,29 @@
 
 module JekyllImgFlow
   class Config
+    # Sensible defaults — users only need to configure `originals` and `output`
+    # (or even nothing at all). All other values fall back to these.
+    DEFAULT_ORIGINALS = "assets/images/originals"
+    DEFAULT_OUTPUT = "assets/images/optimized"
+    DEFAULT_INPUT_FORMATS = %w[jpg jpeg png webp avif gif tiff tif svg].freeze
+    # Output format priority: avif > webp > png > jpg (fallback).
+    # The browser picks the first <source> format it supports, so avif is
+    # served to modern browsers, webp as a fallback for avif, png for
+    # transparency, and jpg as the universal <img> fallback.
+    DEFAULT_FORMATS = %w[avif webp png jpg].freeze
+    DEFAULT_SIZES = { "sm" => 400, "md" => 800, "lg" => 1200, "xl" => 2000 }.freeze
+    DEFAULT_QUALITY = 85
+    # Ordered by speed (see docs/providers.md benchmark):
+    # sharp (14s) → libvips (22s) → imagemagick (31s) → imgproxy (31s) → weserv (30s) → flyimg
+    DEFAULT_BACKEND_PRIORITY = %w[sharp libvips imagemagick imgproxy weserv flyimg].freeze
+    # Format used for the <img> fallback in <picture> elements.
+    # All other formats in `formats` get <source> tags for browsers that support them.
+    DEFAULT_FALLBACK_FORMAT = "jpg"
+
     attr_reader :site, :originals, :output, :input_formats, :sizes, :formats,
                 :quality, :backend_priority, :imgproxy_url,
                 :image_compressor_url, :weserv_url, :flyimg_url,
-                :optimize_qualities
+                :optimize_qualities, :fallback_format
 
     def initialize(site)
       shared = site.config["shared_images_configs"] || {}
@@ -13,20 +32,14 @@ module JekyllImgFlow
       cfg = shared.merge(overrides)
 
       @site             = site
-      @originals        = cfg["originals"]
-      @output           = cfg["output"]
-      @input_formats    = cfg["input_formats"]
-      @sizes            = cfg["sizes"]
-      @formats          = cfg["formats"]
-      @quality          = cfg["quality"]
-      @backend_priority = cfg["backend_priority"]
-
-      # Validate required config fields
-      raise ArgumentError, "No originals configured in unified config" unless @originals
-      raise ArgumentError, "No output configured in unified config" unless @output
-      raise ArgumentError, "No input_formats configured in unified config" unless @input_formats
-      raise ArgumentError, "No formats configured in unified config" unless @formats
-      raise ArgumentError, "No sizes configured in unified config" unless @sizes
+      @originals        = cfg["originals"] || DEFAULT_ORIGINALS
+      @output           = cfg["output"] || DEFAULT_OUTPUT
+      @input_formats    = cfg["input_formats"] || DEFAULT_INPUT_FORMATS
+      @sizes            = cfg["sizes"] || DEFAULT_SIZES
+      @formats          = cfg["formats"] || DEFAULT_FORMATS
+      @quality          = cfg["quality"] || DEFAULT_QUALITY
+      @backend_priority = cfg["backend_priority"] || DEFAULT_BACKEND_PRIORITY
+      @fallback_format  = cfg["fallback_format"] || DEFAULT_FALLBACK_FORMAT
 
       @imgproxy_url = cfg["imgproxy_url"]
       @image_compressor_url = cfg["image_compressor_url"]

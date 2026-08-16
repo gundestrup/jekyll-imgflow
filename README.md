@@ -16,16 +16,25 @@ gem 'jekyll-imgflow'
 # Install
 bundle install
 
-# Configure (_config.yml)
+# Configure (_config.yml) — only originals and output are required,
+# everything else has sensible defaults:
 imgflow:
   originals: "assets/images/originals"
   output: "assets/images/optimized"
-  sizes: {sm: 400, md: 800, lg: 1200}
-  formats: [webp, avif, jpg]
 
 # Use in templates
 {% imgflow photo.jpg resize width:800 %}
 ```
+
+> **Full configuration options:** `quality`, `backend_priority`, `formats`,
+> `fallback_format`, `sizes`, provider URLs, and more — see the
+> [Installation Guide](docs/installation.md#4-add-to-_configyml)
+> and [Configuration Reference](docs/ARCHITECTURE.md).
+
+> **Note:** Image references require exact filenames (or paths relative to
+> `originals`). There is no fuzzy matching or autocomplete yet — if you type
+> `photo.jpg` but the file is `photo.jpeg`, the build will fail with an error.
+> Future versions may add "did you mean" suggestions.
 
 ## ✨ Key Features
 
@@ -112,18 +121,17 @@ gem 'jekyll-imgflow'
 # Install
 bundle install
 
-# Configure (_config.yml)
+# Configure (_config.yml) — only originals and output required:
 imgflow:
   originals: "assets/images/originals"
   output: "assets/images/optimized"
-  sizes: {sm: 400, md: 800, lg: 1200}
-  formats: [webp, avif, jpg]
 
 # Use in templates
 {% imgflow photo.jpg resize width:800 %}
 ```
 
-**See:** [installation.md](docs/installation.md) for detailed installation instructions and configuration options
+**See:** [installation.md](docs/installation.md) for detailed installation and
+[all configuration options](docs/installation.md#4-add-to-_configyml)
 
 ## 🐳 Docker Setup (Recommended)
 

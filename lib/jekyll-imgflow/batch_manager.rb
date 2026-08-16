@@ -213,8 +213,8 @@ module JekyllImgFlow
           # Use FilenameGenerator to generate proper filename
           operations = { width: width, format: format, quality: config.quality }
           filename = filename_generator.generate_filename(original_name, operations)
-          # Write to _site during build (after Jekyll copies assets)
-          output_path = path_resolver.resolve_output_path(filename)
+          # Write to source directory so Jekyll copies files to _site during write phase
+          output_path = path_resolver.resolve_source_output_path(filename)
 
           tasks << {
             original_name: original_name,

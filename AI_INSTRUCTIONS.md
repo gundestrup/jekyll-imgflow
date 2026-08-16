@@ -122,11 +122,22 @@ Key points (see the linked doc for details):
 
 Key rules:
 
-- **1005 examples, 0 failures** is the baseline — never introduce regressions
+- **1064 examples, 0 failures** is the baseline — never introduce regressions
 - Use `:unit` tag for unit tests, `:slow` tag for slow tests (excluded by default)
 - Mock Docker services in tests; do not require real HTTP providers for unit tests
 - Reset singleton methods and shared state in `after` blocks to prevent cross-test contamination
 - Tests should assert concrete behavior (outputs, side effects, return values), not just absence of errors
+
+### Test Infrastructure Lessons (v0.1.6 wipe bug)
+
+The v0.1.6 bug (optimized images wiped from `_site` on rebuild) went undetected because:
+
+1. **`keep_files: ["assets"]` in spec_helper.rb** — this prevented Jekyll from cleaning `_site/assets/` between builds, masking the exact bug. **Removed in v0.1.7** — do not re-add it.
+2. **Most tests use mock sites (RSpec doubles)** — they never run `jekyll build` end-to-end, so they never exercise Jekyll's site reset behavior.
+3. **No file placement verification** — tests checked that files existed *somewhere*, but not whether they were in the source directory (correct) vs `_site` (bug).
+4. **No second-build tests** — only `spec/realworld_build_spec.rb` (tagged `:slow`) runs `jekyll build` twice to check for the wipe.
+
+To prevent similar bugs: run `bundle exec rspec --tag slow` before releases, and add file-placement assertions to integration tests.
 
 ## Release Process
 

@@ -1,6 +1,36 @@
 # Changelog
 
 
+## [0.1.7] - 2026-08-16
+
+### Added
+- **Minimal config support** — users only need to specify `originals` and `output` in `_config.yml`. All other settings (`quality`, `formats`, `sizes`, `backend_priority`, `input_formats`) now have sensible defaults built into the `Config` class. An empty `imgflow:` block works out of the box.
+- **`fallback_format` config option** — controls which format is used for the `<img>` fallback in `<picture>` elements (default: `jpg`). All other formats get `<source>` tags for browsers that support them.
+- **End-to-end regression test** (`spec/realworld_build_spec.rb`) — builds a real Jekyll site with the plugin, runs `jekyll build` twice, and verifies optimized images survive in `_site/` across rebuilds. Uses 12 real-world fixture images (6 JPG, 6 GIF including 1 animated). Tagged `:slow`.
+- **Format priority ordering** — `<source>` tags in `<picture>` elements are now emitted in config format priority order (avif → webp → png → jpg), so the browser picks the best format it supports.
+- Documentation for image referencing limitations (no fuzzy matching/autocomplete yet).
+
+### Changed
+- **`DEFAULT_FORMATS` reordered** from `[webp, avif, jpg, png]` to `[avif, webp, png, jpg]` — AVIF is served first (best compression), WebP as fallback for AVIF, PNG for transparency, JPG as universal `<img>` fallback.
+- **`DEFAULT_BACKEND_PRIORITY` reordered** by benchmark speed: `sharp` (14s) → `libvips` (22s) → `imagemagick` (31s) → `imgproxy` (31s) → `weserv` (30s) → `flyimg`. Previous order had `imgproxy` second despite being slower.
+- **Removed required-field validation** from `Config#initialize` — `originals`, `output`, `input_formats`, `formats`, and `sizes` now fall back to defaults instead of raising `ArgumentError`.
+- **Fixed `HtmlGenerator` fallback logic** — previously all configured formats were treated as "fallback formats", causing all `<source>` tags to be skipped. Only the configured `fallback_format` is now skipped in the `<source>` loop.
+- Updated `benchmark` gem 0.4.1 → 0.5.0 and `rubocop-performance` 1.26.1 → 1.27.0.
+- Updated README.md, docs/installation.md, docs/ARCHITECTURE.md, docs/usage/tags.md with new config format, defaults table, and format priority documentation.
+- Removed 113 unused test fixture images (9.6 MB → 352 KB), keeping only the 12 used by the regression test.
+
+### Fixed
+- **Optimized images wiped from `_site` on rebuild (v0.1.6 bug)** — images were written directly to `_site/` which Jekyll clears at the start of each build. Fixed by writing to the source directory and registering generated files as `Jekyll::StaticFile` objects during the `pre_render` hook, so Jekyll copies them to `_site` during its write phase. This works on the first build (previously required two builds).
+- **`keep_files: ["assets"]` removed from spec_helper.rb** — this setting masked the v0.1.6 wipe bug by preventing Jekyll from cleaning `_site/assets/` between builds. All 1064 tests pass without it.
+- **Manifest path storage** — manifest now stores relative paths with leading slash (`/assets/images/optimized/...`) for consistency with Jekyll conventions.
+
+### Improved
+- Test suite expanded from 1052 to 1064 examples with 0 failures.
+- Line coverage: 97.97%.
+- RuboCop: 0 offenses across all files.
+- `AI_INSTRUCTIONS.md` updated with test infrastructure lessons documenting why the v0.1.6 bug went undetected.
+
+
 ## [0.1.6] - 2026-08-15
 
 ### Added

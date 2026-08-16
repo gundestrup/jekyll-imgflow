@@ -58,13 +58,13 @@ module JekyllImgFlow
 
     private
 
-    # Get fallback formats from config or use sensible defaults
+    # Get fallback formats — only the configured fallback format (e.g. jpg).
+    # These are skipped in the <source> loop and used for the <img> fallback.
+    # All other formats (webp, avif, etc.) get <source> tags.
     def fallback_formats
-      if @config&.formats
-        # Convert format names to extensions and add dots
-        @config.formats.map { |fmt| ".#{fmt}" }
+      if @config&.fallback_format
+        [".#{@config.fallback_format}"]
       else
-        # Fallback to common formats if no config available
         %w[.jpg .jpeg .png]
       end
     end
@@ -242,13 +242,40 @@ module JekyllImgFlow
       "<div#{parent_attrs}>#{html}</div>"
     end
 
-    # Group results by file extension/format
+    # Group results by file extension, ordered by config format priority
+    # (avif → webp → png → jpg). The browser picks the first <source> format
+    # it supports, so the order of <source> tags determines format priority.
     def group_by_format(results)
-      results.group_by { |r| File.extname(r).downcase }
+      grouped = results.group_by { |r| File.extname(r).downcase }
+      sort_format_groups(grouped)
     end
 
-    # Find fallback image (prefer jpg/jpeg/png)
+    # Sort format groups by config format priority (first = highest priority).
+    # Formats not in config.formats are appended at the end alphabetically.
+    def sort_format_groups(grouped)
+      priority = build_format_priority
+      grouped.sort_by { |ext, _| priority.index(ext) || Float::INFINITY }
+    end
+
+    # Build a lookup of format extensions ordered by config.formats priority.
+    # E.g. ["avif", "webp", "png", "jpg"] → [".avif", ".webp", ".png", ".jpg"]
+    def build_format_priority
+      return %w[.avif .webp .png .jpg] unless @config&.formats
+
+      @config.formats.map { |fmt| ".#{fmt.downcase}" }
+    end
+
+    # Find fallback image — prefer the configured fallback format,
+    # then any legacy format (jpg/jpeg/png), then first result.
     def find_fallback_image(results)
+      return results.first if results.empty?
+
+      preferred = @config&.fallback_format
+      if preferred
+        found = results.find { |r| r.end_with?(".#{preferred}") }
+        return found if found
+      end
+
       results.find { |r| r.match?(/\.(jpe?g|png)$/i) } || results.first
     end
 
