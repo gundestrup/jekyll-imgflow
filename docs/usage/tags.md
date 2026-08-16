@@ -54,8 +54,11 @@ Image references in `{% imgflow %}` tags use **exact filenames** relative to the
 
 - **No fuzzy matching** — `photo.jpg` will not resolve to `photo.jpeg`.
   The filename must match exactly.
-- **No autocomplete** — there is no editor integration to suggest available
-  image names while typing. Users must know the exact filename.
+- **No build-time autocomplete** — the Jekyll plugin itself does not suggest
+  image names while running `jekyll build` or `jekyll serve`.
+- **Editor autocomplete available** — install the
+  [Jekyll ImgFlow VS Code extension](https://github.com/gundestrup/jekyll-imgflow-vscode)
+  for image-name suggestions while writing `{% imgflow %}` tags in Markdown.
 - **Error on not found** — if the image doesn't exist, the build logs an error
   and the tag outputs an HTML comment (`<!-- ImgFlow Error: ... -->`).
 

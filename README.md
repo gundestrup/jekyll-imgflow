@@ -5,6 +5,7 @@ A [Jekyll](https://jekyllrb.com/) plugin for automatic image optimization with m
 [![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundestrup/jekyll-imgflow)
 [![Status](https://img.shields.io/badge/status-active-success)](https://github.com/gundestrup/jekyll-imgflow)
 [![codecov](https://codecov.io/gh/gundestrup/jekyll-imgflow/branch/main/graph/badge.svg)](https://codecov.io/gh/gundestrup/jekyll-imgflow)
+[![VS Code Extension](https://img.shields.io/badge/VS%20Code%20Companion-jekyll--imgflow-blue?logo=visual-studio-code)](https://github.com/gundestrup/jekyll-imgflow-vscode)
 [![License](https://img.shields.io/github/license/gundestrup/jekyll-imgflow)](LICENSE)
 
 ## 🚀 Quick Start
@@ -32,9 +33,11 @@ imgflow:
 > and [Configuration Reference](docs/ARCHITECTURE.md).
 
 > **Note:** Image references require exact filenames (or paths relative to
-> `originals`). There is no fuzzy matching or autocomplete yet — if you type
+> `originals`). There is no fuzzy matching during the build yet — if you type
 > `photo.jpg` but the file is `photo.jpeg`, the build will fail with an error.
-> Future versions may add "did you mean" suggestions.
+>
+> For editor autocomplete while writing `{% imgflow %}` tags, install the
+> [VS Code companion extension](https://github.com/gundestrup/jekyll-imgflow-vscode).
 
 ## ✨ Key Features
 
