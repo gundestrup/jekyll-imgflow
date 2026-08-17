@@ -55,9 +55,9 @@ fi
 echo "✅ CHANGELOG.md has entry for v$VERSION"
 echo ""
 
-# Check version consistency
+# Check version consistency (first matching versioned header in CHANGELOG)
 echo "🔍 Checking version consistency..."
-CHANGELOG_VERSION=$(grep -m 1 "## \[" CHANGELOG.md | sed 's/.*\[\(.*\)\].*/\1/')
+CHANGELOG_VERSION=$(grep -m 1 "## \[$VERSION\]" CHANGELOG.md | sed 's/.*\[\(.*\)\].*/\1/')
 if [[ "$VERSION" != "$CHANGELOG_VERSION" ]]; then
     echo "⚠️  Warning: Version mismatch"
     echo "   version.rb: $VERSION"
@@ -122,7 +122,11 @@ gem build jekyll-imgflow.gemspec || {
 rm -f jekyll-imgflow-*.gem
 
 echo "3️⃣  Extracting release notes..."
-RELEASE_NOTES=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | head -n -1 | tail -n +2)
+RELEASE_NOTES=$(awk -v header="## [$VERSION]" '
+  index($0, header) == 1 { in_section=1; next }
+  in_section && /^## \[/ { exit }
+  in_section { print }
+' CHANGELOG.md)
 echo "Release notes extracted for GitHub release"
 
 echo "4️⃣  Adding all files..."
