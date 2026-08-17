@@ -133,9 +133,9 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
 
       # Realworld Build Test
 
-      {% imgflow assets/images/originals/pictures/109th/raven_cheers.jpg width:800 format:webp %}
+      {% imgflow pictures/109th/raven_cheers.jpg width:800 format:webp %}
 
-      {% imgflow assets/images/originals/pictures/109th/K_loader_SFJ.jpg width:400 format:jpg %}
+      {% imgflow pictures/109th/K_loader_SFJ.jpg width:400 format:jpg %}
     MARKDOWN
 
     # Install gems so `jekyll build` can load the plugin
@@ -183,15 +183,24 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
       # At least 2 versions per non-animated image (2 sizes × 2 formats = 4,
       # minus animated GIF which is skipped). 11 non-animated images × 4 = 44.
       expect(files.length).to be >= 4
+
+      # Optimized files should mirror the original directory structure.
+      expect(files).to include(a_string_matching(%r{pictures/109th/})),
+                       "Optimized images should preserve the original subdirectory structure"
     end
 
     it "copies optimized images into _site via Jekyll's write phase" do
-      source_files = optimized_files_in(source_optimized_dir).map { |f| File.basename(f) }
-      site_files = optimized_files_in(site_optimized_dir).map { |f| File.basename(f) }
+      source_files = optimized_files_in(source_optimized_dir).map do |f|
+        f.delete_prefix("#{source_optimized_dir}/")
+      end
+      site_files = optimized_files_in(site_optimized_dir).map do |f|
+        f.delete_prefix("#{site_optimized_dir}/")
+      end
 
       expect(site_files).not_to be_empty,
                                 "No optimized images copied to _site #{site_optimized_dir}"
-      # Every source-optimized file should also be in _site (Jekyll copied it)
+      # Every source-optimized file should also be in _site (Jekyll copied it).
+      # Use relative paths so the original directory structure is also verified.
       missing = source_files - site_files
       expect(missing).to be_empty,
                          "Optimized files missing from _site (would be wiped in 0.1.6): #{missing.first(5).join(', ')}"
