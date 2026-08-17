@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name        = "jekyll-imgflow"
-  s.version     = "0.1.7"
+  s.version     = "0.1.8"
   s.summary     = "A modern, multi-provider, multi-format image optimization engine for Jekyll"
   s.description = "ImgFlow provides automatic image optimization for Jekyll with " \
                   "support for multiple providers (Sharp, Imgproxy, ImageMagick, " \
