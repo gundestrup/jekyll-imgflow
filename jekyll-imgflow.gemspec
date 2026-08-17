@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require_relative "lib/jekyll-imgflow/version"
+
 Gem::Specification.new do |s|
   s.name        = "jekyll-imgflow"
-  s.version     = "0.1.8"
+  s.version     = JekyllImgFlow::VERSION
   s.summary     = "A modern, multi-provider, multi-format image optimization engine for Jekyll"
   s.description = "ImgFlow provides automatic image optimization for Jekyll with " \
                   "support for multiple providers (Sharp, Imgproxy, ImageMagick, " \
