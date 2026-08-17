@@ -42,13 +42,18 @@ module JekyllImgFlow
       type = operation[:type]
       params = operation[:params]
 
-      # Generate filename using FilenameGenerator (JPT compatible)
-      filename = @filename_generator.generate_filename(input_path, params)
-      # Write to source directory so Jekyll copies files to _site during write phase
-      actual_output_path = @path_resolver.resolve_source_output_path(filename)
-
       # Determine version type
       version_type = determine_version_type(params)
+
+      # Preserve original directory structure under output
+      subdir = File.dirname(original_name)
+      subdir = nil if subdir == "."
+
+      # Generate filename using FilenameGenerator (JPT compatible)
+      filename = @filename_generator.generate_filename(input_path, params)
+
+      # Write to source directory so Jekyll copies files to _site during the write phase
+      actual_output_path = @path_resolver.resolve_source_output_path(filename, subdir)
 
       # Ensure output directory exists before processing
       FileUtils.mkdir_p(File.dirname(actual_output_path))
@@ -69,7 +74,7 @@ module JekyllImgFlow
       # Register in manifest
       if @manifest
         # Store relative path (with leading /) for manifest storage
-        relative_path = "/#{@path_resolver.resolve_relative_output_path(filename)}"
+        relative_path = "/#{@path_resolver.resolve_relative_output_path(filename, subdir)}"
 
         provider_name = @provider.class.provider_name
         @manifest.register_version(

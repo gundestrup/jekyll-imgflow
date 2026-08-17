@@ -64,7 +64,15 @@ module Jekyll
 
       site = context.registers[:site]
       page = context.registers[:page]
-      original_name = File.basename(parsed[:image_path])
+
+      # Resolve input path
+      input_path = resolve_image_path(parsed[:image_path], site, components[:config])
+      raise ArgumentError, "Input image file not found: #{input_path}" unless File.file?(input_path)
+
+      # Store original name relative to the configured originals directory
+      # so output can mirror the original directory structure
+      originals_dir = File.join(site.source, components[:config].originals)
+      original_name = input_path.sub("#{originals_dir}/", "")
 
       # Get page path for manifest tracking
       # Try multiple attributes to get the page identifier
@@ -73,10 +81,6 @@ module Jekyll
                   else
                     "unknown"
                   end
-
-      # Resolve input path
-      input_path = resolve_image_path(parsed[:image_path], site, components[:config])
-      raise ArgumentError, "Input image file not found: #{input_path}" unless File.file?(input_path)
 
       # Process operations using clean architecture
       operations = parsed[:operations]
@@ -96,8 +100,12 @@ module Jekyll
                    params[:quality] ||= components[:config].quality       # Use default quality
                  end
 
+                 # Preserve original directory structure under output
+                 subdir = File.dirname(original_name)
+                 subdir = nil if subdir == "."
+
                  filename = components[:filename_generator].generate_filename(input_path, params)
-                 output_path = components[:path_resolver].resolve_source_output_path(filename)
+                 output_path = components[:path_resolver].resolve_source_output_path(filename, subdir)
 
                  # Determine version type
                  version_type = determine_version_type(params, components[:config])
@@ -199,11 +207,12 @@ module Jekyll
       path_resolver = JekyllImgFlow::PathResolver.new(config)
 
       # Handle different path formats
-      if image_path.start_with?("/") || image_path.include?("/")
-        # Absolute or relative path
+      if image_path.start_with?("/")
+        # Absolute site-root path: /assets/images/originals/valdemar/photo.jpg
         File.join(site.source, image_path)
       else
-        # Use PathResolver to get CLI path (full filesystem path)
+        # Relative path: photo.jpg or valdemar/photo.jpg
+        # Always resolve against the configured originals directory
         path_resolver.cli_path(image_path)
       end
     end

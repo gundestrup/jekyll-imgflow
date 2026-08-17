@@ -223,6 +223,13 @@ RSpec.describe JekyllImgFlow::PathResolver, :unit do
       expect(result).to include(components[:config].output)
       expect(result).to include(site.source)
     end
+
+    it "preserves subdirectory structure" do
+      result = path_resolver.resolve_source_output_path("output.webp", "valdemar")
+      expect(result).to include("valdemar/output.webp")
+      expect(result).to include(components[:config].output)
+      expect(result).to include(site.source)
+    end
   end
 
   describe "#resolve_relative_output_path" do
@@ -230,6 +237,13 @@ RSpec.describe JekyllImgFlow::PathResolver, :unit do
       result = path_resolver.resolve_relative_output_path("output.webp")
       expect(result).to include("output.webp")
       expect(result).to include(components[:config].output)
+      expect(result).not_to include(site.source)
+      expect(result).not_to include(site.dest)
+    end
+
+    it "preserves subdirectory structure" do
+      result = path_resolver.resolve_relative_output_path("output.webp", "valdemar")
+      expect(result).to eq(File.join(components[:config].output, "valdemar/output.webp"))
       expect(result).not_to include(site.source)
       expect(result).not_to include(site.dest)
     end

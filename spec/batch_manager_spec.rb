@@ -337,6 +337,17 @@ RSpec.describe JekyllImgFlow::BatchManager, :unit do
       task = tasks.first
       expect(task[:params]).to include(:width, :format, :quality)
     end
+
+    it "preserves original directory structure in output paths" do
+      nested_name = "valdemar/#{test_image}"
+      nested_input = File.join(config.site.source, config.originals, nested_name)
+      tasks = described_class.build_default_tasks(nested_name, nested_input, config, site)
+
+      tasks.each do |task|
+        expect(task[:output_path]).to include("valdemar/")
+        expect(task[:output_path]).not_to include("/valdemar/valdemar/")
+      end
+    end
   end
 
   describe ".build_specialized_task" do

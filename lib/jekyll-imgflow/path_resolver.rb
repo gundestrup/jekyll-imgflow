@@ -61,26 +61,29 @@ module JekyllImgFlow
 
     # Resolve output path for generated filename
     # @param filename [String] Generated filename
+    # @param subdir [String, nil] Optional subdirectory under output
     # @return [String] Full path to output file in _site (for specialized versions during rendering)
-    def resolve_output_path(filename)
+    def resolve_output_path(filename, subdir = nil)
       # Resolve output path relative to site destination
-      File.join(@config.site.dest, @config.output, filename)
+      File.join([@config.site.dest, @config.output, subdir, filename].compact)
     end
 
     # Resolve output path to source directory for default images
     # @param filename [String] Generated filename
+    # @param subdir [String, nil] Optional subdirectory under output
     # @return [String] Full path to output file in source (for default versions during pre_render)
-    def resolve_source_output_path(filename)
+    def resolve_source_output_path(filename, subdir = nil)
       # Default images go to source directory so Jekyll can copy them to _site
-      File.join(@config.site.source, @config.output, filename)
+      File.join([@config.site.source, @config.output, subdir, filename].compact)
     end
 
     # Resolve relative output path for manifest storage
     # @param filename [String] Generated filename
+    # @param subdir [String, nil] Optional subdirectory under output
     # @return [String] Relative path from site root
-    def resolve_relative_output_path(filename)
+    def resolve_relative_output_path(filename, subdir = nil)
       # Return path relative to site root (without leading /)
-      File.join(@config.output, filename)
+      File.join([@config.output, subdir, filename].compact)
     end
 
     # Get site destination directory

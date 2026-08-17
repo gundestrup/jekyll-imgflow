@@ -118,9 +118,22 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       expect(result).to eq(File.join(site.source, "/images/test.jpg"))
     end
 
-    it "joins relative path with subdirectory" do
+    it "joins relative path with originals directory" do
       result = tag.send(:resolve_image_path, "assets/test.jpg", site, config)
-      expect(result).to eq(File.join(site.source, "assets/test.jpg"))
+      expect(result).to eq(File.join(site.source, config.originals, "assets/test.jpg"))
+    end
+
+    it "preserves nested directories inside the originals directory" do
+      result = tag.send(:resolve_image_path, "valdemar/photo.jpg", site, config)
+      expect(result).to eq(File.join(site.source, config.originals, "valdemar/photo.jpg"))
+    end
+
+    it "respects a custom originals directory" do
+      custom_site = double("site", config: TEST_CONFIG.merge({ "imgflow" => { "originals" => "custom/originals" } }),
+                                   source: "/tmp/test_site", dest: "/tmp/test_site/_site")
+      custom_config = JekyllImgFlow::Config.new(custom_site)
+      result = tag.send(:resolve_image_path, "valdemar/photo.jpg", custom_site, custom_config)
+      expect(result).to eq("/tmp/test_site/custom/originals/valdemar/photo.jpg")
     end
 
     it "uses PathResolver for bare filename" do

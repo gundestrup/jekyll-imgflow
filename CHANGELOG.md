@@ -1,14 +1,21 @@
 # Changelog
 
 
-## [Unreleased]
+## [0.1.8] - 2026-08-17
 
 ### Added
 - **VS Code companion extension** — added the `jekyll-imgflow-vscode` companion extension. It provides image filename autocomplete for `{% imgflow %}` tags in Markdown and Liquid files, auto-discovers `imgflow.originals` from `_config.yml`, and watches the originals directory for changes.
+- Tests for nested original image resolution, custom `originals` directories, and preserved output directory structure.
 
 ### Fixed
+- **Nested original image resolution** — `{% imgflow valdemar/photo.jpg %}` now correctly resolves to `assets/images/originals/valdemar/photo.jpg` instead of `assets/images/valdemar/photo.jpg`. Previously any path containing `/` was joined directly to the site source, ignoring the configured `originals` directory.
+- **Output directory structure preservation** — optimized images now mirror the original directory structure under `assets/images/optimized/`. This prevents name collisions when two different folders contain images with the same basename (e.g. `valdemar/photo.jpg` vs `familie/photo.jpg`).
+- **Build-time manifest path storage** — default versions are written to the source directory, but the manifest relative path was computed against `site.dest`, producing incorrect `/_site/...` entries. Now computed against `site.source` so manifest URLs are correct.
 - **Parallel test race condition in temp file cleanup** — `cleanup_temp_output_files` in `spec_helper.rb` deleted ALL `imgflow-out-*` files in `Dir.tmpdir` with no age check. In parallel mode, process 0's pre-suite cleanup could delete temp files being actively used by other processes, causing sharp to fail with "No input files". Fixed by only deleting files older than 1 hour.
 - **Parallel test race condition in temp file counting test** — `operation_processor_spec.rb` "cleans up temporary files" test compared global `imgflow-out-*` counts before/after processing. In parallel mode, other processes create/delete temp files between snapshots, causing false failures. Fixed by stubbing `PathResolver#temp_output_path` with a test-specific prefix so only this test's temp files are counted.
+
+
+## [Unreleased]
 
 
 ## [0.1.7] - 2026-08-16

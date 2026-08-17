@@ -42,12 +42,14 @@ module JekyllImgFlow
       original_paths = find_original_images
       Jekyll.logger.info "📸 Found #{original_paths.length} original images"
 
+      originals_dir = File.join(@site.source, @config.originals)
+
       # Build tasks for each original image
       original_paths.each do |path|
-        original_name = File.basename(path)
+        original_name = path.sub("#{originals_dir}/", "")
 
         # Check if needs processing (file changed or provider changed)
-        if needs_processing?(path)
+        if needs_processing?(original_name, path)
           Jekyll.logger.info "🔧 Queuing default versions for: #{original_name}"
 
           # Build default tasks
@@ -84,8 +86,10 @@ module JekyllImgFlow
         provider_name = @registry.current_provider.class.name.split("::").last.downcase
 
         # Convert absolute path to relative for manifest storage
+        # Default versions are written to the source directory so Jekyll can
+        # copy them to _site during the write phase.
         absolute_path = task[:result]
-        relative_path = absolute_path.sub(@site.dest, "")
+        relative_path = absolute_path.sub(@site.source, "")
 
         # Register the version in manifest
         @manifest.register_version(
@@ -113,10 +117,13 @@ module JekyllImgFlow
     end
 
     # Check if image needs processing
-    # @param path [String] Path to original image
+    # @param original_name [String] Path to original image relative to originals directory
+    # @param path [String, nil] Full path to original image (defaults to original_name)
     # @return [Boolean] True if processing needed
-    def needs_processing?(path)
-      original_name = File.basename(path)
+    def needs_processing?(original_name, path = nil)
+      path ||= original_name
+      # For single-argument calls, derive a flat original_name from the full path
+      original_name = File.basename(original_name) if original_name == path
 
       # If no versions exist, needs processing
       return true unless @manifest.versions?(original_name)

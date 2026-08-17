@@ -121,7 +121,7 @@ RSpec.describe JekyllImgFlow::BuildTimeProcessor, :unit do
         image_name,
         sizes: %i[md lg],
         formats: %i[webp avif],
-        output_dir: File.join(test_site_dir, "_site/assets/images/optimized")
+        output_dir: File.join(test_site_dir, "assets/images/optimized")
       )
 
       # Override the batch_manager mock to return our completed tasks
