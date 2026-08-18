@@ -147,10 +147,25 @@ bin/imgflow_migrate_presets            # Migrate presets
 
 ## Release Process
 
+The version bump and release scripts keep `version.rb`, `Gemfile.lock`, and
+`CHANGELOG.md` synchronized. The release script runs quality checks, builds the
+gem, pushes the commit, creates the GitHub tag and Release page together, and
+starts the RubyGems publishing workflow.
+
+Prerequisites:
+
+- Authenticate GitHub CLI once with `gh auth login`.
+- Keep the working tree free of untracked files.
+- Add or review the current notes under `## [Unreleased]`.
+
 ```bash
-./bump_version.sh patch  # Update version
-./release.sh             # Release with checks
+./bump_version.sh patch  # or minor/major; moves Unreleased notes to the version
+# Review and complete the new version section in CHANGELOG.md
+./release.sh             # quality checks, gem build, tag, GitHub Release, and publish workflow
 ```
+
+Do not create the tag or GitHub Release page manually. The release script does
+both together to prevent a tag from being published without a Release page.
 
 ## Troubleshooting
 

@@ -14,6 +14,11 @@ Jekyll ImgFlow is a Jekyll plugin for automatic image optimization with multiple
 - **Author:** Svend Gundestrup (<svend@gundestrup.dk>)
 - **Repo:** <https://github.com/gundestrup/jekyll-imgflow>
 
+## External Resources
+
+- [DeepWiki](https://deepwiki.com/gundestrup/jekyll-imgflow) — supplemental generated architecture reference; repository documentation remains authoritative
+- [GitHub repository](https://github.com/gundestrup/jekyll-imgflow) — source, issues, releases, and workflows
+
 ## Key Files & Structure
 
 The full file tree with descriptions is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Key entry points:
@@ -25,7 +30,7 @@ The full file tree with descriptions is in [docs/ARCHITECTURE.md](docs/ARCHITECT
 - `lib/jekyll-imgflow/manifest_manager.rb` — Image version tracking (single source of truth)
 - `lib/jekyll-imgflow/providers/` — Provider implementations (see [docs/providers.md](docs/providers.md))
 - `lib/jekyll-imgflow/tags/` — Tag validation classes
-- `spec/` — RSpec test suite (~980 examples)
+- `spec/` — RSpec test suite
 - `docs/` — All project documentation
 
 ## Documentation Index
@@ -122,7 +127,7 @@ Key points (see the linked doc for details):
 
 Key rules:
 
-- **1064 examples, 0 failures** is the baseline — never introduce regressions
+- The full test suite must pass with 0 failures; do not introduce regressions or reduce coverage
 - Use `:unit` tag for unit tests, `:slow` tag for slow tests (excluded by default)
 - Mock Docker services in tests; do not require real HTTP providers for unit tests
 - Reset singleton methods and shared state in `after` blocks to prevent cross-test contamination
@@ -141,12 +146,25 @@ To prevent similar bugs: run `bundle exec rspec --tag slow` before releases, and
 
 ## Release Process
 
+Before committing or releasing, update all relevant documentation, including
+README examples, usage guides, development documentation, architecture notes,
+and the changelog. Documentation must describe the behavior that is actually
+being committed or released.
+
+Release prerequisites:
+
+- Authenticate GitHub CLI once with `gh auth login`.
+- Keep the working tree free of untracked files.
+
 See [docs/scripts.md](docs/scripts.md) for release scripts reference.
 
 ```bash
 ./bump_version.sh patch    # or minor/major
-./release.sh               # Full release with checks
+./release.sh               # Full release with checks and GitHub Release page
 ```
+
+Do not create tags or GitHub Release pages manually. `release.sh` creates both
+together and starts the RubyGems publishing workflow.
 
 ## Do NOT
 

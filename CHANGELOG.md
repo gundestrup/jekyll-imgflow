@@ -14,6 +14,8 @@
 ### Changed
 - Release script now creates the GitHub Release page and tag together through `gh release create`, avoiding tag-without-release failures.
 - Renamed `AI_INSTRUCTIONS.md` to `AGENTS.md` and updated tool-specific instruction references.
+- Updated release documentation with the single-command release workflow and GitHub CLI prerequisite.
+- Improved `AGENTS.md` with non-hardcoded test guidance, explicit release prerequisites, a manual-tag prohibition, and supplemental DeepWiki/GitHub resource links.
 
 
 ## [0.1.9] - 2026-08-18

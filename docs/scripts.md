@@ -45,6 +45,10 @@ bin/imgflow_migrate_presets --preview  # Preview migration
 ./release.sh                         # Quality-check, tag, push, and create release
 ```
 
+`release.sh` also creates the GitHub Release page automatically and starts the
+RubyGems publishing workflow through the pushed tag. Authenticate first with
+`gh auth login`; do not create tags or Release pages manually.
+
 ## Quick Reference
 
 | Script | Purpose | Usage |
