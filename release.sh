@@ -146,27 +146,28 @@ if [ -z "$COMMIT_MSG" ]; then
 fi
 git commit -m "$COMMIT_MSG" || echo "Nothing to commit"
 
-echo "6️⃣  Creating tag v$VERSION..."
-git tag -a "v$VERSION" -m "Version $VERSION"
-
-echo "7️⃣  Pushing to GitHub..."
+echo "6️⃣  Pushing code to GitHub..."
 git push origin main
-git push origin "v$VERSION"
 
 echo ""
-echo "✅ Code pushed to GitHub!"
-echo ""
-echo "8️⃣  Creating GitHub release page..."
+echo "7️⃣  Creating GitHub release and tag..."
 if ! command -v gh >/dev/null 2>&1; then
-    echo "❌ GitHub CLI (gh) is required to create the release page"
-    exit 1
-fi
-if ! gh release create "v$VERSION" --title "v$VERSION" --notes "$RELEASE_NOTES"; then
-    echo "❌ GitHub release page creation failed"
+    echo "❌ GitHub CLI (gh) is required to create the release and tag"
     exit 1
 fi
 
-echo "✅ GitHub release page created"
+# gh creates the GitHub Release and its tag together. This avoids the old
+# failure mode where the tag was pushed but the release page was forgotten.
+if ! gh release create "v$VERSION" \
+    --target "$(git rev-parse HEAD)" \
+    --title "v$VERSION" \
+    --notes "$RELEASE_NOTES"; then
+    echo "❌ GitHub release/tag creation failed"
+    exit 1
+fi
+
+git fetch origin "refs/tags/v$VERSION:refs/tags/v$VERSION"
+echo "✅ GitHub release page and tag created"
 echo ""
 echo "🔍 Post-release verification..."
 echo "   Waiting 30 seconds for GitHub Actions to start..."
