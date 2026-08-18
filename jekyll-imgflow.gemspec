@@ -32,4 +32,7 @@ Gem::Specification.new do |s|
   s.add_development_dependency "simplecov", "~> 1.1.1"
   s.add_development_dependency "yard", "~> 0.9.45"
   s.metadata["rubygems_mfa_required"] = "true"
+  s.metadata["icon_uri"] =
+    "https://raw.githubusercontent.com/gundestrup/jekyll-imgflow/v0.1.10/" \
+    "docs/assets/images/jekyll-imgflow-icon.png"
 end

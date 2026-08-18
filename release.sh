@@ -130,7 +130,7 @@ RELEASE_NOTES=$(awk -v header="## [$VERSION]" '
 echo "Release notes extracted for GitHub release"
 
 echo "4️⃣  Adding all files..."
-git add .
+git add -u
 
 echo "5️⃣  Committing changes..."
 read -p "Enter commit message: " COMMIT_MSG

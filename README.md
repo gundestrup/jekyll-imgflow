@@ -1,5 +1,7 @@
 # ImgFlow
 
+![Jekyll ImgFlow](docs/assets/images/jekyll-imgflow-logo.png)
+
 A [Jekyll](https://jekyllrb.com/) plugin for automatic image optimization with multiple providers and formats.
 
 [![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundestrup/jekyll-imgflow)

@@ -3,6 +3,13 @@
 
 ## [Unreleased]
 
+### Added
+- **Project branding assets** — moved the full logo and icon to `docs/assets/images/` with project-specific names for GitHub documentation and the next RubyGems release.
+- README branding now uses the repository logo, and the gemspec defines a stable `icon_uri` for the planned `0.1.10` release.
+
+### Fixed
+- Release script now stages tracked changes only, preventing unrelated untracked files from being included in a release commit.
+
 
 ## [0.1.9] - 2026-08-18
 
