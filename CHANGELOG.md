@@ -9,6 +9,11 @@
 
 ### Fixed
 - Release script now stages tracked changes only, preventing unrelated untracked files from being included in a release commit.
+- Version bumping now synchronizes `Gemfile.lock` and carries `[Unreleased]` notes into the new version section.
+
+### Changed
+- Release script now creates the GitHub Release page automatically after pushing the tag.
+- Renamed `AI_INSTRUCTIONS.md` to `AGENTS.md` and updated tool-specific instruction references.
 
 
 ## [0.1.9] - 2026-08-18

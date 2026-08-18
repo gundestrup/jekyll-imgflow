@@ -41,8 +41,8 @@ bin/imgflow_migrate_presets --preview  # Preview migration
 ### Build Scripts
 
 ```bash
-./bump_version.sh patch               # Bump version (patch/minor/major)
-./release.sh                         # Release with checks
+./bump_version.sh patch               # Bump version, changelog, and lockfile
+./release.sh                         # Quality-check, tag, push, and create release
 ```
 
 ## Quick Reference

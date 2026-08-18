@@ -40,53 +40,46 @@ case "$1" in
 esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+TODAY=$(date +%Y-%m-%d)
+
+if grep -q "## \[$NEW_VERSION\]" CHANGELOG.md; then
+    echo "Version $NEW_VERSION already exists in CHANGELOG.md"
+    exit 1
+fi
 
 echo "Bumping version: $CURRENT → $NEW_VERSION"
 echo ""
 
-# Update version file
+# Update the single source of truth for the version.
 sed -i.bak "s/VERSION = \".*\"/VERSION = \"$NEW_VERSION\"/" "$VERSION_FILE"
 rm "${VERSION_FILE}.bak"
-
 echo "✅ Updated $VERSION_FILE"
-echo ""
 
-# Add CHANGELOG entry if it doesn't exist
-if ! grep -q "## \[$NEW_VERSION\]" CHANGELOG.md; then
-    echo "📝 Adding CHANGELOG entry for v$NEW_VERSION..."
-    
-    # Create temporary file with new entry
-    TEMP_FILE=$(mktemp)
-    
-    # Add new version entry at the top (after "# Changelog")
-    {
-        head -n 2 CHANGELOG.md
-        echo ""
-        echo "## [$NEW_VERSION] - $(date +%Y-%m-%d)"
-        echo ""
-        echo "### Added"
-        echo "- "
-        echo ""
-        echo "### Changed"
-        echo "- "
-        echo ""
-        echo "### Fixed"
-        echo "- "
-        echo ""
-        tail -n +3 CHANGELOG.md
-    } > "$TEMP_FILE"
-    
-    mv "$TEMP_FILE" CHANGELOG.md
-    echo "✅ CHANGELOG.md updated with template for v$NEW_VERSION"
-else
-    echo "ℹ️  CHANGELOG.md already has entry for v$NEW_VERSION"
-fi
+# Move the current Unreleased notes into the new version section and create
+# a fresh Unreleased section above it. This keeps release notes intact.
+TEMP_FILE=$(mktemp)
+awk -v version="$NEW_VERSION" -v today="$TODAY" '
+  /^## \[Unreleased\]$/ && !moved {
+    print "## [Unreleased]"
+    print ""
+    print "## [" version "] - " today
+    moved = 1
+    next
+  }
+  { print }
+' CHANGELOG.md > "$TEMP_FILE"
+mv "$TEMP_FILE" CHANGELOG.md
+echo "✅ Moved Unreleased notes into v$NEW_VERSION"
+
+# Synchronize the path-gem version in Gemfile.lock without changing resolved
+# dependency versions. CI runs Bundler in frozen mode and requires this match.
+bundle lock >/dev/null
+echo "✅ Updated Gemfile.lock"
 
 echo ""
 echo "Next steps:"
-echo "  1. Edit CHANGELOG.md and fill in changes for v$NEW_VERSION"
+echo "  1. Edit CHANGELOG.md and review the v$NEW_VERSION notes"
 echo "  2. Run: ./release.sh"
-echo "     (This will commit, tag, and push to GitHub)"
-echo "  3. Create GitHub release (release notes will be auto-extracted)"
-echo "     → Workflow will automatically publish to RubyGems! 🎉"
+echo "     (This will quality-check, commit, tag, push, and create the GitHub release)"
+echo "  3. GitHub Actions will publish the gem to RubyGems via OIDC"
 echo ""

@@ -1,7 +1,7 @@
-# AI Instructions — Jekyll ImgFlow
+# AGENTS.md — Jekyll ImgFlow
 
-> **Single source of truth for all AI assistants working on this project.**
-> Tool-specific files (`CLAUDE.md`, `.windsurf/rules`, `.devin/instructions.md`) reference this document.
+> **Single source of truth for all coding agents working on this project.**
+> Tool-specific files (`CLAUDE.md`, `.windsurfrules`, `.devin/instructions.md`) reference this document.
 
 ## Project Summary
 
@@ -9,7 +9,7 @@ Jekyll ImgFlow is a Jekyll plugin for automatic image optimization with multiple
 
 - **Language:** Ruby 3.4+
 - **Framework:** Jekyll 4.x plugin (Liquid tags + build hooks)
-- **Gem:** `jekyll-imgflow` v0.1.0
+- **Gem:** `jekyll-imgflow` (version is defined in `lib/jekyll-imgflow/version.rb`)
 - **License:** AGPL-3.0-or-later
 - **Author:** Svend Gundestrup (<svend@gundestrup.dk>)
 - **Repo:** <https://github.com/gundestrup/jekyll-imgflow>

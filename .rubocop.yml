@@ -12,7 +12,7 @@ AllCops:
     - 'spec/fixtures/**/*'
     - '*.gem'
     - 'Gemfile.lock'
-    - 'AI_INSTRUCTIONS.md'
+    - 'AGENTS.md'
     - 'docs/**/*'
     - '**/*.md'
     - 'scripts/test_html_generator.rb'

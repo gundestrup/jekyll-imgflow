@@ -18,21 +18,16 @@ VERSION=$(grep 'VERSION = ' lib/jekyll-imgflow/version.rb | sed 's/.*VERSION = \
 echo "📦 Version: $VERSION"
 echo ""
 
-# Check for uncommitted changes
+# Check for untracked files. Release commits only stage tracked changes, so
+# fail early instead of silently omitting or accidentally including new files.
 echo "🔍 Checking git status..."
-if [[ -n $(git status -s) ]]; then
-    echo "⚠️  Warning: Uncommitted changes detected"
-    git status -s
-    echo ""
-    read -p "Continue anyway? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "❌ Release cancelled"
-        exit 1
-    fi
-else
-    echo "✅ Working directory clean"
+UNTRACKED=$(git ls-files --others --exclude-standard)
+if [[ -n "$UNTRACKED" ]]; then
+    echo "❌ Untracked files detected; commit or remove them before releasing:"
+    echo "$UNTRACKED"
+    exit 1
 fi
+echo "✅ No untracked files"
 echo ""
 
 # Check if CHANGELOG has entry for this version
@@ -72,6 +67,22 @@ if [[ "$VERSION" != "$CHANGELOG_VERSION" ]]; then
 else
     echo "✅ Version consistent across files"
 fi
+
+if ! grep -q "jekyll-imgflow ($VERSION)" Gemfile.lock; then
+    echo "❌ Gemfile.lock does not reference jekyll-imgflow $VERSION"
+    echo "Run ./bump_version.sh or bundle lock before releasing."
+    exit 1
+fi
+echo "✅ Gemfile.lock matches v$VERSION"
+echo ""
+
+# Check that this version has not already been tagged.
+if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null || \
+   git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+    echo "❌ Tag v$VERSION already exists"
+    exit 1
+fi
+echo "✅ Tag v$VERSION is available"
 echo ""
 
 # Check dependencies
@@ -98,16 +109,6 @@ else
 fi
 
 echo ""
-if [[ "$DRY_RUN" == true ]]; then
-    echo "📋 DRY RUN: Skipping quality checks"
-    echo "📋 DRY RUN: Skipping gem build"
-    echo "📋 DRY RUN: Would commit and push to GitHub"
-    echo "📋 DRY RUN: Would create tag v$VERSION"
-    echo ""
-    echo "✅ Dry run completed successfully"
-    exit 0
-fi
-
 echo "1️⃣  Running quality checks..."
 bundle exec rake quality || {
     echo "❌ Quality checks failed! Fix issues before releasing."
@@ -120,6 +121,12 @@ gem build jekyll-imgflow.gemspec || {
     exit 1
 }
 rm -f jekyll-imgflow-*.gem
+
+if [[ "$DRY_RUN" == true ]]; then
+    echo "📋 DRY RUN: Would commit, tag, push, and create GitHub release v$VERSION"
+    echo "✅ Dry run completed successfully"
+    exit 0
+fi
 
 echo "3️⃣  Extracting release notes..."
 RELEASE_NOTES=$(awk -v header="## [$VERSION]" '
@@ -149,24 +156,17 @@ git push origin "v$VERSION"
 echo ""
 echo "✅ Code pushed to GitHub!"
 echo ""
-echo "📋 Next step: Create GitHub release"
-echo "   URL: https://github.com/gundestrup/jekyll-imgflow/releases/new?tag=v$VERSION"
-echo ""
-echo "   Release notes (copied to clipboard if possible):"
-echo "   ────────────────────────────────────────"
-echo "$RELEASE_NOTES"
-echo "   ────────────────────────────────────────"
-echo ""
-
-# Try to copy release notes to clipboard
-if command -v pbcopy &> /dev/null; then
-    echo "$RELEASE_NOTES" | pbcopy
-    echo "✅ Release notes copied to clipboard!"
-elif command -v xclip &> /dev/null; then
-    echo "$RELEASE_NOTES" | xclip -selection clipboard
-    echo "✅ Release notes copied to clipboard!"
+echo "8️⃣  Creating GitHub release page..."
+if ! command -v gh >/dev/null 2>&1; then
+    echo "❌ GitHub CLI (gh) is required to create the release page"
+    exit 1
+fi
+if ! gh release create "v$VERSION" --title "v$VERSION" --notes "$RELEASE_NOTES"; then
+    echo "❌ GitHub release page creation failed"
+    exit 1
 fi
 
+echo "✅ GitHub release page created"
 echo ""
 echo "🔍 Post-release verification..."
 echo "   Waiting 30 seconds for GitHub Actions to start..."
