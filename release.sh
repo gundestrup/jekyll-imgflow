@@ -136,7 +136,7 @@ RELEASE_NOTES=$(awk -v header="## [$VERSION]" '
 ' CHANGELOG.md)
 echo "Release notes extracted for GitHub release"
 
-echo "4️⃣  Adding all files..."
+echo "4️⃣  Adding tracked changes..."
 git add -u
 
 echo "5️⃣  Committing changes..."
