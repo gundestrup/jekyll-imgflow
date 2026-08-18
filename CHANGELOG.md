@@ -12,7 +12,7 @@
 - Version bumping now synchronizes `Gemfile.lock` and carries `[Unreleased]` notes into the new version section.
 
 ### Changed
-- Release script now creates the GitHub Release page automatically after pushing the tag.
+- Release script now creates the GitHub Release page and tag together through `gh release create`, avoiding tag-without-release failures.
 - Renamed `AI_INSTRUCTIONS.md` to `AGENTS.md` and updated tool-specific instruction references.
 
 
