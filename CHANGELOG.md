@@ -1,6 +1,20 @@
 # Changelog
 
 
+## [Unreleased]
+
+
+## [0.1.9] - 2026-08-18
+
+### Added
+- Tests for quoted image paths, site-root paths, and exact originals-relative path resolution.
+- Real-world integration coverage for preserving nested output directories and validating generated HTML paths.
+
+### Fixed
+- **Generated post path compatibility** — image references that already include the configured originals directory, such as `assets/images/originals/subdir/photo.jpg`, are now resolved as site-root paths instead of incorrectly prepending the originals directory a second time.
+- **Canonical image path documentation** — user-facing examples now use paths relative to `imgflow.originals`, such as `subdir/more_subdir/photo.jpg`, without exposing the `assets/` directory.
+- **Release tooling** — version consistency checks and release-note extraction now work correctly with an `[Unreleased]` section on macOS and Linux.
+
 ## [0.1.8] - 2026-08-17
 
 ### Added

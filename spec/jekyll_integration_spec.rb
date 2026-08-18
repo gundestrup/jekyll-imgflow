@@ -54,23 +54,25 @@ RSpec.describe "Jekyll Integration", :integration, :system do
     describe "Image Path Resolution" do
       let(:tag) { Jekyll::ImgflowTag.send(:new, "imgflow", "", tokens) }
 
-      it "resolves absolute paths" do
-        resolved = tag.send(:resolve_image_path, "/assets/images/banner.jpg", site, imgflow_config)
+      it "resolves site-root paths with a leading slash" do
+        image_path = "/#{imgflow_config.originals}/#{test_image_name}"
+        resolved = tag.send(:resolve_image_path, image_path, site, imgflow_config)
 
-        expect(resolved).to include("/assets/images/banner.jpg")
+        expect(resolved).to eq(File.join(site.source, imgflow_config.originals, test_image_name))
       end
 
-      it "resolves relative paths" do
-        resolved = tag.send(:resolve_image_path, "assets/images/banner.jpg", site, imgflow_config)
+      it "resolves site-root paths without a leading slash" do
+        image_path = "#{imgflow_config.originals}/#{test_image_name}"
+        resolved = tag.send(:resolve_image_path, image_path, site, imgflow_config)
 
-        expect(resolved).to include("assets/images/banner.jpg")
+        expect(resolved).to eq(File.join(site.source, imgflow_config.originals, test_image_name))
       end
 
-      it "resolves originals directory paths" do
+      it "resolves paths relative to the originals directory" do
         resolved = tag.send(:resolve_image_path, test_image_name, site, imgflow_config)
 
-        expect(resolved).to include("assets/images/originals")
-        expect(resolved).to include(test_image_name)
+        expect(resolved).to eq(File.join(site.source, imgflow_config.originals, test_image_name))
+        expect(File.file?(resolved)).to be(true)
       end
     end
 

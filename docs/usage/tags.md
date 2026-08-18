@@ -5,6 +5,7 @@ All ImgFlow providers must implement these standardized tags to ensure compatibi
 ## 🏷️ Standard Tag Interface
 
 ### Core Tags
+
 - `resize` - Change image dimensions
 - `crop` - Crop to specific aspect ratio
 - `quality` - Set compression quality
@@ -13,6 +14,7 @@ All ImgFlow providers must implement these standardized tags to ensure compatibi
 - `watermark` - Add watermarks
 
 ### Advanced Tags
+
 - `rotate` - Rotate image
 - `flip` - Flip horizontally/vertically
 - `blur` - Apply blur effects
@@ -47,7 +49,7 @@ Image references in `{% imgflow %}` tags use **exact filenames** relative to the
 ```liquid
 {% imgflow photo.jpg resize width:800 %}
 {% imgflow subfolder/banner.png format:webp %}
-{% imgflow /assets/images/originals/header.jpg optimize %}
+{% imgflow header.jpg optimize %}
 ```
 
 ### Limitations

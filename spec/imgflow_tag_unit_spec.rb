@@ -128,6 +128,18 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       expect(result).to eq(File.join(site.source, config.originals, "valdemar/photo.jpg"))
     end
 
+    it "accepts a site-root path without a leading slash" do
+      image_path = File.join(config.originals, "valdemar/photo.jpg")
+      result = tag.send(:resolve_image_path, image_path, site, config)
+      expect(result).to eq(File.join(site.source, image_path))
+    end
+
+    it "accepts a site-root path with a leading slash" do
+      image_path = "/#{config.originals}/valdemar/photo.jpg"
+      result = tag.send(:resolve_image_path, image_path, site, config)
+      expect(result).to eq(File.join(site.source, config.originals, "valdemar/photo.jpg"))
+    end
+
     it "respects a custom originals directory" do
       custom_site = double("site", config: TEST_CONFIG.merge({ "imgflow" => { "originals" => "custom/originals" } }),
                                    source: "/tmp/test_site", dest: "/tmp/test_site/_site")

@@ -207,13 +207,16 @@ module Jekyll
       path_resolver = JekyllImgFlow::PathResolver.new(config)
 
       # Handle different path formats
-      if image_path.start_with?("/")
-        # Absolute site-root path: /assets/images/originals/valdemar/photo.jpg
-        File.join(site.source, image_path)
+      normalized_path = image_path.delete_prefix("/")
+      originals_prefix = "#{config.originals.chomp('/')}/"
+
+      if image_path.start_with?("/") || normalized_path.start_with?(originals_prefix)
+        # Site-root path, with or without a leading slash:
+        # /assets/images/originals/valdemar/photo.jpg
+        File.join(site.source, normalized_path)
       else
-        # Relative path: photo.jpg or valdemar/photo.jpg
-        # Always resolve against the configured originals directory
-        path_resolver.cli_path(image_path)
+        # Originals-relative path: photo.jpg or valdemar/photo.jpg
+        path_resolver.cli_path(normalized_path)
       end
     end
 

@@ -16,6 +16,13 @@ RSpec.describe JekyllImgFlow::Parser, :unit do
         expect(result[:operations].first[:params]).to include(width: 800)
       end
 
+      it "removes quotes around an image path" do
+        result = described_class.parse('"subdir/more_subdir/photo.jpg" resize width:800', nil)
+
+        expect(result[:image_path]).to eq("subdir/more_subdir/photo.jpg")
+        expect(result[:operations].first[:params]).to include(width: 800)
+      end
+
       it "parses multiple operations" do
         result = described_class.parse("image.jpg width:800 height:600 quality:85", nil)
 
