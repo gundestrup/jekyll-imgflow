@@ -3,6 +3,34 @@
 
 ## [Unreleased]
 
+### Changed
+- Replaced `push_gem.yml` with `release.yml` using official trusted publishing pattern (`rubygems/release-gem@v1`)
+- Removed `continue-on-error: true` from CI workflow so tests and style actually gate
+- Added `rake version:show`, `rake version:bump`, and `rake version:check_changelog` tasks
+- Added CHANGELOG gate to release workflow (fails if entry missing for the version)
+- Dropped reek from Gemfile, gemspec, Rakefile, and deleted `.reek.yml` (KISS)
+- Deleted `bump_version.sh` and `release.sh` — replaced by rake tasks and release workflow
+- Added `bin/install-hooks.sh` for pre-commit (rubocop) and pre-push (rubocop + rspec) hooks
+
+## [0.1.11] - 2026-08-20
+
+### Fixed
+- **Manifest wiped on every server restart** — the manifest now persists under the configured `cache_dir` instead of `_site/`, so Jekyll destination cleanup cannot remove it. The cache directory is excluded from Jekyll watch processing, unchanged manifests are not rewritten, and updates use an atomic temporary-file rename.
+- **Persisted operation comparison** — manifest operations are recursively normalized after JSON persistence, preventing duplicate versions when in-memory symbol keys or values are compared with persisted strings.
+- **Unwritten `.cache_key` dependency** — cache checks no longer require sidecar files that no code path created. Every generated version stores the SHA-256 digest of its source bytes, so changed content is regenerated even when `mtime` is preserved, while timestamp-only changes remain cached.
+- **Incomplete cache checks** — every configured default size/format/quality combination must have a matching manifest entry, current provider, current source digest, and existing output file before an original is skipped. Missing default or specialized outputs and newly configured defaults are regenerated.
+- **Stale generated files** — deleted originals now remove their default and specialized outputs from both source and destination. Defaults removed from configured sizes/formats are pruned with path-safe deletion and empty-directory cleanup.
+- **Deleted-original matching** — cleanup compares complete paths relative to the originals directory instead of extensionless basenames. Animated GIFs remain part of discovery and are no longer mistaken for deleted originals when default conversion is skipped.
+- **Specialized orphan cleanup** — specialized page usage is reset before rendering, rebuilt by rendered tags, cleaned in non-development builds, and saved through the shared manifest.
+- **Double registration** — processed versions remain registered by `OperationProcessor`; only existing outputs skipped while rebuilding a missing manifest are registered by `BuildTimeProcessor`.
+- **Deep permalink and `baseurl` paths** — generated `<img>` and `<source>` paths are root-absolute and include Jekyll's configured `baseurl` without duplicating it. Absolute URLs use the same normalized path.
+- **Stale watch components** — each build refreshes the shared config, manifest, provider, and processor used by Liquid tags, allowing new originals and changed tag operations to use current state.
+
+### Changed
+- The manifest is cache metadata and is no longer published into `_site`; legacy source and destination manifests migrate automatically to `cache_dir` and are removed after a successful save.
+- Manifest operation hashes are stored in canonical JSON-compatible form.
+- Releases now run the slow real-world repeated-build regression in addition to the standard quality suite.
+
 ## [0.1.10] - 2026-08-18
 
 ### Added
