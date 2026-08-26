@@ -22,7 +22,6 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency "bundler-audit", "~> 0.9.3"
   s.add_development_dependency "rake", "~> 13.4.2"
-  s.add_development_dependency "reek", "~> 6.5.0"
   s.add_development_dependency "rspec", "~> 3.13.2"
   s.add_development_dependency "rubocop", "~> 1.89.0"
   s.add_development_dependency "rubocop-markdown", "~> 0.2.0"

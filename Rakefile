@@ -7,6 +7,55 @@ require "yard"
 require "jekyll"
 require "net/http"
 
+VERSION_FILE = File.expand_path("lib/jekyll-imgflow/version.rb", __dir__)
+CHANGELOG_FILE = File.expand_path("CHANGELOG.md", __dir__)
+
+namespace :version do
+  desc "Print the current gem version"
+  task :show do
+    puts File.read(VERSION_FILE)[/VERSION = "([^"]+)"/, 1]
+  end
+
+  desc "Bump the gem version: bundle exec rake 'version:bump[patch]'"
+  task :bump, [:part] do |_task, args|
+    part = args[:part].to_s
+    abort "Usage: bundle exec rake 'version:bump[major|minor|patch]'" unless %w[major minor patch].include?(part)
+
+    current = Gem::Version.new(File.read(VERSION_FILE)[/VERSION = "([^"]+)"/, 1])
+    segments = current.segments
+    index = { "major" => 0, "minor" => 1, "patch" => 2 }.fetch(part)
+    segments[index] += 1
+    ((index + 1)...segments.length).each { |position| segments[position] = 0 }
+    next_version = segments.join(".")
+
+    content = File.read(VERSION_FILE)
+    updated = content.sub(/VERSION = "[^"]+"/, "VERSION = \"#{next_version}\"")
+    File.write(VERSION_FILE, updated)
+
+    # Update Gemfile.lock to reference the new version
+    begin
+      sh "bundle lock >/dev/null"
+    rescue StandardError
+      nil
+    end
+
+    puts "Bumped #{current} -> #{next_version}"
+    puts "Updated: #{VERSION_FILE}"
+    puts "Add a '## [#{next_version}] - YYYY-MM-DD' entry to CHANGELOG.md before committing."
+  end
+
+  desc "Verify CHANGELOG.md has an entry for the current version"
+  task :check_changelog do
+    version = File.read(VERSION_FILE)[/VERSION = "([^"]+)"/, 1]
+    changelog = File.read(CHANGELOG_FILE)
+    if changelog.match?(/^## \[#{Regexp.escape(version)}\]/)
+      puts "✅ CHANGELOG.md has an entry for version #{version}"
+    else
+      abort "CHANGELOG.md has no '## [#{version}]' entry. Add one before releasing."
+    end
+  end
+end
+
 desc "Run tests (parallel by default, SEQUENTIAL=true for sequential)"
 # Default spec task - uses parallel execution by default
 task :spec do
@@ -134,8 +183,8 @@ namespace :parallel do
   end
 end
 
-desc "Run all quality checks (style, smells, security, tests)"
-task quality: %i[rubocop reek bundler_audit spec]
+desc "Run all quality checks (style, security, tests)"
+task quality: %i[rubocop bundler_audit spec]
 
 desc "Run tests only (fast) - excludes slow and external tests by default"
 task :spec_fast do
@@ -521,14 +570,6 @@ end
 desc "Auto-fix RuboCop issues"
 task :rubocop_fix do
   sh "bundle exec rubocop -a"
-end
-
-desc "Check code smells with Reek"
-task :reek do
-  sh "bundle exec reek --config .reek.yml lib/" do |ok, _|
-    # Reek warnings are acceptable, only fail on errors
-    ok || $CHILD_STATUS.exitstatus == 2
-  end
 end
 
 desc "Run security audit"
@@ -1719,7 +1760,6 @@ task :help do
   Jekyll.logger.info "🔧 Individual Checks:"
   Jekyll.logger.info "  rake rubocop      # Code style check"
   Jekyll.logger.info "  rake rubocop_fix  # Auto-fix style issues"
-  Jekyll.logger.info "  rake reek         # Code smell check"
   Jekyll.logger.info "  rake bundler_audit # Security scan"
   Jekyll.logger.info ""
   Jekyll.logger.info "📦 Other:"

@@ -77,8 +77,10 @@ rake test           # All tests
 rake quality        # Full quality checks
 rake rubocop        # Check code style
 rake rubocop_fix    # Auto-fix style issues
-rake reek           # Code smell detection
 rake bundler_audit  # Security scan
+rake version:show   # Print current gem version
+rake version:bump[patch]  # Bump version (patch/minor/major)
+rake version:check_changelog  # Verify CHANGELOG has current version entry
 ```
 
 See [docs/parallel_testing.md](docs/parallel_testing.md) for parallel test setup and [docs/scripts.md](docs/scripts.md) for utility scripts.
@@ -88,7 +90,6 @@ See [docs/parallel_testing.md](docs/parallel_testing.md) for parallel test setup
 | Tool | Config | Purpose |
 | --- | --- | --- |
 | RuboCop | `.rubocop.yml` | Code style (Ruby 3.4, double quotes, max line 100) |
-| Reek | `.reek.yml` | Code smell detection |
 | RSpec | `.rspec` / `.rspec_parallel` | Test framework with coverage |
 | SimpleCov | (in spec_helper) | Coverage reporting |
 | Bundler Audit | — | Security vulnerability scanning |
@@ -115,7 +116,7 @@ See [docs/parallel_testing.md](docs/parallel_testing.md) for parallel test setup
 Key points (see the linked doc for details):
 
 - **Two processing flows:** Build-Time (pre-generate defaults) and Runtime (on-demand specialized versions)
-- **ManifestManager** is the single source of truth for image versions, persisted to `_site/assets/images/imgflow-manifest.json`
+- **ManifestManager** is the single source of truth for image versions, persisted to `<source>/<cache_dir>/imgflow-manifest.json` (survives `_site` wipes and is excluded from Jekyll output/watch processing); per-version SHA-256 source digests drive cache invalidation
 - **ProviderRegistry** auto-discovers providers from `lib/jekyll-imgflow/providers/*.rb`; first available from `config.backend_priority` is used
 - **TagRegistry** auto-discovers tags from `lib/jekyll-imgflow/tags/*_tag.rb`
 
@@ -155,16 +156,36 @@ Release prerequisites:
 
 - Authenticate GitHub CLI once with `gh auth login`.
 - Keep the working tree free of untracked files.
+- Install git hooks once with `bin/install-hooks.sh` (pre-commit: rubocop,
+  pre-push: rubocop + rspec).
 
-See [docs/scripts.md](docs/scripts.md) for release scripts reference.
+The release flow uses rake tasks and a trusted-publishing GitHub Actions
+workflow (`.github/workflows/release.yml`). Pushing a `v*` tag triggers the
+workflow, which builds the gem, uploads it to the GitHub release, and
+publishes to RubyGems via OIDC trusted publishing.
 
 ```bash
-./bump_version.sh patch    # or minor/major
-./release.sh               # Full release with checks and GitHub Release page
+# 1. Bump the version
+bundle exec rake 'version:bump[patch]'    # or minor/major
+
+# 2. Add a CHANGELOG entry: "## [0.1.12] - YYYY-MM-DD"
+#    (the rake task prints the exact header to add)
+
+# 3. Verify the CHANGELOG entry exists
+bundle exec rake version:check_changelog
+
+# 4. Commit the version bump and changelog
+git add lib/jekyll-imgflow/version.rb CHANGELOG.md Gemfile.lock
+git commit -m "Release v0.1.12"
+
+# 5. Tag and push (triggers the release workflow)
+git tag v0.1.12
+git push origin main --tags
 ```
 
-Do not create tags or GitHub Release pages manually. `release.sh` creates both
-together and starts the RubyGems publishing workflow.
+Do not create GitHub Release pages manually. The release workflow creates the
+GitHub release (with the `.gem` artifact) and publishes to RubyGems
+automatically.
 
 ## Do NOT
 

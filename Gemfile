@@ -18,7 +18,6 @@ group :development do
   gem "parallel", "~> 2.1.0"
   gem "parallel_tests", "~> 5.7.0"
   gem "rake", "~> 13.4.2"
-  gem "reek", "~> 6.5.0"
   gem "rspec", "~> 3.13.2"
   gem "rubocop", "~> 1.89.0"
   gem "rubocop-markdown", "~> 0.2.0"

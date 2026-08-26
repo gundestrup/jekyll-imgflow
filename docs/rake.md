@@ -60,7 +60,6 @@ rake generate_docs        # Update docs from templates
 
 - `rake rubocop` - Check code style
 - `rake rubocop_fix` - Auto-fix style issues
-- `rake reek` - Check code smells
 - `rake bundler_audit` - Security scan
 
 ### 📦 Build & Install

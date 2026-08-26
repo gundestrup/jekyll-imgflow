@@ -38,16 +38,11 @@ bin/imgflow_migrate_presets            # Migrate Picture Tag presets
 bin/imgflow_migrate_presets --preview  # Preview migration
 ```
 
-### Build Scripts
+### Git Hooks
 
 ```bash
-./bump_version.sh patch               # Bump version, changelog, and lockfile
-./release.sh                         # Quality-check, tag, push, and create release
+bin/install-hooks.sh                  # Install pre-commit (rubocop) and pre-push (rubocop + rspec) hooks
 ```
-
-`release.sh` also creates the GitHub Release page automatically and starts the
-RubyGems publishing workflow through the pushed tag. Authenticate first with
-`gh auth login`; do not create tags or Release pages manually.
 
 ## Quick Reference
 
@@ -62,8 +57,7 @@ RubyGems publishing workflow through the pushed tag. Authenticate first with
 | `performance_benchmark.rb` | Performance | `ruby scripts/performance_benchmark.rb` |
 | `cleanup_test_artifacts.rb` | Cleanup | `ruby scripts/cleanup_test_artifacts.rb` |
 | `imgflow_migrate_presets` | Preset migration | `bin/imgflow_migrate_presets` |
-| `bump_version.sh` | Version bump | `./bump_version.sh patch` |
-| `release.sh` | Release | `./release.sh` |
+| `install-hooks.sh` | Git hooks setup | `bin/install-hooks.sh` |
 
 ## Development Workflow
 

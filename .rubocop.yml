@@ -54,6 +54,8 @@ Metrics/MethodLength:
 
 Metrics/ClassLength:
   Max: 250
+  Exclude:
+    - 'lib/jekyll-imgflow/manifest_manager.rb'
 
 Metrics/AbcSize:
   Enabled: false

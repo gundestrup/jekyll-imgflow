@@ -1,0 +1,44 @@
+name: Release gem
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    name: Build and publish RubyGem
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          ruby-version: "3.4"
+
+      - name: Verify tag matches gem version
+        run: test "v$(bundle exec rake version:show)" = "${GITHUB_REF_NAME}"
+
+      - name: Verify CHANGELOG has an entry for this version
+        run: bundle exec rake version:check_changelog
+
+      - name: Build gem
+        run: gem build jekyll-imgflow.gemspec
+
+      - name: Upload gem to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: jekyll-imgflow-*.gem
+
+      - name: Publish to RubyGems
+        uses: rubygems/release-gem@v1

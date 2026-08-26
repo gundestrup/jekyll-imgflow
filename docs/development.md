@@ -85,7 +85,6 @@ rake quick        # Fast check (style + tests)
 ```bash
 rake rubocop      # Code style
 rake rubocop_fix  # Auto-fix issues
-rake reek         # Code smells
 rake bundler_audit # Security check
 ```
 
@@ -159,13 +158,18 @@ Prerequisites:
 - Add or review the current notes under `## [Unreleased]`.
 
 ```bash
-./bump_version.sh patch  # or minor/major; moves Unreleased notes to the version
-# Review and complete the new version section in CHANGELOG.md
-./release.sh             # quality checks, gem build, tag, GitHub Release, and publish workflow
+bundle exec rake 'version:bump[patch]'  # or minor/major
+# Add a '## [0.1.12] - YYYY-MM-DD' entry to CHANGELOG.md
+bundle exec rake version:check_changelog  # verify the entry exists
+git add lib/jekyll-imgflow/version.rb CHANGELOG.md Gemfile.lock
+git commit -m "Release v0.1.12"
+git tag v0.1.12
+git push origin main --tags  # triggers the release workflow
 ```
 
-Do not create the tag or GitHub Release page manually. The release script does
-both together to prevent a tag from being published without a Release page.
+Do not create the GitHub Release page manually. The release workflow
+(`release.yml`) creates the GitHub release and publishes to RubyGems
+automatically via OIDC trusted publishing.
 
 ## Troubleshooting
 
@@ -188,8 +192,7 @@ docker-compose -f docker-compose.test.yml restart  # Restart
 
 - `create-test-images.sh` - Download test images
 - `check-test-services.sh` - Health check
-- `bump_version.sh` - Version bumping
-- `release.sh` - Release automation
+- `bin/install-hooks.sh` - Install git hooks (pre-commit: rubocop, pre-push: rubocop + rspec)
 
 ---
 
@@ -257,7 +260,6 @@ rake download_test_images     # Download test images
 # Code Quality
 rake rubocop                  # Style check
 rake rubocop_fix              # Auto-fix style issues
-rake reek                     # Code smells
 rake bundler_audit            # Security audit
 
 # Build & Install
