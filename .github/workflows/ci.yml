@@ -25,6 +25,9 @@ jobs:
           sudo apt-get install -y libvips-dev imagemagick \
             libheif-plugin-aomenc libheif-plugin-aomdec libheif-plugin-libde265
 
+      - name: Install Sharp CLI
+        run: npm install -g sharp-cli
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -32,7 +35,7 @@ jobs:
           bundler-cache: true
 
       - name: Run tests
-        run: bundle exec rspec --format progress --tag ~slow --tag ~external
+        run: bundle exec rspec --format progress --tag ~slow
         env:
           CI: "true"
 

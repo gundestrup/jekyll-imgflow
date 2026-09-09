@@ -33,10 +33,11 @@ fi
 HOOK
 chmod +x "$HOOKS_DIR/pre-commit"
 
-# pre-push: full quality gate (rubocop + rspec) + docker image check on tags
+# pre-push: full quality gate (rubocop + rspec, mirrors CI) + docker image check on tags
 cat > "$HOOKS_DIR/pre-push" << 'HOOK'
 #!/bin/bash
 # Pre-push hook — full quality gate before pushing
+# Runs the same checks as CI (rake ci) to catch failures locally
 # Reads stdin (list of refs being pushed) to detect release tag pushes
 
 # Read the list of refs being pushed
@@ -47,12 +48,12 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     fi
 done
 
-echo "🔍 Running pre-push checks (rubocop + rspec)..."
+echo "🔍 Running pre-push checks (rubocop + rspec, mirrors CI)..."
 echo ""
 
-if bundle exec rake quick 2>&1 | grep -q "✅ Tests passed"; then
+if bundle exec rake ci 2>&1 | grep -q "✅ CI checks passed"; then
     echo ""
-    echo "✅ Pre-push checks passed"
+    echo "✅ Pre-push checks passed (same as CI)"
 else
     echo ""
     echo "❌ Pre-push checks failed"
@@ -83,7 +84,7 @@ chmod +x "$HOOKS_DIR/pre-push"
 
 echo "✅ Installed git hooks:"
 echo "   pre-commit:  rubocop only (fast, ~2s)"
-echo "   pre-push:    rubocop + rspec (full quality gate)"
+echo "   pre-push:    rubocop + rspec (mirrors CI, includes external tests)"
 echo "                + docker image version check when pushing v* tags"
 echo ""
 echo "   Skip with: git commit --no-verify  /  git push --no-verify"

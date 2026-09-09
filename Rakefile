@@ -688,6 +688,16 @@ task :quick do
   Jekyll.logger.info "✅ Tests passed"
 end
 
+desc "Run CI checks locally (mirrors .github/workflows/ci.yml)"
+task :ci do
+  Jekyll.logger.info "🤖 Running CI checks (mirrors GitHub Actions)..."
+  Jekyll.logger.info "📝 Excluding slow tests only (includes external tests)"
+  sh "bundle exec rubocop"
+  Jekyll.logger.info "✅ Style checks passed"
+  sh "bundle exec rspec --format progress --tag ~slow"
+  Jekyll.logger.info "✅ CI checks passed"
+end
+
 desc "Check gem dependencies"
 task :check_gems do
   Jekyll.logger.info "🔍 Checking required gems..."
