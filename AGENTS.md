@@ -81,6 +81,10 @@ rake bundler_audit  # Security scan
 rake version:show   # Print current gem version
 rake version:bump[patch]  # Bump version (patch/minor/major)
 rake version:check_changelog  # Verify CHANGELOG has current version entry
+rake start_services  # Start Docker test services (recreates stale containers)
+rake stop_services   # Stop Docker test services
+rake check_services  # Check if Docker services are running
+rake check_docker_images  # Check if pinned Docker images are outdated (run before releases)
 ```
 
 See [docs/parallel_testing.md](docs/parallel_testing.md) for parallel test setup and [docs/scripts.md](docs/scripts.md) for utility scripts.
@@ -157,7 +161,7 @@ Release prerequisites:
 - Authenticate GitHub CLI once with `gh auth login`.
 - Keep the working tree free of untracked files.
 - Install git hooks once with `bin/install-hooks.sh` (pre-commit: rubocop,
-  pre-push: rubocop + rspec).
+  pre-push: rubocop + rspec + docker image check on tag pushes).
 
 The release flow uses rake tasks and a trusted-publishing GitHub Actions
 workflow (`.github/workflows/release.yml`). Pushing a `v*` tag triggers the
@@ -165,20 +169,24 @@ workflow, which builds the gem, uploads it to the GitHub release, and
 publishes to RubyGems via OIDC trusted publishing.
 
 ```bash
-# 1. Bump the version
+# 1. Check if Docker image pins in docker-compose.base.yml are outdated
+bundle exec rake check_docker_images
+# If any are outdated, update the pins, run `rake start_services`, and re-test
+
+# 2. Bump the version
 bundle exec rake 'version:bump[patch]'    # or minor/major
 
-# 2. Add a CHANGELOG entry: "## [0.1.12] - YYYY-MM-DD"
+# 3. Add a CHANGELOG entry: "## [0.1.12] - YYYY-MM-DD"
 #    (the rake task prints the exact header to add)
 
-# 3. Verify the CHANGELOG entry exists
+# 4. Verify the CHANGELOG entry exists
 bundle exec rake version:check_changelog
 
-# 4. Commit the version bump and changelog
+# 5. Commit the version bump and changelog
 git add lib/jekyll-imgflow/version.rb CHANGELOG.md Gemfile.lock
 git commit -m "Release v0.1.12"
 
-# 5. Tag and push (triggers the release workflow)
+# 6. Tag and push (triggers the release workflow)
 git tag v0.1.12
 git push origin main --tags
 ```

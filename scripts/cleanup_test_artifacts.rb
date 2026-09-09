@@ -6,18 +6,14 @@
 
 require "fileutils"
 require "tmpdir"
+require_relative "../spec/support/test_environment"
 
 puts "🧹 ImgFlow Test Artifacts Cleanup"
 puts "=" * 50
 
-# Configuration
-SINGLE_TEST_PORT = 4000
-PARALLEL_PORT_BASE = 4010
-MAX_PARALLEL_PROCESSES = 8
-
-# 1. Kill orphaned Jekyll servers
-puts "\n1️⃣  Checking for orphaned Jekyll servers..."
-ports_to_check = [SINGLE_TEST_PORT] + (PARALLEL_PORT_BASE..(PARALLEL_PORT_BASE + MAX_PARALLEL_PROCESSES - 1)).to_a
+# 1. Kill orphaned test servers
+puts "\n1️⃣  Checking for orphaned test servers..."
+ports_to_check = TestEnvironment.all_test_ports
 
 killed_count = 0
 ports_to_check.each do |port|

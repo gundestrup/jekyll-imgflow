@@ -79,11 +79,13 @@ RSpec.describe JekyllImgFlow::Config, "Format Validation", :unit do
     end
 
     it "includes supported formats in error message" do
-      config.validate_input_format!("bmp")
-    rescue ArgumentError => e
-      expect(e.message).to include("jpg")
-      expect(e.message).to include("png")
-      expect(e.message).to include("webp")
+      expect do
+        config.validate_input_format!("bmp")
+      end.to raise_error(ArgumentError) { |error|
+        expect(error.message).to include("jpg")
+        expect(error.message).to include("png")
+        expect(error.message).to include("webp")
+      }
     end
   end
 
@@ -106,11 +108,13 @@ RSpec.describe JekyllImgFlow::Config, "Format Validation", :unit do
     end
 
     it "includes supported formats in error message" do
-      config.validate_output_format!("gif")
-    rescue ArgumentError => e
-      expect(e.message).to include("webp")
-      expect(e.message).to include("avif")
-      expect(e.message).to include("jpg")
+      expect do
+        config.validate_output_format!("gif")
+      end.to raise_error(ArgumentError) { |error|
+        expect(error.message).to include("webp")
+        expect(error.message).to include("avif")
+        expect(error.message).to include("jpg")
+      }
     end
   end
 

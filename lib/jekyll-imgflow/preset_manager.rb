@@ -1,26 +1,51 @@
 # frozen_string_literal: true
 
+require "shellwords"
 require "yaml"
 
 module JekyllImgFlow
   # PresetManager - translates YAML presets to tags:value format
   # Handles tag overrides (user tags override preset tags)
   # Passes combined markup to Parser for uniform validation flow
+  #
+  # Presets are loaded from two sources (user presets take precedence):
+  # 1. Site presets:  _data/imgflow/presets/*.yml  (user-defined, override built-ins)
+  # 2. Built-in presets: lib/jekyll-imgflow/presets/*.yml (shipped with the gem)
   class PresetManager
+    BUILTIN_PRESETS_DIR = File.expand_path("presets", __dir__).freeze
+
     def initialize(site, config)
       @site = site
       @config = config
       @presets = load_presets
     end
 
-    # Load presets from _data/imgflow/presets/
+    # Load presets from the site's _data/imgflow/presets/ directory,
+    # then merge in built-in presets from the gem. User presets override
+    # built-in presets of the same name.
     def load_presets
+      presets = load_presets_from_dir(builtin_presets_dir)
+      presets.merge(load_presets_from_dir(site_presets_dir))
+    end
+
+    # Path to built-in presets shipped with the gem
+    def builtin_presets_dir
+      BUILTIN_PRESETS_DIR
+    end
+
+    # Path to user-defined presets in the site
+    def site_presets_dir
+      File.join(@site.source, "_data", "imgflow", "presets")
+    end
+
+    # Load all preset YAML files from a directory
+    # @param dir [String] Directory containing *.yml preset files
+    # @return [Hash<String, Hash>] Preset name => preset data
+    def load_presets_from_dir(dir)
       presets = {}
-      presets_dir = File.join(@site.source, "_data", "imgflow", "presets")
+      return presets unless dir && Dir.exist?(dir)
 
-      return presets unless Dir.exist?(presets_dir)
-
-      Dir.glob(File.join(presets_dir, "*.yml")).each do |preset_file|
+      Dir.glob(File.join(dir, "*.yml")).each do |preset_file|
         preset_name = File.basename(preset_file, ".yml")
         begin
           preset_data = YAML.safe_load_file(preset_file)
@@ -48,10 +73,36 @@ module JekyllImgFlow
       @presets.key?(name.to_s)
     end
 
-    # Get all available preset names
+    # Get all available preset names (user + built-in)
     # @return [Array<String>] Array of preset names
     def available_presets
       @presets.keys
+    end
+
+    # Get names of built-in presets shipped with the gem
+    # @return [Array<String>] Array of built-in preset names
+    def builtin_preset_names
+      names = []
+      return names unless Dir.exist?(builtin_presets_dir)
+
+      Dir.glob(File.join(builtin_presets_dir, "*.yml")).each do |file|
+        names << File.basename(file, ".yml")
+      end
+      names
+    end
+
+    # Check if a preset is a built-in (shipped with the gem)
+    # @param name [String] Preset name
+    # @return [Boolean] True if the preset is built-in
+    def builtin_preset?(name)
+      builtin_preset_names.include?(name.to_s)
+    end
+
+    # Check if a preset is user-defined (in the site's _data/)
+    # @param name [String] Preset name
+    # @return [Boolean] True if the preset is user-defined
+    def user_preset?(name)
+      File.exist?(File.join(site_presets_dir, "#{name}.yml"))
     end
 
     # Build markup from preset (tags:value format)
@@ -143,7 +194,7 @@ module JekyllImgFlow
     # @param tags [Hash] Tags in key => value format
     # @return [String] Markup string
     def tags_to_markup(tags)
-      tags.map { |key, value| "#{key}:#{value}" }.join(" ")
+      tags.map { |key, value| "#{key}:#{Shellwords.escape(value.to_s)}" }.join(" ")
     end
   end
 end

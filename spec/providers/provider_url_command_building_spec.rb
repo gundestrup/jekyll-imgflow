@@ -12,6 +12,9 @@ RSpec.describe "Provider URL and Command Building", :provider do
                    dest: "/tmp/test_site/_site")
   end
   let(:config) { JekyllImgFlow::Config.new(site) }
+  let(:imgproxy_url) { TestEnvironment.docker_url("imgproxy") }
+  let(:weserv_url) { TestEnvironment.docker_url("weserv") }
+  let(:flyimg_url) { TestEnvironment.docker_url("flyimg") }
 
   # ============================================================
   # Weserv Provider
@@ -23,7 +26,7 @@ RSpec.describe "Provider URL and Command Building", :provider do
       it "builds URL with resize (width only)" do
         provider.resize(800, nil)
         url = provider.build_combined_weserv_url("/images/test.jpg")
-        expect(url).to start_with("http://localhost:33007/?")
+        expect(url).to start_with("#{weserv_url}/?")
         expect(url).to include("w=800")
         expect(url).not_to include("h=")
       end
@@ -135,15 +138,15 @@ RSpec.describe "Provider URL and Command Building", :provider do
 
     describe "#fetch_with_timeout" do
       it "raises on HTTP error" do
-        stub_request(:get, /localhost:33007/).to_return(status: 500)
-        expect { provider.send(:fetch_with_timeout, "http://localhost:33007/?url=test") }
+        stub_request(:get, /#{Regexp.escape(weserv_url)}/).to_return(status: 500)
+        expect { provider.send(:fetch_with_timeout, "#{weserv_url}/?url=test") }
           .to raise_error(/Weserv request failed/)
       end
 
       it "returns body on success" do
-        stub_request(:get, /localhost:33007/).to_return(status: 200, body: "bytes")
+        stub_request(:get, /#{Regexp.escape(weserv_url)}/).to_return(status: 200, body: "bytes")
         expect(provider.send(:fetch_with_timeout,
-                             "http://localhost:33007/?url=test")).to eq("bytes")
+                             "#{weserv_url}/?url=test")).to eq("bytes")
       end
 
       it "raises on connection error" do
@@ -164,7 +167,7 @@ RSpec.describe "Provider URL and Command Building", :provider do
       it "builds URL with resize (width only)" do
         provider.resize(800, nil)
         url = provider.build_combined_flyimg_url("/images/test.jpg")
-        expect(url).to start_with("http://localhost:33008/upload/")
+        expect(url).to start_with("#{flyimg_url}/upload/")
         expect(url).to include("w_800")
       end
 
@@ -297,15 +300,15 @@ RSpec.describe "Provider URL and Command Building", :provider do
 
     describe "#fetch_with_timeout" do
       it "raises on HTTP error" do
-        stub_request(:get, /localhost:33008/).to_return(status: 500)
-        expect { provider.send(:fetch_with_timeout, "http://localhost:33008/upload/test") }
+        stub_request(:get, /#{Regexp.escape(flyimg_url)}/).to_return(status: 500)
+        expect { provider.send(:fetch_with_timeout, "#{flyimg_url}/upload/test") }
           .to raise_error(/Flyimg request failed/)
       end
 
       it "returns body on success" do
-        stub_request(:get, /localhost:33008/).to_return(status: 200, body: "bytes")
+        stub_request(:get, /#{Regexp.escape(flyimg_url)}/).to_return(status: 200, body: "bytes")
         expect(provider.send(:fetch_with_timeout,
-                             "http://localhost:33008/upload/test")).to eq("bytes")
+                             "#{flyimg_url}/upload/test")).to eq("bytes")
       end
     end
   end
@@ -320,7 +323,7 @@ RSpec.describe "Provider URL and Command Building", :provider do
       it "builds URL with resize (width and height)" do
         provider.resize(800, 600)
         url = provider.build_combined_imgproxy_url("/images/test.jpg")
-        expect(url).to start_with("http://localhost:33001/insecure/")
+        expect(url).to start_with("#{imgproxy_url}/insecure/")
         expect(url).to include("rs:fill:800:600")
       end
 
@@ -418,15 +421,15 @@ RSpec.describe "Provider URL and Command Building", :provider do
 
     describe "#fetch_with_timeout" do
       it "raises on HTTP error" do
-        stub_request(:get, /localhost:33001/).to_return(status: 500)
-        expect { provider.send(:fetch_with_timeout, "http://localhost:33001/insecure/test") }
+        stub_request(:get, /#{Regexp.escape(imgproxy_url)}/).to_return(status: 500)
+        expect { provider.send(:fetch_with_timeout, "#{imgproxy_url}/insecure/test") }
           .to raise_error(/Imgproxy request failed/)
       end
 
       it "returns body on success" do
-        stub_request(:get, /localhost:33001/).to_return(status: 200, body: "bytes")
+        stub_request(:get, /#{Regexp.escape(imgproxy_url)}/).to_return(status: 200, body: "bytes")
         expect(provider.send(:fetch_with_timeout,
-                             "http://localhost:33001/insecure/test")).to eq("bytes")
+                             "#{imgproxy_url}/insecure/test")).to eq("bytes")
       end
     end
   end
@@ -565,27 +568,31 @@ RSpec.describe "Provider URL and Command Building", :provider do
         cmd = provider.build_vips_command("input.jpg", "output.jpg")
         expect(cmd).to include("&&")
         expect(cmd).to include("extract_area")
-        expect(cmd).to include("VipsResize")
+        expect(cmd).to include("thumbnail")
         expect(cmd).to include("rm -f")
       end
 
-      it "builds resize with both scale factors" do
+      it "builds resize with both dimensions" do
         provider.resize(400, 225, scale_x: 0.5, scale_y: 0.5)
         cmd = provider.build_vips_command("input.jpg", "output.jpg")
-        expect(cmd).to include("--vscale=0.5")
+        expect(cmd).to include("thumbnail")
+        expect(cmd).to include("400")
+        expect(cmd).to include("--height=225")
       end
 
       it "builds resize with fallback when scale_y missing" do
         provider.resize(400, 225, scale_x: 0.5)
         cmd = provider.build_vips_command("input.jpg", "output.jpg")
-        expect(cmd).to include("0.5")
-        expect(cmd).not_to include("--vscale")
+        expect(cmd).to include("thumbnail")
+        expect(cmd).to include("400")
+        expect(cmd).to include("--height=225")
       end
 
-      it "builds resize with one dimension (default scale_x)" do
+      it "builds resize with one dimension" do
         provider.resize(400, nil, {})
         cmd = provider.build_vips_command("input.jpg", "output.jpg")
-        expect(cmd).to include("1.0")
+        expect(cmd).to include("thumbnail")
+        expect(cmd).to include("400")
       end
 
       it "builds smartcrop (attention)" do
@@ -666,7 +673,7 @@ RSpec.describe "Provider URL and Command Building", :provider do
         provider.resize(800, 600, scale_x: 0.5, scale_y: 0.5)
         provider.add_watermark("watermark.png", position: "center")
         cmd = provider.build_vips_command("input.jpg", "output.jpg")
-        expect(cmd).to include("VipsResize")
+        expect(cmd).to include("thumbnail")
         expect(cmd).to include("composite2")
         expect(cmd).to include("&&")
       end
@@ -682,7 +689,7 @@ RSpec.describe "Provider URL and Command Building", :provider do
         provider.resize(800, 600, scale_x: 0.5, scale_y: 0.5)
         provider.alpha_opacity = 0.3
         cmd = provider.build_vips_command("input.jpg", "output.jpg")
-        expect(cmd).to include("VipsResize")
+        expect(cmd).to include("thumbnail")
         expect(cmd).to include("linear")
         expect(cmd).to include("0.3")
         expect(cmd).to include("&&")
@@ -718,30 +725,30 @@ RSpec.describe "Provider URL and Command Building", :provider do
     describe "#position_to_vips_xy" do
       it "translates compass directions to vips composite2 x/y args" do
         expect(provider.position_to_vips_xy("northwest", "/base.jpg",
-                                            "/wm.png")).to eq("--x 0 --y 0")
+                                            "/wm.png")).to eq(["--x", "0", "--y", "0"])
         expect(provider.position_to_vips_xy("center", "/base.jpg",
-                                            "/wm.png")).to eq("--x 0 --y 0")
+                                            "/wm.png")).to eq(["--x", "0", "--y", "0"])
         expect(provider.position_to_vips_xy("custom", "/base.jpg",
-                                            "/wm.png")).to eq("--x 0 --y 0")
+                                            "/wm.png")).to eq(["--x", "0", "--y", "0"])
       end
     end
 
     describe "#execute_command" do
       it "raises on command failure" do
-        expect { provider.execute_command("echo 'real error'; false") }
+        expect { provider.execute_command(["false"]) }
           .to raise_error(/LibVips command failed/)
       end
 
       it "continues on 'same file' warning" do
-        expect(provider.execute_command("echo 'same file'; false")).to eq("same file")
+        expect(provider.execute_command(["sh", "-c", "echo 'same file'; false"])).to eq("same file")
       end
 
       it "continues on VipsForeignSave warning" do
-        expect(provider.execute_command("echo 'VipsForeignSave'; false")).to eq("VipsForeignSave")
+        expect(provider.execute_command(["sh", "-c", "echo 'VipsForeignSave'; false"])).to eq("VipsForeignSave")
       end
 
       it "returns output on success" do
-        expect(provider.execute_command("true")).to eq("")
+        expect(provider.execute_command(["true"])).to eq("")
       end
     end
 
@@ -932,8 +939,8 @@ RSpec.describe "Provider URL and Command Building", :provider do
       end
 
       it "returns true when service responds" do
-        stub_request(:get, "http://localhost:33001/").to_return(status: 200)
-        expect(provider.check_http_service("http://localhost:33001")).to be true
+        stub_request(:get, "#{imgproxy_url}/").to_return(status: 200)
+        expect(provider.check_http_service(imgproxy_url)).to be true
       end
 
       it "returns false on connection failure" do

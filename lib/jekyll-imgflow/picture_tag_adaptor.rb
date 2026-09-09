@@ -43,7 +43,7 @@ module JekyllImgFlow
     # @return [Hash] Translation result with markup and attributes
     def translate_to_imgflow(picture_markup)
       # Extract content between {% picture ... %}
-      match = picture_markup.match(/\{%\s*picture\s+(.+?)\s*%}/)
+      match = picture_markup.match(/\{%\s*picture\s+(.+?)%\}/)
       return { markup: "", attributes: {} } unless match
 
       content = match[1].strip

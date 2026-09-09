@@ -3,9 +3,11 @@
 # Reduces code duplication and ensures consistency across environments
 
 services:
-  # Imgproxy HTTP service (official image with built-in server)
+  # HTTP service - official image with built-in server
+  # Moved from Docker Hub to GHCR (Hub tag may stop being updated)
+  # Pinned to v4.0.14 for reproducibility
   imgproxy:
-    image: darthsim/imgproxy:latest
+    image: ghcr.io/imgproxy/imgproxy:v4.0.14
     environment:
       - IMGPROXY_BIND_ADDRESS=:8080
       - IMGPROXY_LOCAL_STORAGE_ENABLED=${IMGPROXY_LOCAL_STORAGE_ENABLED:-false}
@@ -30,8 +32,9 @@ services:
       - imgflow-network
 
   # Flyimg HTTP service (official image)
+  # Pinned to 1.12.5 for reproducibility (project releases frequently).
   flyimg:
-    image: flyimg/flyimg:latest
+    image: flyimg/flyimg:1.12.5
     restart: unless-stopped
     shm_size: 1gb
     networks:

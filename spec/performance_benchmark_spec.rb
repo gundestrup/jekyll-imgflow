@@ -46,9 +46,7 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
   let(:test_site_dir) { @test_site_dir }
   let(:site) { @site }
   let(:components) { @components }
-  let(:test_image_path) do
-    File.join(@test_site_dir, "assets/images/originals/spider_web-small.jpg")
-  end
+  let(:test_image_path) { @test_image_paths.first }
 
   describe "Performance Benchmark" do
     it "generates comprehensive performance report" do
@@ -86,9 +84,11 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
 
       # Start Jekyll server once to serve original images for HTTP providers
       server_port = test_port
-      build_jekyll_site(test_site_dir, serve: true, port: server_port,
-                                       use_prebuilt: false)
+      build_jekyll_site(test_site_dir, serve: true, port: server_port)
       sleep 3 # Give server time to fully start
+      FileUtils.rm_rf(File.join(test_site_dir, "assets", "images", "optimized"))
+      FileUtils.rm_rf(File.join(test_site_dir, "_site", "assets", "images", "optimized"))
+      FileUtils.rm_rf(File.join(test_site_dir, ".cache", "imgflow"))
 
       begin
         providers.each do |provider_info|
@@ -99,14 +99,16 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
           config_file = File.join(test_site_dir, "_config.yml")
           config = YAML.load_file(config_file)
           config["imgflow"]["backend_priority"] = [provider_name]
-          config["url"] = "http://localhost:#{server_port}"
+          config["url"] = TestEnvironment.site_url(provider: provider_name,
+                                                   port: server_port)
           File.write(config_file, config.to_yaml)
 
           # Recreate site with updated config
           site_config = TEST_CONFIG.dup
           site_config["destination"] = File.join(test_site_dir, "_site")
           site_config["source"] = test_site_dir
-          site_config["url"] = "http://localhost:#{server_port}"
+          site_config["url"] = TestEnvironment.site_url(provider: provider_name,
+                                                        port: server_port)
           # Deep dup the imgflow hash to avoid frozen hash error
           site_config["imgflow"] = site_config["imgflow"].dup
           site_config["imgflow"]["backend_priority"] = [provider_name]
@@ -117,35 +119,18 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
             test_site.process
           end
 
-          # Collect metrics
-          output_dir = File.join(test_site_dir, "_site", "assets", "images", "optimized")
-          originals_dir = File.join(test_site_dir, "assets", "images", "originals")
+          metrics = collect_metrics(test_site, test_site_dir, build_time)
+          metrics[:cold_cache_hits] = metrics.delete(:cache_hits)
+          metrics[:cold_cache_misses] = metrics.delete(:cache_misses)
+          metrics.delete(:cache_hit_rate)
 
-          metrics = {
-            build_time: build_time.round(2),
-            images_generated: 0,
-            total_output_size: 0,
-            total_input_size: 0
-          }
-
-          if Dir.exist?(originals_dir)
-            originals = Dir.glob(File.join(originals_dir, "*")).select { |f| File.file?(f) }
-            metrics[:total_input_size] = originals.sum { |f| File.size(f) }
-          end
-
-          if Dir.exist?(output_dir)
-            images = Dir.glob(File.join(output_dir, "**", "*")).select { |f| File.file?(f) }
-            metrics[:images_generated] = images.length
-            metrics[:total_output_size] = images.sum { |f| File.size(f) }
-          end
-
-          # Mark provider as failed if no images were generated
-          metrics[:status] = if metrics[:images_generated] == 0
-                               "failed"
-                             else
-                               "success"
-                             end
-
+          warm_site = Jekyll::Site.new(Jekyll.configuration(site_config))
+          warm_build_time = Benchmark.realtime { warm_site.process }
+          warm_stats = warm_site.imgflow_components[:stats]
+          metrics[:warm_build_time] = warm_build_time.round(2)
+          metrics[:cache_hits] = warm_stats.cache_hits
+          metrics[:cache_misses] = warm_stats.cache_misses
+          metrics[:cache_hit_rate] = warm_stats.cache_hit_rate
           results[provider_name] = metrics
         end
       ensure
@@ -181,9 +166,53 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
       expect(File.exist?(report_file)).to be true
       expect(File.exist?(json_file)).to be true
 
-      results.each_value do |data|
-        expect(data).to include(:build_time, :images_generated)
+      results.each do |provider, data|
+        expect(data).to include(:build_time, :warm_build_time, :images_generated, :status,
+                                :operation_timings, :compression_ratios)
+        expect(data[:status]).to eq("success"), "#{provider} did not generate benchmark output"
+        expect(data[:cold_cache_misses]).to be > 0
+        expect(data[:cache_hits]).to be > 0
+        expect(data[:cache_misses]).to eq(0)
+        expect(data[:cache_hit_rate]).to eq(100.0)
+        expect(data[:operation_timings]).not_to be_empty
+        expect(data[:compression_ratios]).not_to be_empty
       end
+    end
+
+    def collect_metrics(test_site, test_site_dir, build_time)
+      output_dir = File.join(test_site_dir, "_site", "assets", "images", "optimized")
+      originals_dir = File.join(test_site_dir, "assets", "images", "originals")
+
+      metrics = {
+        build_time: build_time.round(2),
+        images_generated: 0,
+        total_output_size: 0,
+        total_input_size: 0
+      }
+
+      if Dir.exist?(originals_dir)
+        originals = Dir.glob(File.join(originals_dir, "*")).select { |f| File.file?(f) }
+        metrics[:total_input_size] = originals.sum { |f| File.size(f) }
+      end
+
+      if Dir.exist?(output_dir)
+        images = Dir.glob(File.join(output_dir, "**", "*")).select { |f| File.file?(f) }
+        metrics[:images_generated] = images.length
+        metrics[:total_output_size] = images.sum { |f| File.size(f) }
+      end
+
+      # Collect processing stats from the OperationProcessor
+      if test_site.respond_to?(:imgflow_components) && test_site.imgflow_components[:stats]
+        stats = test_site.imgflow_components[:stats]
+        metrics[:cache_hits] = stats.cache_hits
+        metrics[:cache_misses] = stats.cache_misses
+        metrics[:cache_hit_rate] = stats.cache_hit_rate
+        metrics[:operation_timings] = stats.operation_timings.transform_values { |v| v.round(3) }
+        metrics[:compression_ratios] = stats.average_compression_ratios
+      end
+
+      metrics[:status] = metrics[:images_generated] == 0 ? "failed" : "success"
+      metrics
     end
 
     def generate_performance_report(picture_library, test_images, results, test_sizes,
@@ -204,20 +233,25 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
         **CPU:** #{cpu[:type]}
         **Memory:** #{mem}
         **CPU Cores:** #{cpu[:total]} total, #{cpu[:used]} used for testing
-        **Test Set:** #{picture_library.to_s.upcase} SET (#{test_images.length} images)
+        **Test Set:** #{picture_library.to_s.upcase} SET (#{test_images.length} #{test_images.one? ? 'image' : 'images'})
 
         ## Summary Table
 
-        | Provider | Runtime (s) | Images Generated | Total Size (MB) | Avg Size (KB) |
-        |----------|-------------|------------------|-----------------|---------------|
+        | Provider | Cold (s) | Warm (s) | Images Generated | Total Size (MB) | Avg Size (KB) |
+        | --- | ---: | ---: | ---: | ---: | ---: |
       MARKDOWN
 
       results.each do |provider_name, metrics|
         avg_size = metrics[:images_generated] > 0 ? (metrics[:total_output_size] / metrics[:images_generated] / 1024.0).round(2) : 0
         total_mb = (metrics[:total_output_size] / 1024.0 / 1024.0).round(2)
         report += "| #{provider_name.upcase} | #{metrics[:build_time]} | " \
-                  "#{metrics[:images_generated]} | #{total_mb} | #{avg_size} |\n"
+                  "#{metrics[:warm_build_time]} | #{metrics[:images_generated]} | " \
+                  "#{total_mb} | #{avg_size} |\n"
       end
+
+      report += cache_performance_section(results)
+      report += operation_timing_section(results)
+      report += compression_ratio_section(results)
 
       report += <<~MARKDOWN
 
@@ -239,6 +273,50 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
       MARKDOWN
 
       report
+    end
+
+    def cache_performance_section(results)
+      return "" unless results.values.any? { |m| m.key?(:cache_hits) }
+
+      section = "\n## Cache Performance\n\n"
+      section += "| Provider | Cold Misses | Warm Hits | Warm Misses | Warm Hit Rate (%) |\n"
+      section += "| --- | ---: | ---: | ---: | ---: |\n"
+      results.each do |provider_name, metrics|
+        section += "| #{provider_name.upcase} | #{metrics[:cold_cache_misses] || 0} | " \
+                   "#{metrics[:cache_hits] || 0} | #{metrics[:cache_misses] || 0} | " \
+                   "#{metrics[:cache_hit_rate] || 0.0} |\n"
+      end
+      section
+    end
+
+    def operation_timing_section(results)
+      all_ops = results.values.flat_map { |m| m[:operation_timings]&.keys || [] }.uniq.sort
+      return "" if all_ops.empty?
+
+      section = "\n## Processing Time by Primary Operation (s)\n\n"
+      section += "| Provider | #{all_ops.join(' | ')} |\n"
+      section += "| --- #{'| ---: ' * all_ops.length}|\n"
+      results.each do |provider_name, metrics|
+        timings = metrics[:operation_timings] || {}
+        values = all_ops.map { |op| timings[op]&.round(3) || "-" }
+        section += "| #{provider_name.upcase} | #{values.join(' | ')} |\n"
+      end
+      section
+    end
+
+    def compression_ratio_section(results)
+      all_formats = results.values.flat_map { |m| m[:compression_ratios]&.keys || [] }.uniq.sort
+      return "" if all_formats.empty?
+
+      section = "\n## Compression Ratio by Format (% saved)\n\n"
+      section += "| Provider | #{all_formats.join(' | ')} |\n"
+      section += "| --- #{'| ---: ' * all_formats.length}|\n"
+      results.each do |provider_name, metrics|
+        ratios = metrics[:compression_ratios] || {}
+        values = all_formats.map { |f| ratios[f] ? "#{ratios[f]}%" : "-" }
+        section += "| #{provider_name.upcase} | #{values.join(' | ')} |\n"
+      end
+      section
     end
 
     def cpu_info

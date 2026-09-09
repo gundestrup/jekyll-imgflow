@@ -47,7 +47,7 @@ bin/install-hooks.sh                  # Install pre-commit (rubocop) and pre-pus
 ## Quick Reference
 
 | Script | Purpose | Usage |
-|--------|---------|-------|
+| --- | --- | --- |
 | `debug_picture_tag.rb` | Picture Tag adaptor testing | `ruby scripts/debug_picture_tag.rb` |
 | `debug_test_url.rb` | URL testing | `ruby scripts/debug_test_url.rb` |
 | `test_enhanced_adaptor.rb` | Adaptor attributes | `ruby scripts/test_enhanced_adaptor.rb` |
@@ -104,21 +104,7 @@ PERFORMANCE=true rake performance_test
 cat docs/performance/README.Performance.md
 ```
 
-## Comprehensive Testing (via Rake Tasks)
-
-```bash
-# All test suites
-rake test_comprehensive
-
-# Individual test suites
-rake test_providers     # Provider tests only
-rake test_jekyll        # Jekyll integration only
-rake test_picture       # Picture tag integration only
-
-# Pre-flight checks
-rake check_services     # Service availability
-rake check_gems         # Gem dependencies
-```
+For comprehensive testing via Rake tasks, see [rake.md](rake.md).
 
 ---
 
@@ -126,4 +112,5 @@ rake check_gems         # Gem dependencies
 
 - [development.md](development.md) - Development workflow
 - [testing.md](testing.md) - Testing guide
+- [rake.md](rake.md) - Rake tasks reference
 - [picture_tag_migration.md](picture_tag_migration.md) - Migration guide

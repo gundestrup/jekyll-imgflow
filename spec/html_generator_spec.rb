@@ -47,7 +47,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
         expect(html).to include("<img")
         expect(html).to include('class="responsive"')
         expect(html).to include('alt="Test Image"')
-        expect(html).to include("src=\"assets/images/optimized/#{TestPictures.expected_filename(
+        expect(html).to include("src=\"/assets/images/optimized/#{TestPictures.expected_filename(
           test_image_name, :md, :webp
         )}\"")
         expect(html).to include("srcset=")
@@ -150,7 +150,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
         # png should NOT get a <source> tag — it's the <img> fallback
         expect(html).not_to include("type=\"image/png\"")
         # <img> should use a png file
-        expect(html).to include("src=\"assets/images/optimized/")
+        expect(html).to include("src=\"/assets/images/optimized/")
         # Find the img src and verify it ends with .png
         img_src = html.match(/<img src="([^"]+)"/)
         expect(img_src).not_to be_nil
@@ -258,7 +258,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
       expect(html).to include("type=\"image/png\"")
       expect(html).to include("<img")
       # Should use jpg as fallback
-      expect(html).to include("src=\"assets/images/optimized/#{TestPictures.expected_filename(
+      expect(html).to include("src=\"/assets/images/optimized/#{TestPictures.expected_filename(
         test_image_name, :md, :jpg
       )}\"")
     end
@@ -497,6 +497,19 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
                                                    context_with_baseurl, config)
       expect(html).to start_with("https://example.com/blog/")
     end
+
+    it "includes baseurl in regular image paths" do
+      html = JekyllImgFlow::HtmlGenerator.generate(test_results.first(1), {}, "img",
+                                                   context_with_baseurl, config)
+      expect(html).to include("src=\"/blog/assets/images/optimized/")
+    end
+
+    it "does not duplicate an existing baseurl" do
+      generator = JekyllImgFlow::HtmlGenerator.new(test_results, {}, "img",
+                                                   context_with_baseurl, config)
+      expect(generator.send(:html_path, "/blog/assets/img.webp"))
+        .to eq("/blog/assets/img.webp")
+    end
   end
 
   describe "extract_width_from_filename" do
@@ -517,16 +530,16 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
   end
 
   describe "html_path" do
-    it "removes leading slash" do
+    it "keeps root-absolute path (leading slash) for deep permalink compatibility" do
       generator = JekyllImgFlow::HtmlGenerator.new(test_results, attributes, "img",
                                                    context, config)
-      expect(generator.send(:html_path, "/assets/img.webp")).to eq("assets/img.webp")
+      expect(generator.send(:html_path, "/assets/img.webp")).to eq("/assets/img.webp")
     end
 
-    it "keeps relative path as-is" do
+    it "adds leading slash to relative paths" do
       generator = JekyllImgFlow::HtmlGenerator.new(test_results, attributes, "img",
                                                    context, config)
-      expect(generator.send(:html_path, "assets/img.webp")).to eq("assets/img.webp")
+      expect(generator.send(:html_path, "assets/img.webp")).to eq("/assets/img.webp")
     end
   end
 

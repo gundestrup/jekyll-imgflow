@@ -6,6 +6,7 @@ require "fastimage"
 require_relative "../scripts/test_logger"
 require_relative "support/test_directory_helper"
 require_relative "support/test_pictures"
+require_relative "support/test_environment"
 
 # Auto-start test logging for all test runs
 TestLogger.auto_start
@@ -15,8 +16,8 @@ SimpleCov.start do
 end
 
 # Constants for performance optimization
-HTTP_API_PROVIDERS = %w[Imgproxy Weserv Flyimg].freeze
-CLI_TOOLS = %w[Sharp Imagemagick Libvips].freeze
+HTTP_API_PROVIDERS = TestEnvironment::HTTP_PROVIDERS.map(&:capitalize).freeze
+CLI_TOOLS = TestEnvironment::CLI_PROVIDERS.map(&:capitalize).freeze
 
 # Add lib to load path
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
@@ -32,115 +33,21 @@ require "jekyll-imgflow/tags/quality_tag"
 require "jekyll-imgflow/tags/resize_tag"
 require "jekyll-imgflow/tags/watermark_tag"
 require "test_config"
+require_relative "support/provider_integration_helper"
 require "webmock/rspec"
 require "jekyll"
 
 WebMock.disable_net_connect!(allow_localhost: true)
 
-# Parallel Testing Configuration
-SINGLE_TEST_PORT = 4000        # Port for non-parallel tests
-PARALLEL_PORT_BASE = 4010      # Base port for parallel tests (4010-4018)
+# Parallel testing configuration is centralized in TestEnvironment.
 
-# Auto-detect CPU cores and use n-1 for parallel testing
-# Can be overridden with IMGFLOW_MAX_PARALLEL_PROCESSES environment variable
-# Maximum of 8 parallel processes to prevent excessive resource usage
-def detect_max_parallel_processes
-  if ENV["IMGFLOW_MAX_PARALLEL_PROCESSES"]
-    ENV["IMGFLOW_MAX_PARALLEL_PROCESSES"].to_i
-  else
-    # Detect number of CPU cores
-    cpu_count = case RbConfig::CONFIG["host_os"]
-                when /darwin|mac os/
-                  `sysctl -n hw.ncpu`.to_i
-                when /linux/
-                  `nproc`.to_i
-                else
-                  # Fallback to Ruby's processor count
-                  require "etc"
-                  Etc.nprocessors
-                end
-
-    # Use n-1 cores (leave one for system), with a maximum of 8
-    (cpu_count - 1).clamp(1, 8)
-  end
+def active_servers
+  @active_servers ||= {}
 end
 
-MAX_PARALLEL_PROCESSES = detect_max_parallel_processes
-ACTIVE_SERVERS = {}.freeze
-PREBUILT_SITES = {}.freeze
-
-# Process-specific test site registry for parallel execution
-class TestSiteRegistry
-  include Singleton
-
-  attr_accessor :prebuilt_sites, :test_file_server
-
-  def initialize
-    @prebuilt_sites = {}
-  end
-
-  def add_site(index, site_data)
-    @prebuilt_sites[index] = site_data
-  end
-
-  def get_site(index)
-    @prebuilt_sites[index]
-  end
-
-  def clear_sites
-    @prebuilt_sites.clear
-  end
-
-  def any_sites?
-    @prebuilt_sites.any?
-  end
-
-  def sites_count
-    @prebuilt_sites.length
-  end
-
-  # Make singleton process-specific by using process ID
-  def self.instance
-    @instances ||= {}
-    process_id = Process.pid
-    @instances[process_id] ||= new
-  end
-
-  # Clean up instances when process exits
-  def self.cleanup_instance
-    process_id = Process.pid
-    @instances&.delete(process_id)
-  end
-end
-
-# Detect actual CPU count for display
-DETECTED_CPU_CORES = case RbConfig::CONFIG["host_os"]
-                     when /darwin|mac os/
-                       `sysctl -n hw.ncpu`.to_i
-                     when /linux/
-                       `nproc`.to_i
-                     else
-                       require "etc"
-                       Etc.nprocessors
-                     end
-
-# Global methods for RSpec configuration (outside module scope)
-def prebuild_test_sites
-  ProviderTestHelpers.prebuild_test_sites
-end
-
-def prebuilt_site
-  ProviderTestHelpers.prebuilt_site
-end
-
-# Get port for current test process
+# Get the source/server port assigned to the current test process.
 def test_port
-  test_env_number = ENV.fetch("TEST_ENV_NUMBER", nil)
-  if test_env_number.nil? || test_env_number.empty?
-    SINGLE_TEST_PORT # Non-parallel test uses port 4000
-  else
-    PARALLEL_PORT_BASE + test_env_number.to_i # Parallel tests use 4010, 4011, etc.
-  end
+  TestEnvironment.current_source_port
 end
 
 # Signal handling for cleanup when tests are canceled
@@ -160,10 +67,10 @@ end
 
 # Clean up all active servers with enhanced error handling and process isolation
 def cleanup_all_servers
-  return if ACTIVE_SERVERS.empty?
+  return if active_servers.empty?
 
   # Create a copy to avoid modification during iteration
-  servers_to_cleanup = ACTIVE_SERVERS.dup
+  servers_to_cleanup = active_servers.dup
 
   servers_to_cleanup.each do |port, server_info|
     # Kill by port first (most reliable)
@@ -184,25 +91,24 @@ def cleanup_all_servers
     end
 
     # Remove from tracking immediately
-    ACTIVE_SERVERS.delete(port)
+    active_servers.delete(port)
   rescue Errno::ESRCH, Errno::ECHILD
     # Process already gone - still remove from tracking
-    ACTIVE_SERVERS.delete(port)
+    active_servers.delete(port)
     nil
   rescue StandardError
     # Still try to remove from tracking to prevent accumulation
-    ACTIVE_SERVERS.delete(port) if ENV["DEBUG"]
+    active_servers.delete(port) if ENV["DEBUG"]
   end
 
   # Final safety clear
-  ACTIVE_SERVERS.clear if ACTIVE_SERVERS.any?
+  active_servers.clear if active_servers.any?
 end
 
 # Manual cleanup for orphaned servers (can be called from command line)
 def cleanup_orphaned_servers
-  # Kill any remaining Jekyll processes on test ports
-  ports_to_check = [SINGLE_TEST_PORT] +
-                   (PARALLEL_PORT_BASE..(PARALLEL_PORT_BASE + MAX_PARALLEL_PROCESSES - 1)).to_a
+  # Kill any remaining servers on test ports.
+  ports_to_check = TestEnvironment.all_test_ports
 
   ports_to_check.each do |port|
     # Check if port is in use
@@ -214,29 +120,6 @@ def cleanup_orphaned_servers
 
     system("lsof -ti:#{port} | xargs kill -9 2>/dev/null")
   end
-end
-
-# Get local tmp directory for test artifacts
-def local_tmp_dir
-  @local_tmp_dir ||= File.expand_path("../tmp", __dir__)
-end
-
-# Cleanup pre-built test sites with enhanced error handling
-def cleanup_prebuilt_sites
-  base_tmp_dir = File.join(local_tmp_dir, "test_sites")
-  if File.exist?(base_tmp_dir)
-
-    begin
-      FileUtils.rm_rf(base_tmp_dir)
-    rescue StandardError
-    ensure
-      # Always clear the tracking hash, even if file cleanup fails
-      TestSiteRegistry.instance.clear_sites
-    end
-  elsif TestSiteRegistry.instance.any_sites?
-    TestSiteRegistry.instance.clear_sites
-  end
-  # Clear hash even if directory doesn't exist (prevents stale data)
 end
 
 # Cleanup temporary output files from OperationProcessor
@@ -301,10 +184,7 @@ def cleanup_all_test_artifacts
   # 1. Stop all Jekyll servers
   cleanup_all_servers
 
-  # 2. Pre-built sites are NOT cleaned - they're reused across test runs
-  # To manually clean: CLEAN_PREBUILT=1 bundle exec rspec
-
-  # 3. Clean up old temporary test directories
+  # 2. Clean up old temporary test directories
   cleanup_temp_test_dirs
 
   # 4. Clean up old TestDirectoryHelper test directories (>1 hour old)
@@ -318,67 +198,6 @@ MockSite = Struct.new(:config)
 
 module ProviderTestHelpers
   extend self # Make all instance methods available as module methods
-
-  # Pre-build test sites for parallel testing
-  def prebuild_test_sites
-    base_tmp_dir = File.join(local_tmp_dir, "test_sites")
-
-    # Check if pre-built sites already exist
-    if Dir.exist?(base_tmp_dir) && Dir.glob(File.join(base_tmp_dir,
-                                                      "site_*")).length == MAX_PARALLEL_PROCESSES
-
-      # Register existing sites
-      (0...MAX_PARALLEL_PROCESSES).each do |i|
-        site_dir = File.join(base_tmp_dir, "site_#{i}")
-        port = PARALLEL_PORT_BASE + i
-        TestSiteRegistry.instance.add_site(i, {
-                                             site_dir: site_dir,
-                                             built_at: File.mtime(site_dir),
-                                             port: port
-                                           })
-      end
-      return
-    end
-
-    FileUtils.rm_rf(base_tmp_dir)
-    FileUtils.mkdir_p(base_tmp_dir)
-
-    (0...MAX_PARALLEL_PROCESSES).each do |i|
-      site_dir = File.join(base_tmp_dir, "site_#{i}")
-      port = PARALLEL_PORT_BASE + i
-
-      # Create and build the site
-      create_test_jekyll_site(site_dir, :imgflow_only)
-
-      # Update the Jekyll config to use the correct port
-      config_file = File.join(site_dir, "_config.yml")
-      config_content = File.read(config_file)
-      config_content.gsub!("url: http://localhost:4000", "url: http://localhost:#{port}")
-      File.write(config_file, config_content)
-
-      # Build the Jekyll site (without serving)
-      Dir.chdir(site_dir) do
-        system("bundle exec jekyll build --trace > /dev/null 2>&1")
-      end
-
-      # Store the pre-built site info
-      TestSiteRegistry.instance.add_site(i, {
-                                           site_dir: site_dir,
-                                           built_at: Time.now,
-                                           port: port
-                                         })
-    end
-  end
-
-  # Get or create pre-built site for current test process
-  def prebuilt_site
-    test_env_number = ENV["TEST_ENV_NUMBER"].to_i
-    registry = TestSiteRegistry.instance
-
-    raise "Pre-built site #{test_env_number} not found. Run prebuild_test_sites first." unless registry.get_site(test_env_number)
-
-    registry.get_site(test_env_number)
-  end
 
   # Clean up test site modifications to restore pristine state
   def cleanup_test_site_modifications(site_dir)
@@ -481,16 +300,21 @@ module ProviderTestHelpers
     registry = JekyllImgFlow::ProviderRegistry.new(config)
     provider = registry.current_provider
     path_resolver = JekyllImgFlow::PathResolver.new(config)
-    operation_processor = JekyllImgFlow::OperationProcessor.new(provider, path_resolver)
-    batch_manager = JekyllImgFlow::BatchManager.new(operation_processor)
+    filename_generator = JekyllImgFlow::FilenameGenerator.new
     manifest_manager = JekyllImgFlow::ManifestManager.new(site)
+    operation_processor = JekyllImgFlow::OperationProcessor.new(
+      provider, path_resolver, manifest_manager, config
+    )
+    batch_manager = JekyllImgFlow::BatchManager.new(operation_processor)
 
     {
       config: config,
       registry: registry,
       provider: provider,
       path_resolver: path_resolver,
+      filename_generator: filename_generator,
       operation_processor: operation_processor,
+      stats: operation_processor.stats,
       batch_manager: batch_manager,
       manifest_manager: manifest_manager,
       manifest: manifest_manager # Alias for backward compatibility
@@ -687,35 +511,24 @@ module ProviderTestHelpers
     site_dir
   end
 
-  # Build and optionally serve a Jekyll site with parallel testing support
-  def build_jekyll_site(site_dir = nil, serve: false, port: nil, use_prebuilt: true)
-    # Use pre-built site if available and requested
-    if use_prebuilt && !PREBUILT_SITES.empty?
-      prebuilt = prebuilt_site
-      site_dir = prebuilt[:site_dir]
-      port = prebuilt[:port]
-    else
-      # Fallback to building on-demand
-      # Auto-assign port based on test environment
-      port ||= test_port
+  # Build and optionally serve a Jekyll site
+  def build_jekyll_site(site_dir, serve: false, port: nil)
+    port ||= test_port
 
-      Dir.chdir(site_dir) do
-        # Build the site
-        system("bundle exec jekyll build --trace")
-      end
+    Dir.chdir(site_dir) do
+      system("bundle exec jekyll build --trace")
     end
 
-    # Optionally serve the site
     if serve
       # Clean up any existing server on this port
       cleanup_server(port)
 
       Dir.chdir(site_dir) do
-        pid = spawn("bundle exec jekyll serve --port #{port} --detach")
+        pid = spawn("bundle exec jekyll serve --host 0.0.0.0 --port #{port} --detach")
         sleep 2 # Give server time to start
 
         # Track the server for cleanup
-        ACTIVE_SERVERS[port] = {
+        active_servers[port] = {
           pid: pid,
           url: "http://localhost:#{port}",
           site_dir: site_dir
@@ -723,7 +536,7 @@ module ProviderTestHelpers
       end
 
       # Return server info
-      ACTIVE_SERVERS[port]
+      active_servers[port]
     else
       { site_dir: site_dir, port: port }
     end
@@ -735,7 +548,7 @@ module ProviderTestHelpers
     system("lsof -ti:#{port} | xargs kill -9 2>/dev/null")
 
     # Also try to kill the tracked PID if we have one
-    server_info = ACTIVE_SERVERS[port]
+    server_info = active_servers[port]
     if server_info && server_info[:pid]
       begin
         Process.kill("TERM", server_info[:pid])
@@ -749,7 +562,7 @@ module ProviderTestHelpers
       end
     end
 
-    ACTIVE_SERVERS.delete(port)
+    active_servers.delete(port)
 
     # Give the port a moment to be released
     sleep 0.5
@@ -932,8 +745,10 @@ module ProviderTestHelpers
     test_images = options[:test_images] || TestPictures.get(:default)
 
     # Generate imgflow tags for each test image
+    format = options[:test_output_format]
+    format_option = format ? " format:#{format}" : ""
     imgflow_tags = test_images.map do |image|
-      "{% imgflow #{image} width:800 height:600 ratio:16:9 %}"
+      "{% imgflow #{image} width:800#{format_option} %}"
     end.join("\n")
 
     index_content = <<~MARKDOWN
@@ -1190,6 +1005,7 @@ RSpec.configure do |config|
   # Add comprehensive failure and error logging for debugging
   config.after(:suite) do
     failure_log = File.join(Dir.pwd, "test_logs", "latest_failures.json")
+    session_failure_log = TestLogger.rspec_result_path(:failure)
 
     # Get test statistics using the RSpec API
     total_examples = RSpec.world.example_count
@@ -1205,6 +1021,15 @@ RSpec.configure do |config|
     end
 
     total_failures = failed_examples.count
+    pending_count = if config.reporter.respond_to?(:examples)
+                      config.reporter.examples.count do |example|
+                        example.respond_to?(:execution_result) &&
+                          example.execution_result.respond_to?(:status) &&
+                          example.execution_result.status == :pending
+                      end
+                    else
+                      0
+                    end
 
     if total_failures > 0
       failure_data = {
@@ -1212,6 +1037,7 @@ RSpec.configure do |config|
         total_examples: total_examples,
         test_failure_count: total_failures,
         total_failures: total_failures,
+        pending_count: pending_count,
         test_failures: failed_examples.map do |example|
           exception_info = if example.respond_to?(:execution_result) && example.execution_result.respond_to?(:exception)
                              example.execution_result.exception
@@ -1231,17 +1057,25 @@ RSpec.configure do |config|
         end
       }
 
-      File.write(failure_log, JSON.pretty_generate(failure_data))
+      content = JSON.pretty_generate(failure_data)
+      FileUtils.rm_f(File.join(Dir.pwd, "test_logs", "latest_success.json"))
+      File.write(failure_log, content)
+      File.write(session_failure_log, content)
 
     else
       # Create a success log for tracking
       success_log = File.join(Dir.pwd, "test_logs", "latest_success.json")
+      session_success_log = TestLogger.rspec_result_path(:success)
       success_data = {
         timestamp: Time.now.iso8601,
         total_examples: total_examples,
+        pending_count: pending_count,
         status: "all_passed"
       }
-      File.write(success_log, JSON.pretty_generate(success_data))
+      content = JSON.pretty_generate(success_data)
+      FileUtils.rm_f(failure_log)
+      File.write(success_log, content)
+      File.write(session_success_log, content)
 
     end
   rescue StandardError => e
@@ -1258,89 +1092,11 @@ RSpec.configure do |config|
     File.write(error_log, JSON.pretty_generate(error_data))
   end
 
-  # Setup signal handlers and pre-build test sites
+  # Setup signal handlers and shared test lifecycle
   config.before(:suite) do
     setup_signal_handlers
-
-    # Start a file server for HTTP provider tests via Docker
-    # Docker containers use host.docker.internal:4000 to fetch source images
-    # encode_file_url produces paths relative to site.source, which varies per test.
-    # Use a proc handler that searches candidate roots to resolve the file.
-    if ENV["IMGFLOW_TEST_PROVIDER"] && HTTP_API_PROVIDERS.include?(ENV["IMGFLOW_TEST_PROVIDER"].capitalize)
-      require "webrick"
-
-      project_root = File.expand_path("..", __dir__)
-
-      TestSiteRegistry.instance.test_file_server = WEBrick::HTTPServer.new(
-        BindAddress: "0.0.0.0",
-        Port: 4000,
-        Logger: WEBrick::Log.new(File::NULL),
-        AccessLog: []
-      )
-
-      # Custom servlet: resolve URL path against candidate document roots
-      TestSiteRegistry.instance.test_file_server.mount_proc("/") do |req, res|
-        path = req.path_info
-        # Candidate roots: project root, filesystem root, /tmp,
-        # and all subdirs of tmp/tests (for jekyll_integration_spec test sites)
-        candidates = [project_root, "/", "/tmp"]
-        tests_dir = File.join(project_root, "tmp", "tests")
-        Dir.glob(File.join(tests_dir, "*")).each { |d| candidates << d } if Dir.exist?(tests_dir)
-        found = nil
-        candidates.each do |root|
-          full = File.join(root, path)
-          if File.file?(full)
-            found = full
-            break
-          end
-        end
-
-        if found
-          res.body = File.binread(found)
-          res["content-type"] = WEBrick::HTTPUtils.mime_type(found, WEBrick::HTTPUtils::DefaultMimeTypes)
-        else
-          res.status = 404
-          res.body = "Not found: #{path}"
-        end
-      end
-
-      Thread.new { TestSiteRegistry.instance.test_file_server.start }
-      sleep 1
-    end
-
-    # Clean up old temp files before starting
+    TestEnvironment.start_source_server
     cleanup_temp_output_files if ENV["TEST_ENV_NUMBER"].to_i == 0
-
-    # Pre-build test sites only once (first parallel process does this)
-    # Other processes will wait and reuse the pre-built sites
-    # Singleton pattern handles frozen hash issues automatically
-    base_tmp_dir = File.join(local_tmp_dir, "test_sites")
-
-    if ENV["TEST_ENV_NUMBER"].to_i == 0
-      prebuild_test_sites
-    else
-      # Wait for pre-built sites to be ready
-      max_wait = 60 # seconds
-      waited = 0
-
-      until File.exist?(base_tmp_dir) &&
-            Dir.glob(File.join(base_tmp_dir, "site_*")).length >= MAX_PARALLEL_PROCESSES
-        sleep 1
-        waited += 1
-        break if waited > max_wait
-      end
-    end
-
-    # Load pre-built site info
-    if File.exist?(base_tmp_dir)
-      Dir.glob(File.join(base_tmp_dir, "site_*")).each_with_index do |site_dir, i|
-        TestSiteRegistry.instance.add_site(i, {
-                                             site_dir: site_dir,
-                                             built_at: File.mtime(site_dir),
-                                             port: PARALLEL_PORT_BASE + i
-                                           })
-      end
-    end
   end
 
   # Per-test cleanup to ensure clean state
@@ -1351,10 +1107,7 @@ RSpec.configure do |config|
 
   # Comprehensive cleanup after entire test suite
   config.after(:suite) do
-    if TestSiteRegistry.instance.test_file_server
-      TestSiteRegistry.instance.test_file_server.shutdown
-      TestSiteRegistry.instance.test_file_server = nil
-    end
+    TestEnvironment.stop_source_server
     cleanup_all_test_artifacts
   end
 
@@ -1398,6 +1151,7 @@ RSpec.configure do |config|
 
   # Setup common test helpers
   config.include ProviderTestHelpers
+  config.include ProviderIntegrationHelper
   config.include TestImageHelpers
 end
 

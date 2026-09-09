@@ -557,8 +557,9 @@ RSpec.describe "JekyllImgFlow Version System - RSpec Helper Integration", :unit 
 
   describe "Edge Cases and Error Handling" do
     it "handles missing manifest file gracefully" do
-      # Use a site with non-existent dest - create a proper mock
+      # Use a site with non-existent source - create a proper mock
       empty_site = double("site",
+                          source: File.join(test_site_dir, "nonexistent"),
                           dest: File.join(test_site_dir, "nonexistent"),
                           config: TEST_CONFIG)
       empty_manager = JekyllImgFlow::ManifestManager.new(empty_site)

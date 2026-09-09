@@ -1,35 +1,56 @@
 # Enhanced ImgFlow Performance Benchmark Report (DEFAULT SET)
 
-**Generated:** 2026-03-27T11:27:56+0100
-**Ruby Version:** 3.2.7
-**Operating System:** macOS 26.3.1
+**Generated:** 2026-09-08T08:32:14+0200
+**Ruby Version:** 3.4.10
+**Operating System:** macOS 26.6.2
 **CPU:** Apple M2
 **Memory:** 24.0 GB
 **CPU Cores:** 8 total, 7 used for testing
-**Test Set:** DEFAULT SET (1 images)
+**Test Set:** DEFAULT SET (1 image)
 
 ## Summary Table
 
-| Provider | Runtime (s) | Images Generated | Total Size (MB) | Avg Size (KB) |
-|----------|-------------|------------------|-----------------|---------------|
-| SHARP | 42.1 | 122 | 55.44 | 465.35 |
-| IMGPROXY | 1.27 | 0 | 0.0 | 0 |
-| IMAGEMAGICK | 136.21 | 122 | 56.37 | 473.15 |
-| LIBVIPS | 858.31 | 110 | 571.0 | 5315.45 |
-| WESERV | 3.54 | 0 | 0.0 | 0 |
-| FLYIMG | 1.48 | 0 | 0.0 | 0 |
+| Provider | Cold (s) | Warm (s) | Images Generated | Total Size (MB) | Avg Size (KB) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SHARP | 8.77 | 0.07 | 20 | 18.7 | 957.31 |
+| LIBVIPS | 6.97 | 0.07 | 20 | 18.41 | 942.84 |
+| IMAGEMAGICK | 5.75 | 0.08 | 20 | 14.05 | 719.12 |
+
+## Cache Performance
+
+| Provider | Cold Misses | Warm Hits | Warm Misses | Warm Hit Rate (%) |
+| --- | ---: | ---: | ---: | ---: |
+| SHARP | 20 | 33 | 0 | 100.0 |
+| LIBVIPS | 20 | 33 | 0 | 100.0 |
+| IMAGEMAGICK | 20 | 33 | 0 | 100.0 |
+
+## Processing Time by Primary Operation (s)
+
+| Provider | resize |
+| --- | ---: |
+| SHARP | 8.664 |
+| LIBVIPS | 6.877 |
+| IMAGEMAGICK | 5.647 |
+
+## Compression Ratio by Format (% saved)
+
+| Provider | avif | jpg | png | webp |
+| --- | ---: | ---: | ---: | ---: |
+| SHARP | 90.6% | 93.5% | 20.3% | 94.2% |
+| LIBVIPS | 93.0% | 92.9% | 20.1% | 94.1% |
+| IMAGEMAGICK | 91.4% | 90.0% | 49.1% | 93.3% |
 
 ## Test Library Information
 
-**Total Input Library Size:** 17.76 MB
+**Total Input Library Size:** 3.69 MB
 **Number of Test Images:** 1
 **Test Sizes:** 400, 800, 1200, 1600px
-**Output Formats:** webp, avif, jpg, png
+**Output Formats:** avif, webp, png, jpg
 
 ## Key Findings
 
-- **Fastest Provider:** imgproxy
-- **Total Processing Time:** 1042.91s
+- **Fastest Provider:** imagemagick
+- **Total Processing Time:** 21.49s
 
 ---
 

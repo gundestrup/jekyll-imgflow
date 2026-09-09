@@ -16,7 +16,7 @@ This template defines the structure for performance benchmark reports.
 ## Test Images
 
 | Name | Description | Dimensions | Original Size |
-|------|-------------|------------|---------------|
+| --- | --- | --- | ---: |
 | IMAGE_TABLE_ROWS
 
 ## Provider Performance
@@ -31,7 +31,7 @@ This template defines the structure for performance benchmark reports.
 - **Average Compression:** PERCENTAGE%
 
 | Size | Time (s) | Original (MB) | Processed (MB) | Compression |
-|------|----------|----------------|-----------------|------------|
+| --- | ---: | ---: | ---: | ---: |
 | SIZE_TABLE_ROWS
 
 ## Summary

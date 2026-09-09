@@ -323,7 +323,9 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       allow(config).to receive_messages(determine_version_type: :default, formats: ["webp"], quality: 85)
 
       allow(filename_generator).to receive(:generate_filename).and_return("test-800-hash.webp")
-      allow(path_resolver).to receive(:resolve_output_path).and_return("/tmp/test_site/_site/assets/images/optimized/test-800-hash.webp")
+      allow(File).to receive(:file?).and_call_original
+      allow(File).to receive(:file?).with(a_string_ending_with("test-800-hash.webp"))
+                                    .and_return(true)
 
       allow(manifest).to receive(:version_exists?).and_return(true)
       allow(manifest).to receive(:update_page_usage)
@@ -336,6 +338,26 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
                         context)
       expect(manifest).to have_received(:update_page_usage)
       expect(result).to eq("<img>")
+    end
+
+    it "regenerates a manifest version whose output file is missing" do
+      allow(tag).to receive(:resolve_image_path).and_return(fixture_image_path)
+      allow(config).to receive_messages(determine_version_type: :default, formats: ["webp"], quality: 85)
+      allow(filename_generator).to receive(:generate_filename).and_return("missing-800-hash.webp")
+      allow(manifest).to receive_messages(
+        version_exists?: true,
+        get_versions: { "default" => [], "specialized" => [] }
+      )
+      allow(operation_processor).to receive(:process_operation)
+        .and_return(path_resolver.resolve_source_output_path("missing-800-hash.webp"))
+      allow(JekyllImgFlow::HtmlGenerator).to receive(:generate).and_return("<img>")
+
+      tag.send(:process_operations, components,
+               { image_path: "test.jpg",
+                 operations: [{ type: :resize, params: { width: 800 } }] },
+               context)
+
+      expect(operation_processor).to have_received(:process_operation)
     end
   end
 
@@ -374,7 +396,9 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       allow(File).to receive(:file?).and_return(true)
 
       allow(config).to receive(:determine_version_type).and_return(:specialized)
-      allow(filename_generator).to receive(:generate_filename).and_return("test-800-hash.webp")
+      allow(filename_generator).to receive_messages(
+        generate_filename: "test-800-hash.webp", file_digest: "digest"
+      )
       allow(path_resolver).to receive(:resolve_output_path).and_return("/tmp/test_site/_site/assets/images/optimized/test-800-hash.webp")
 
       allow(manifest).to receive_messages(version_exists?: false, get_versions: {})
@@ -393,7 +417,9 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       allow(tag).to receive(:resolve_image_path).and_return(fixture_image_path)
 
       allow(config).to receive(:determine_version_type).and_return(:specialized)
-      allow(filename_generator).to receive(:generate_filename).and_return("test-800-hash.webp")
+      allow(filename_generator).to receive_messages(
+        generate_filename: "test-800-hash.webp", file_digest: "digest"
+      )
       allow(path_resolver).to receive(:resolve_output_path).and_return("/tmp/test_site/_site/assets/images/optimized/test-800-hash.webp")
 
       allow(manifest).to receive_messages(version_exists?: false, get_versions: {})
@@ -406,6 +432,207 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
                           operations: [{ type: :resize, params: { width: 800 } }] },
                         context)
       expect(result).to eq("<img>")
+    end
+  end
+
+  describe "#process_variants format expansion" do
+    let(:config) { JekyllImgFlow::Config.new(site) }
+    let(:components) { { config: config } }
+
+    before do
+      allow(tag).to receive(:process_variant) do |_, _, params, _, _, _|
+        "/tmp/output-#{params[:format]}.img"
+      end
+    end
+
+    context "when no format is specified" do
+      it "expands to all config formats for a specialized width" do
+        operation = { type: :resize, params: { width: 300 } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(config.formats.length)
+        config.formats.each do |format|
+          expect(results).to include("/tmp/output-#{format}.img")
+        end
+      end
+
+      it "expands to all config formats for a default width" do
+        operation = { type: :resize, params: { width: 400 } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(config.formats.length)
+        config.formats.each do |format|
+          expect(results).to include("/tmp/output-#{format}.img")
+        end
+      end
+    end
+
+    context "when a single format is explicitly specified" do
+      it "uses only that format for a specialized width" do
+        operation = { type: :resize, params: { width: 300, format: "avif" } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(1)
+        expect(results).to include("/tmp/output-avif.img")
+      end
+
+      it "uses only that format for a default width" do
+        operation = { type: :resize, params: { width: 400, format: "avif" } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(1)
+        expect(results).to include("/tmp/output-avif.img")
+      end
+
+      it "uses webp only when format:webp is specified" do
+        operation = { type: :resize, params: { width: 300, format: "webp" } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(1)
+        expect(results).to include("/tmp/output-webp.img")
+      end
+    end
+
+    context "when multiple formats are explicitly specified" do
+      it "uses avif and png for a specialized width" do
+        operation = { type: :resize, params: { width: 300, formats: %w[avif png] } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(2)
+        expect(results).to include("/tmp/output-avif.img", "/tmp/output-png.img")
+      end
+
+      it "uses avif and png for a default width" do
+        operation = { type: :resize, params: { width: 400, formats: %w[avif png] } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(2)
+        expect(results).to include("/tmp/output-avif.img", "/tmp/output-png.img")
+      end
+
+      it "uses webp and jpg for a specialized width" do
+        operation = { type: :resize, params: { width: 300, formats: %w[webp jpg] } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(2)
+        expect(results).to include("/tmp/output-webp.img", "/tmp/output-jpg.img")
+      end
+
+      it "uses webp and jpg for a default width" do
+        operation = { type: :resize, params: { width: 800, formats: %w[webp jpg] } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(2)
+        expect(results).to include("/tmp/output-webp.img", "/tmp/output-jpg.img")
+      end
+
+      it "uses all three formats when formats:avif,webp,jpg is specified" do
+        operation = { type: :resize, params: { width: 300, formats: %w[avif webp jpg] } }
+
+        results = tag.send(:process_variants, components, operation, "test.jpg",
+                           "/tmp/test.jpg", "/page")
+
+        expect(results.length).to eq(3)
+        expect(results).to include("/tmp/output-avif.img", "/tmp/output-webp.img",
+                                   "/tmp/output-jpg.img")
+      end
+    end
+  end
+
+  describe "#process_variant format preservation for default versions" do
+    let(:config) { JekyllImgFlow::Config.new(site) }
+    let(:manifest) { double("manifest") }
+    let(:path_resolver) { JekyllImgFlow::PathResolver.new(config) }
+    let(:filename_generator) { JekyllImgFlow::FilenameGenerator.new }
+    let(:components) do
+      {
+        config: config, manifest: manifest, path_resolver: path_resolver,
+        filename_generator: filename_generator, stats: nil
+      }
+    end
+
+    before do
+      allow(manifest).to receive_messages(version_exists?: false, update_page_usage: nil,
+                                          register_version: nil, get_versions: {})
+      allow(Jekyll.logger).to receive(:debug)
+    end
+
+    it "preserves explicit avif format for a default-width version" do
+      params = { width: 400, format: "avif" }
+      operation = { type: :resize, params: params, file_digest: "digest" }
+
+      allow(filename_generator).to receive(:file_digest).and_return("digest")
+      allow(filename_generator).to receive(:generate_filename) do |_, ops|
+        "test-#{ops[:width]}-#{ops[:format]}.img"
+      end
+      allow(path_resolver).to receive(:resolve_source_output_path) do |filename|
+        "/tmp/#{filename}"
+      end
+
+      tag.send(:process_variant, components, operation, params, "test.jpg",
+               fixture_image_path, "/page")
+
+      expect(filename_generator).to have_received(:generate_filename)
+        .with(anything, hash_including(format: "avif"))
+    end
+
+    it "preserves explicit webp format for a default-width version" do
+      params = { width: 800, format: "webp" }
+      operation = { type: :resize, params: params, file_digest: "digest" }
+
+      allow(filename_generator).to receive(:file_digest).and_return("digest")
+      allow(filename_generator).to receive(:generate_filename) do |_, ops|
+        "test-#{ops[:width]}-#{ops[:format]}.img"
+      end
+      allow(path_resolver).to receive(:resolve_source_output_path) do |filename|
+        "/tmp/#{filename}"
+      end
+
+      tag.send(:process_variant, components, operation, params, "test.jpg",
+               fixture_image_path, "/page")
+
+      expect(filename_generator).to have_received(:generate_filename)
+        .with(anything, hash_including(format: "webp"))
+    end
+
+    it "does not inject config.formats.first when format is already set" do
+      params = { width: 400, format: "png" }
+      operation = { type: :resize, params: params, file_digest: "digest" }
+
+      allow(filename_generator).to receive(:file_digest).and_return("digest")
+      allow(filename_generator).to receive(:generate_filename) do |_, ops|
+        "test-#{ops[:width]}-#{ops[:format]}.img"
+      end
+      allow(path_resolver).to receive(:resolve_source_output_path) do |filename|
+        "/tmp/#{filename}"
+      end
+
+      tag.send(:process_variant, components, operation, params, "test.jpg",
+               fixture_image_path, "/page")
+
+      # format should still be "png", not config.formats.first (avif)
+      expect(filename_generator).to have_received(:generate_filename)
+        .with(anything, hash_including(format: "png"))
+      expect(filename_generator).not_to have_received(:generate_filename)
+        .with(anything, hash_including(format: "avif"))
     end
   end
 end

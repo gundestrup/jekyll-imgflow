@@ -1,0 +1,7 @@
+operations:
+  - resize:
+      width: 800
+  - format:
+      formats: ["avif", "webp", "jpg"]
+  - quality:
+      quality: 85

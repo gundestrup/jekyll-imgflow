@@ -47,6 +47,8 @@ module JekyllImgFlow
 
         Jekyll.logger.debug "🔍 ResizeTag: About to execute provider - input: #{input_path}, output: #{output_path}"
         @provider.resize(width, height, resize_data)
+        @provider.quality(options[:quality]) if options[:quality]
+        @provider.convert_format(options[:format]) if options[:format]
         result = @provider.execute(input_path, output_path)
         Jekyll.logger.debug "🔍 ResizeTag: Provider executed - result: #{result}, output exists: #{File.exist?(output_path)}"
         result

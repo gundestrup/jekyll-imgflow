@@ -600,6 +600,24 @@ RSpec.describe JekyllImgFlow::BatchManager, :unit do
     end
   end
 
+  describe "#process_task forced processing" do
+    it "processes a changed digest even when output mtime is current" do
+      task = create_batch_task("test.jpg", "/input.jpg", "/output.jpg",
+                               skip_if_exists: true)
+      task[:force_processing] = true
+      batch_manager.add_task(task)
+      allow(File).to receive(:exist?).with("/output.jpg").and_return(true)
+      allow(operation_processor).to receive_messages(
+        needs_processing?: false, process_operation: "/output.jpg"
+      )
+
+      batch_manager.process_all
+
+      expect(operation_processor).to have_received(:process_operation)
+      expect(batch_manager.completed.first[:status]).to eq(:processed)
+    end
+  end
+
   describe "#process_task error handling" do
     it "marks task as failed when processing raises" do
       task = create_batch_task("test.jpg", "/input.jpg", "/output.jpg", skip_if_exists: false)

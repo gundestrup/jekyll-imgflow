@@ -24,6 +24,12 @@ RSpec.describe JekyllImgFlow::OperationProcessor, :unit do
       expect(processor.instance_variable_get(:@path_resolver)).to eq(path_resolver)
       expect(processor.instance_variable_get(:@filename_generator)).to be_a(JekyllImgFlow::FilenameGenerator)
     end
+
+    it "initializes a ProcessingStats instance" do
+      expect(processor.stats).to be_a(JekyllImgFlow::ProcessingStats)
+      expect(processor.stats.cache_hits).to eq(0)
+      expect(processor.stats.cache_misses).to eq(0)
+    end
   end
 
   describe "#process_single_operation" do
@@ -199,6 +205,107 @@ RSpec.describe JekyllImgFlow::OperationProcessor, :unit do
     end
   end
 
+  describe "ProcessingStats integration" do
+    let(:original_name) { "mars-crater-large.jpg" }
+    let(:input_path) { test_image }
+    let(:operation) do
+      { type: :resize, params: { width: 800, format: "jpg", quality: 85 },
+        force_processing: true }
+    end
+
+    context "when processing a new image (cache miss)" do
+      it "records a cache miss" do
+        processor.process_operation(original_name, operation, input_path)
+        expect(processor.stats.cache_misses).to eq(1)
+        expect(processor.stats.cache_hits).to eq(0)
+      end
+
+      it "records operation timing for the operation type" do
+        processor.process_operation(original_name, operation, input_path)
+        expect(processor.stats.operation_timings).to have_key(:resize)
+        expect(processor.stats.operation_timings[:resize]).to be > 0
+      end
+
+      it "records a compression ratio for the output format" do
+        processor.process_operation(original_name, operation, input_path)
+        ratios = processor.stats.average_compression_ratios
+        expect(ratios).to have_key("jpg")
+        # mars-crater-large.jpg is large; output should be smaller
+        expect(ratios["jpg"]).to be > 0
+      end
+    end
+
+    context "when output is already up-to-date (cache hit)" do
+      let(:non_forced_operation) do
+        { type: :resize, params: { width: 800, format: "jpg", quality: 85 } }
+      end
+
+      before do
+        # First call with force generates the output
+        processor.process_operation(original_name, operation, input_path)
+        # Reset stats to isolate the second call
+        processor.stats.reset
+      end
+
+      it "records a cache hit and no miss" do
+        # Second call without force should find output up-to-date
+        processor.process_operation(original_name, non_forced_operation, input_path)
+        expect(processor.stats.cache_hits).to eq(1)
+        expect(processor.stats.cache_misses).to eq(0)
+      end
+
+      it "does not record operation timing" do
+        processor.process_operation(original_name, non_forced_operation, input_path)
+        expect(processor.stats.operation_timings).to be_empty
+      end
+
+      it "does not record a compression ratio" do
+        processor.process_operation(original_name, non_forced_operation, input_path)
+        expect(processor.stats.compression_ratios).to be_empty
+      end
+    end
+
+    context "when processing an animated GIF" do
+      let(:original_name) { "ang-head-animation.gif" }
+      let(:input_path) do
+        File.expand_path("fixtures/originals/ang-head-animation.gif", __dir__)
+      end
+      let(:operation) do
+        { type: :resize, params: { width: 400, format: "webp", quality: 85 },
+          force_processing: true }
+      end
+
+      it "records a cache miss (copy, not a cache hit)" do
+        processor.process_operation(original_name, operation, input_path)
+        expect(processor.stats.cache_misses).to eq(1)
+        expect(processor.stats.cache_hits).to eq(0)
+      end
+
+      it "does not record operation timing (no provider call)" do
+        processor.process_operation(original_name, operation, input_path)
+        expect(processor.stats.operation_timings).to be_empty
+      end
+    end
+
+    context "with force_processing" do
+      let(:operation) do
+        { type: :resize, params: { width: 800, format: "jpg", quality: 85 },
+          force_processing: true }
+      end
+
+      it "records a cache miss even when output exists" do
+        # First call generates output
+        processor.process_operation(original_name, operation, input_path)
+        processor.stats.reset
+
+        # Second call with force_processing should still miss
+        processor.process_operation(original_name, operation, input_path)
+        expect(processor.stats.cache_misses).to eq(1)
+        expect(processor.stats.cache_hits).to eq(0)
+      end
+    end
+  end
+
   describe "#needs_processing?" do
     let(:input_path) { test_image }
     let(:output_path) { File.join(output_dir, "output.jpg") }
@@ -225,14 +332,34 @@ RSpec.describe JekyllImgFlow::OperationProcessor, :unit do
       sleep 0.1
       FileUtils.touch(output_path)
 
-      # Create cache key file so needs_processing? recognizes up-to-date state
-      cache_key = processor.instance_variable_get(:@filename_generator)
-                           .generate_cache_key(operations)
-      File.write("#{output_path}.cache_key", cache_key)
-
       result = processor.needs_processing?(input_path, output_path, operations)
 
       expect(result).to be false
+    end
+  end
+
+  describe "#output_up_to_date?" do
+    let(:input_path) { test_image }
+    let(:output_path) { File.join(output_dir, "output.jpg") }
+
+    it "returns false when output doesn't exist" do
+      expect(processor.output_up_to_date?(input_path, output_path)).to be false
+    end
+
+    it "returns true when output exists and input is not newer" do
+      FileUtils.touch(input_path)
+      sleep 0.1
+      FileUtils.touch(output_path)
+
+      expect(processor.output_up_to_date?(input_path, output_path)).to be true
+    end
+
+    it "returns false when input is newer than output" do
+      FileUtils.touch(output_path)
+      sleep 0.1
+      FileUtils.touch(input_path)
+
+      expect(processor.output_up_to_date?(input_path, output_path)).to be false
     end
   end
 

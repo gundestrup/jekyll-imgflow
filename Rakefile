@@ -6,6 +6,11 @@ require "rspec/core/rake_task"
 require "yard"
 require "jekyll"
 require "net/http"
+require "fileutils"
+require "parallel"
+require_relative "lib/jekyll-imgflow/tasks"
+require_relative "spec/support/test_environment"
+require_relative "spec/support/docker_service_status"
 
 VERSION_FILE = File.expand_path("lib/jekyll-imgflow/version.rb", __dir__)
 CHANGELOG_FILE = File.expand_path("CHANGELOG.md", __dir__)
@@ -114,7 +119,7 @@ end
 
 # Integration tests only
 RSpec::Core::RakeTask.new(:spec_integration) do |t|
-  t.rspec_opts = "--require spec_helper --tag integration"
+  t.rspec_opts = "--options /dev/null --require spec_helper --tag integration"
   t.verbose = true
   t.fail_on_error = true
   t.pattern = "spec/**/*_spec.rb"
@@ -122,10 +127,10 @@ end
 
 # Performance tests only (sequential, with profiling)
 RSpec::Core::RakeTask.new(:spec_performance) do |t|
-  t.rspec_opts = "--require spec_helper --tag performance --profile 5"
+  t.rspec_opts = "--require spec_helper --tag slow --profile 5"
   t.verbose = true
   t.fail_on_error = true
-  t.pattern = "spec/**/*_spec.rb"
+  t.pattern = "spec/performance_benchmark_spec.rb"
 end
 
 # Slow tests (for debugging)
@@ -180,6 +185,98 @@ namespace :parallel do
     puts "📝 Using .rspec_parallel configuration (excludes :slow and :external)"
     ENV["COVERAGE"] = "true"
     sh "bundle exec parallel_rspec -n #{processes}"
+  end
+
+  desc "Run slow tests in parallel with a dynamic work queue"
+  task :slow do
+    providers = TestEnvironment::PROVIDERS
+    provider_spec = "spec/provider_real_world_integration_spec.rb"
+    base_env = {
+      "IMGFLOW_TEST_PROVIDER" => nil,
+      "IMGFLOW_TEST_PORT" => nil,
+      "IMGFLOW_TEST_SOURCE_SERVER" => nil,
+      "IMGFLOW_TEST_HTTP" => nil,
+      "TEST_ENV_NUMBER" => nil,
+      "IMGFLOW_USE_PREBUILT" => nil,
+      "IMGFLOW_TEST_PICTURES" => "quick"
+    }
+    job = lambda do |name, command, env = {}|
+      { name: name, command: command, env: base_env.merge(env) }
+    end
+
+    work_queue = providers.map do |provider|
+      env = { "IMGFLOW_TEST_PROVIDER" => provider }
+      if TestEnvironment.http_provider?(provider)
+        env["IMGFLOW_TEST_PORT"] = TestEnvironment.source_port_for(provider).to_s
+        env["IMGFLOW_TEST_SOURCE_SERVER"] = "webrick"
+      end
+      job.call(
+        "#{provider} provider tests",
+        "bundle exec rspec #{provider_spec} --tag slow --tag ~provider_cross --tag ~provider_error --tag ~provider_change --tag ~provider_performance",
+        env
+      )
+    end
+
+    work_queue << job.call(
+      "cross-provider comparison",
+      "bundle exec rspec #{provider_spec} --tag slow --tag ~provider_single --tag ~provider_error --tag ~provider_performance --tag ~provider_change",
+      "IMGFLOW_TEST_PORT" => TestEnvironment.special_port_for(:cross_provider).to_s,
+      "IMGFLOW_TEST_SOURCE_SERVER" => "webrick"
+    )
+    work_queue << job.call(
+      "manifest provider change",
+      "bundle exec rspec #{provider_spec} --tag slow --tag ~provider_single --tag ~provider_cross --tag ~provider_error --tag ~provider_performance",
+      "IMGFLOW_TEST_SOURCE_SERVER" => "none"
+    )
+    work_queue << job.call(
+      "provider error handling",
+      "bundle exec rspec #{provider_spec} --tag slow --tag ~provider_single --tag ~provider_cross --tag ~provider_performance --tag ~provider_change",
+      "IMGFLOW_TEST_PROVIDER" => "sharp"
+    )
+    work_queue << job.call(
+      "realworld build",
+      "bundle exec rspec spec/realworld_build_spec.rb --tag slow"
+    )
+    serial_jobs = [
+      job.call(
+        "provider performance thresholds",
+        "bundle exec rspec #{provider_spec} --tag slow --tag ~provider_single --tag ~provider_cross --tag ~provider_error --tag ~provider_change",
+        "IMGFLOW_TEST_PORT" => TestEnvironment.special_port_for(:performance).to_s,
+        "IMGFLOW_TEST_SOURCE_SERVER" => "webrick"
+      ),
+      job.call(
+        "performance benchmark",
+        "bundle exec rspec spec/performance_benchmark_spec.rb --tag slow --tag performance",
+        "IMGFLOW_TEST_PORT" => TestEnvironment.special_port_for(:performance).to_s,
+        "IMGFLOW_TEST_SOURCE_SERVER" => "jekyll"
+      )
+    ]
+
+    cpu_count = `sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4`.to_i
+    requested_workers = ENV.fetch("IMGFLOW_MAX_PARALLEL_PROCESSES", cpu_count - 1).to_i
+    max_workers = [requested_workers, 1].max
+    max_workers = [max_workers, 7, work_queue.length].min
+
+    run_job = lambda do |queued_job|
+      puts "  ▶ #{queued_job[:name]}"
+      success = system(queued_job[:env], queued_job[:command])
+      { name: queued_job[:name], success: success == true }
+    rescue StandardError => e
+      { name: queued_job[:name], success: false, error: e.message }
+    end
+
+    puts "🐌 Running #{work_queue.length} parallel slow jobs with #{max_workers} workers"
+    results = Parallel.map(work_queue, in_processes: max_workers, &run_job)
+    serial_jobs.each do |queued_job|
+      results << run_job.call(queued_job)
+    end
+
+    failed = results.reject { |result| result[:success] }
+    failed.each do |result|
+      puts "  ❌ #{result[:name]}#{": #{result[:error]}" if result[:error]}"
+    end
+    puts "\n📊 Results: #{results.length - failed.length} passed, #{failed.length} failed"
+    exit 1 unless failed.empty?
   end
 end
 
@@ -603,121 +700,21 @@ task :check_gems do
   end
 end
 
-desc "Run comprehensive test suite (all test types)"
+desc "Run the default comprehensive suite once (slow tests are separate)"
 task :test_comprehensive do
   Jekyll.logger.info "🚀 ImgFlow Comprehensive Test Suite"
   Jekyll.logger.info "=" * 50
-
-  # Pre-flight checks
   Rake::Task[:check_gems].invoke
   Rake::Task[:check_services].invoke
-
+  Jekyll.logger.info ""
+  Jekyll.logger.info "📝 Running all non-slow RSpec examples once"
+  Jekyll.logger.info "   Run rake parallel:slow for real provider and system builds"
   Jekyll.logger.info ""
 
-  # Define test groups
-  test_groups = [
-    {
-      name: "Tags System Tests",
-      description: "All tag functionality and edge cases",
-      files: [
-        "spec/tags/*_spec.rb",
-        "spec/tags_system_spec.rb"
-      ]
-    },
-    {
-      name: "Presets System Tests",
-      description: "Preset management and configuration",
-      files: [
-        "spec/preset_manager_spec.rb",
-        "spec/preset_system_spec.rb"
-      ]
-    },
-    {
-      name: "Core System Tests",
-      description: "Core components (build processor, hooks, providers)",
-      files: [
-        "spec/build_time_processor_spec.rb",
-        "spec/hooks_spec.rb",
-        "spec/provider_capabilities_spec.rb",
-        "spec/provider_interface_spec.rb",
-        "spec/provider_registry_spec.rb"
-      ]
-    },
-    {
-      name: "Integration Tests",
-      description: "Full system integration and Jekyll compatibility",
-      files: [
-        "spec/jekyll_integration_spec.rb",
-        "spec/jekyll_dev_server_integration_spec.rb",
-        "spec/picture_tag_integration_spec.rb",
-        "spec/imgflow_system_spec.rb"
-      ]
-    }
-  ]
-
-  failed_groups = []
-
-  test_groups.each do |group|
-    Jekyll.logger.info "🧪 Running #{group[:name]}..."
-    Jekyll.logger.info "📝 #{group[:description]}"
-    Jekyll.logger.info ""
-
-    # Run all files in the group
-    group_failed = false
-    group[:files].each do |file_pattern|
-      if file_pattern.include?("*")
-        # Handle glob patterns
-        Dir.glob(file_pattern).each do |file|
-          Jekyll.logger.info "  🔸 Running #{File.basename(file)}..."
-          if system("bundle exec rspec #{file} --format progress")
-            Jekyll.logger.info "  ✅ #{File.basename(file)} PASSED"
-          else
-            Jekyll.logger.error "  ❌ #{File.basename(file)} FAILED"
-            group_failed = true
-          end
-        end
-      elsif File.exist?(file_pattern)
-        # Handle individual files
-        Jekyll.logger.info "  🔸 Running #{File.basename(file_pattern)}..."
-        if system("bundle exec rspec #{file_pattern} --format progress")
-          Jekyll.logger.info "  ✅ #{File.basename(file_pattern)} PASSED"
-        else
-          Jekyll.logger.error "  ❌ #{File.basename(file_pattern)} FAILED"
-          group_failed = true
-        end
-      else
-        Jekyll.logger.warn "  ⚠️  File not found: #{file_pattern}"
-      end
-    end
-
-    if group_failed
-      Jekyll.logger.error "❌ #{group[:name]} FAILED"
-      failed_groups << group[:name]
-    else
-      Jekyll.logger.info "✅ #{group[:name]} PASSED"
-    end
-    Jekyll.logger.info ""
-  end
-
-  # Summary
-  Jekyll.logger.info "=" * 50
-  Jekyll.logger.info "🏁 Test Group Summary"
-  Jekyll.logger.info "=" * 50
-
-  if failed_groups.empty?
-    Jekyll.logger.info "🎉 ALL TEST GROUPS PASSED! 🎉"
-    Jekyll.logger.info ""
-    Jekyll.logger.info "✅ Tags System Tests"
-    Jekyll.logger.info "✅ Presets System Tests"
-    Jekyll.logger.info "✅ Core System Tests"
-    Jekyll.logger.info "✅ Integration Tests"
-    Jekyll.logger.info ""
-    Jekyll.logger.info "🚀 ImgFlow plugin is ready for production!"
+  if system("bundle exec rspec --tag ~slow --format documentation")
+    Jekyll.logger.info "🎉 ALL DEFAULT TESTS PASSED! 🎉"
   else
-    Jekyll.logger.error "❌ Some test groups failed:"
-    failed_groups.each { |group| Jekyll.logger.error "  - #{group}" }
-    Jekyll.logger.error ""
-    Jekyll.logger.error "Please check the failed tests and fix any issues before deployment."
+    Jekyll.logger.error "❌ Default test suite failed"
     exit 1
   end
 end
@@ -968,7 +965,7 @@ task :test_performance do
   # Set environment for performance tests
   ENV["PERFORMANCE"] = "true"
 
-  if system("bundle exec rspec --tag performance --format documentation")
+  if system("bundle exec rspec spec/performance_benchmark_spec.rb --tag slow --format documentation")
     Jekyll.logger.info "🎉 ALL PERFORMANCE TESTS PASSED! 🎉"
   else
     Jekyll.logger.error "❌ Performance tests failed"
@@ -1117,7 +1114,7 @@ task :test_performance_only do
   # Set environment for performance tests
   ENV["PERFORMANCE"] = "true"
 
-  if system("bundle exec rspec --tag performance --format documentation")
+  if system("bundle exec rspec spec/performance_benchmark_spec.rb --tag slow --format documentation")
     Jekyll.logger.info "✅ Performance tests passed"
   else
     Jekyll.logger.error "❌ Performance tests failed"
@@ -1130,7 +1127,7 @@ task :test_integration_only do
   Jekyll.logger.info "🔗 Running Integration Tests Only..."
   Jekyll.logger.info "=" * 40
 
-  if system("bundle exec rspec --tag integration --format documentation")
+  if system("bundle exec rspec --options /dev/null --require spec_helper --tag integration --format documentation")
     Jekyll.logger.info "✅ Integration tests passed"
   else
     Jekyll.logger.error "❌ Integration tests failed"
@@ -1143,7 +1140,7 @@ task :test_provider_only do
   Jekyll.logger.info "🌐 Running Provider Tests Only..."
   Jekyll.logger.info "=" * 40
 
-  if system("bundle exec rspec --tag provider --format documentation")
+  if system("bundle exec rspec --options /dev/null --require spec_helper --tag provider --format documentation")
     Jekyll.logger.info "✅ Provider tests passed"
   else
     Jekyll.logger.error "❌ Provider tests failed"
@@ -1156,7 +1153,7 @@ task :test_system_only do
   Jekyll.logger.info "🖥️  Running System Tests Only..."
   Jekyll.logger.info "=" * 40
 
-  if system("bundle exec rspec --tag system --format documentation")
+  if system("bundle exec rspec --options /dev/null --require spec_helper --tag system --format documentation")
     Jekyll.logger.info "✅ System tests passed"
   else
     Jekyll.logger.error "❌ System tests failed"
@@ -1182,7 +1179,7 @@ task :test_external_only do
   Jekyll.logger.info "🌐 Running External Tests Only..."
   Jekyll.logger.info "=" * 40
 
-  if system("bundle exec rspec --tag external --format documentation")
+  if system("bundle exec rspec --options /dev/null --require spec_helper --tag external --format documentation")
     Jekyll.logger.info "✅ External tests passed"
   else
     Jekyll.logger.error "❌ External tests failed"
@@ -1190,34 +1187,20 @@ task :test_external_only do
   end
 end
 
-desc "Run slow tests only (all slow categories)"
+desc "Run slow tests only with provider-aware scheduling"
 task :test_slow_only do
   Jekyll.logger.info "🐌 Running All Slow Tests..."
   Jekyll.logger.info "=" * 40
-  Jekyll.logger.info "📝 Includes: performance, integration, provider, system, e2e tests"
-
-  if system("bundle exec rspec --tag slow --format documentation")
-    Jekyll.logger.info "✅ All slow tests passed"
-  else
-    Jekyll.logger.error "❌ Some slow tests failed"
-    exit 1
-  end
+  Jekyll.logger.info "📝 Includes provider, integration, and performance tests"
+  Rake::Task["parallel:slow"].invoke
 end
 
-desc "Run all tests including slow tests (comprehensive)"
+desc "Run all default and slow tests (comprehensive)"
 task :test_comprehensive_all do
   Jekyll.logger.info "🚀 Running Comprehensive Test Suite (All Tests)"
   Jekyll.logger.info "=" * 50
-  Jekyll.logger.info "📝 Including all slow tests (performance, integration, provider, system)"
-  Jekyll.logger.info ""
-
-  # Run all tests without tag exclusions
-  if system("bundle exec rspec --format documentation")
-    Jekyll.logger.info "✅ All tests passed (including slow tests)"
-  else
-    Jekyll.logger.error "❌ Some tests failed"
-    exit 1
-  end
+  Rake::Task[:test_comprehensive].invoke
+  Rake::Task["parallel:slow"].invoke
 end
 
 desc "Run performance benchmark via RSpec (test integration)"
@@ -1227,7 +1210,7 @@ task :performance_test do
   # Set environment and run RSpec
   ENV["PERFORMANCE"] = "true"
 
-  unless system("bundle exec rspec spec/performance_benchmark_spec.rb --format documentation")
+  unless system("bundle exec rspec spec/performance_benchmark_spec.rb --tag slow --format documentation")
     Jekyll.logger.error "❌ Performance RSpec test failed!"
     exit 1
   end
@@ -1512,80 +1495,244 @@ task :download_test_images do
   Jekyll.logger.warn "⚠️  Some downloads failed - check URLs or network connection" if failed.positive?
 end
 
+# --- Docker image version checker --------------------------------------------
+#
+# Queries each registry for the latest version tag and compares against the
+# pins in docker-compose.base.yml. Run before releasing to catch stale pins.
+#
+#   rake check_docker_images   # report only (exit 0 even if updates exist)
+#   STRICT=true rake check_docker_images  # exit 1 if any pin is outdated
+
+require "yaml" unless defined?(YAML)
+require "json" unless defined?(JSON)
+require "uri" unless defined?(URI)
+
+COMPOSE_BASE_FILE = File.expand_path("docker-compose.base.yml", __dir__)
+
+# Fetch a URL and return the response body as a string.
+def fetch_url(url, headers = {})
+  uri = URI(url)
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = uri.scheme == "https"
+  http.read_timeout = 15
+  http.open_timeout = 10
+  request = Net::HTTP::Get.new(uri.request_uri)
+  headers.each { |key, value| request[key] = value }
+  response = http.request(request)
+  raise "HTTP #{response.code} for #{url}" unless response.code.to_i < 400
+
+  response.body
+end
+
+# Get an anonymous pull token for GHCR, then list tags.
+def ghcr_tags(repository)
+  token_url = "https://ghcr.io/token?service=ghcr.io&scope=repository:#{repository}:pull"
+  token = JSON.parse(fetch_url(token_url))["token"]
+  tags_url = "https://ghcr.io/v2/#{repository}/tags/list"
+  JSON.parse(fetch_url(tags_url, "Authorization" => "Bearer #{token}"))["tags"] || []
+end
+
+# List tags from Docker Hub (anonymous, paginated).
+def dockerhub_tags(repository)
+  tags = []
+  url = "https://hub.docker.com/v2/repositories/#{repository}/tags?ordering=last_updated&page_size=100"
+  while url
+    data = JSON.parse(fetch_url(url))
+    tags.concat(data["results"].map { |tag| tag["name"] })
+    url = data["next"]
+  end
+  tags
+end
+
+# Extract the highest semver tag from a list of tag strings.
+# Handles `v` prefix (imgproxy) and plain `X.Y.Z` (flyimg).
+# Ignores `latest`, `nightly`, branch tags like `5.x`, and pre-release suffixes.
+def latest_semver_tag(tags)
+  versions = tags.filter_map do |tag|
+    clean = tag.delete_prefix("v")
+    next nil unless clean.match?(/\A\d+\.\d+\.\d+\z/)
+
+    Gem::Version.new(clean)
+  end
+  versions.max&.to_s
+end
+
+# For weserv (uses `5.x` branch tag), check if a newer major series exists.
+def latest_weserv_major(tags)
+  majors = tags.filter_map do |tag|
+    match = tag.match(/\A(\d+)\.x\z/)
+    next nil unless match
+
+    match[1].to_i
+  end
+  majors.max
+end
+
+desc "Check if pinned Docker images in docker-compose.base.yml are outdated"
+task :check_docker_images do
+  abort "❌ #{COMPOSE_BASE_FILE} not found" unless File.exist?(COMPOSE_BASE_FILE)
+
+  compose = YAML.safe_load_file(COMPOSE_BASE_FILE)
+  services = compose["services"] || {}
+
+  Jekyll.logger.info "🔍 Checking Docker image versions against upstream registries..."
+  Jekyll.logger.info ""
+
+  outdated = []
+
+  services.each_value do |config|
+    image = config["image"]
+    next unless image
+
+    # Parse image reference: registry/repo:tag  or  repo:tag
+    # Split on the last colon to separate the tag from the reference
+    colon_index = image.rindex(":")
+    next unless colon_index
+
+    reference = image[0...colon_index]
+    current_tag = image[(colon_index + 1)..]
+    next if reference.empty? || current_tag.empty?
+
+    # Determine registry and fetch tags
+    tags = if reference.start_with?("ghcr.io/")
+             repo = reference.sub("ghcr.io/", "")
+             ghcr_tags(repo)
+           else
+             dockerhub_tags(reference)
+           end
+
+    # Compare based on tag style
+    if current_tag.match?(/\A\d+\.x\z/)
+      # Branch tag (e.g. weserv `5.x`) — check for newer major series
+      current_major = current_tag.delete_suffix(".x").to_i
+      latest_major = latest_weserv_major(tags)
+      latest_major ||= current_major
+      if latest_major > current_major
+        Jekyll.logger.warn "⚠️  #{reference}:#{current_tag} — newer series #{latest_major}.x available"
+        outdated << { image: image, current: current_tag, latest: "#{latest_major}.x" }
+      else
+        Jekyll.logger.info "✅ #{image} — #{current_tag} is the latest series"
+      end
+    else
+      # Semver tag (e.g. v4.0.14, 1.12.4)
+      current_version = Gem::Version.new(current_tag.delete_prefix("v"))
+      latest = latest_semver_tag(tags)
+      if latest.nil?
+        Jekyll.logger.warn "⚠️  #{image} — could not determine latest version from tags"
+      elsif Gem::Version.new(latest) > current_version
+        latest_tag = current_tag.start_with?("v") ? "v#{latest}" : latest
+        Jekyll.logger.warn "⚠️  #{image} — pinned #{current_tag}, latest is #{latest_tag}"
+        outdated << { image: image, current: current_tag, latest: latest_tag }
+      else
+        Jekyll.logger.info "✅ #{image} — #{current_tag} is up to date"
+      end
+    end
+  end
+
+  Jekyll.logger.info ""
+  if outdated.empty?
+    Jekyll.logger.info "✅ All Docker image pins are current"
+  else
+    Jekyll.logger.warn "⚠️  #{outdated.length} image(s) need updating:"
+    outdated.each do |item|
+      Jekyll.logger.warn "   #{item[:image]}"
+      Jekyll.logger.warn "     pinned:  #{item[:current]}"
+      Jekyll.logger.warn "     latest:  #{item[:latest]}"
+      Jekyll.logger.warn "     update docker-compose.base.yml and run: rake start_services"
+    end
+    abort "❌ Outdated Docker images found (STRICT=true). Update pins before releasing." if ENV["STRICT"] == "true"
+  end
+end
+
+DOCKER_COMPOSE_FILE = "docker-compose.test.yml"
+DOCKER_ENV_FILE = ".env.test"
+
+def log_docker_service_statuses(statuses)
+  statuses.each do |name, item|
+    container = item[:container]
+    http = item[:http]
+    label = name.capitalize
+    if DockerServiceStatus.ready?(item)
+      Jekyll.logger.info "✅ #{label}: container running, #{http[:detail]} (Port #{item[:service][:port]})"
+    else
+      health = container[:health].to_s.empty? ? "" : ", health=#{container[:health]}"
+      Jekyll.logger.error "❌ #{label}: container=#{container[:state]}#{health}, #{http[:detail]}"
+      Jekyll.logger.error "   Container status: #{container[:detail]}" unless container[:detail].to_s.empty?
+      Jekyll.logger.error "   Logs: docker-compose -f #{DOCKER_COMPOSE_FILE} --env-file #{DOCKER_ENV_FILE} logs #{name}"
+    end
+  end
+end
+
+def docker_files_available?
+  File.exist?(DOCKER_COMPOSE_FILE) && File.exist?(DOCKER_ENV_FILE)
+end
+
+desc "Start test Docker services (pulls missing pinned images, recreates stale containers)"
+task :start_services do
+  abort "❌ #{DOCKER_COMPOSE_FILE} and #{DOCKER_ENV_FILE} are required" unless docker_files_available?
+
+  compose = ["docker-compose", "-f", DOCKER_COMPOSE_FILE, "--env-file", DOCKER_ENV_FILE]
+  Jekyll.logger.info "Starting Docker services (pulling only missing images, recreating stale containers)..."
+  unless system(*compose, "up", "-d", "--pull", "missing", "--force-recreate", "--remove-orphans")
+    Jekyll.logger.error "Failed to start Docker services. Recent logs:"
+    system(*compose, "logs", "--tail", "20")
+    abort "Docker compose up failed"
+  end
+
+  timeout = Integer(ENV.fetch("SERVICE_START_TIMEOUT", "90"), 10)
+  Jekyll.logger.info "⏳ Waiting up to #{timeout}s for containers and HTTP endpoints..."
+  result = DockerServiceStatus.wait(
+    compose_file: DOCKER_COMPOSE_FILE, env_file: DOCKER_ENV_FILE, timeout: timeout
+  )
+  log_docker_service_statuses(result[:statuses])
+  abort "❌ Docker services failed to become ready" unless result[:ready]
+
+  Jekyll.logger.info "✅ All Docker test services are ready"
+end
+
+desc "Stop test Docker services"
+task :stop_services do
+  abort "❌ #{DOCKER_COMPOSE_FILE} and #{DOCKER_ENV_FILE} are required" unless docker_files_available?
+
+  Jekyll.logger.info "🛑 Stopping Docker services..."
+  compose = ["docker-compose", "-f", DOCKER_COMPOSE_FILE, "--env-file", DOCKER_ENV_FILE]
+  abort "❌ Failed to stop Docker services" unless system(*compose, "down", "--remove-orphans")
+
+  Jekyll.logger.info "✅ Docker services stopped"
+end
+
 desc "Check test services availability"
 task :check_services do
+  abort "❌ #{DOCKER_COMPOSE_FILE} and #{DOCKER_ENV_FILE} are required" unless docker_files_available?
+
   Jekyll.logger.info "🔍 Checking ImgFlow test services..."
-  Jekyll.logger.info ""
-  Jekyll.logger.info "═══════════════════════════════════════════════════════════════"
-  Jekyll.logger.info "  PROGRAMMATIC PROVIDERS (HTTP API - Work with ImgFlow)"
-  Jekyll.logger.info "═══════════════════════════════════════════════════════════════"
+  statuses = DockerServiceStatus.statuses(
+    compose_file: DOCKER_COMPOSE_FILE, env_file: DOCKER_ENV_FILE
+  )
+  log_docker_service_statuses(statuses)
 
-  services = [
-    { name: "Imgproxy", port: 33_001, health_path: "/health", docker_cmd: "imgproxy" },
-    { name: "Weserv", port: 33_007, health_path: "/", docker_cmd: "weserv" },
-    { name: "Flyimg", port: 33_008, health_path: "/", docker_cmd: "flyimg" }
-  ]
-
-  services.each do |service|
-    Jekyll.logger.info "🖼️  Checking #{service[:name]} service..."
-    begin
-      response = Net::HTTP.get_response(URI("http://localhost:#{service[:port]}#{service[:health_path]}"))
-      if response.code.to_i >= 200 && response.code.to_i < 300
-        Jekyll.logger.info "✅ #{service[:name]} HTTP API is healthy (Port #{service[:port]})"
-      else
-        Jekyll.logger.info "❌ #{service[:name]} service returned HTTP #{response.code}"
-        Jekyll.logger.info "   Run: docker-compose -f docker-compose.test.yml up -d " \
-                           "#{service[:docker_cmd]}"
-      end
-    rescue Errno::ECONNREFUSED, SocketError
-      Jekyll.logger.info "❌ #{service[:name]} service is not responding"
-      Jekyll.logger.info "   Run: docker-compose -f docker-compose.test.yml up -d " \
-                         "#{service[:docker_cmd]}"
-    end
-  end
-
-  Jekyll.logger.info ""
-  Jekyll.logger.info "═══════════════════════════════════════════════════════════════"
-  Jekyll.logger.info "  LOCAL CLI TOOLS"
-  Jekyll.logger.info "═══════════════════════════════════════════════════════════════"
-
-  cli_tools = [
-    { name: "ImageMagick", command: "magick", version_cmd: "magick -version",
-      install_cmd: "brew install imagemagick (macOS) or apt-get install imagemagick (Ubuntu)" },
-    { name: "LibVips", command: "vips", version_cmd: "vips --version",
-      install_cmd: "brew install vips (macOS) or apt-get install libvips-tools (Ubuntu)" },
-    { name: "Sharp CLI", command: "sharp", version_cmd: "sharp --version",
-      install_cmd: "npm install -g sharp-cli" }
-  ]
-
-  cli_tools.each do |tool|
-    Jekyll.logger.info "🎨 Checking local #{tool[:name]} installation..."
-    if system("which #{tool[:command]} >/dev/null 2>&1")
-      version_output = `#{tool[:version_cmd]} 2>/dev/null | head -1`.chomp
-      Jekyll.logger.info "✅ #{tool[:name]} is available locally (#{version_output})"
+  cli_tools = {
+    "ImageMagick" => ["magick", "magick", "-version"],
+    "LibVips" => ["vips", "vips", "--version"],
+    "Sharp CLI" => ["sharp", "sharp", "--version"]
+  }
+  cli_results = cli_tools.map do |name, (command, *version_command)|
+    _, _, available = Open3.capture3("which", command)
+    if available.success?
+      output, = Open3.capture3(*version_command)
+      Jekyll.logger.info "✅ #{name}: #{output.lines.first.to_s.strip}"
     else
-      Jekyll.logger.info "❌ #{tool[:name]} not found locally"
-      Jekyll.logger.info "   Install with: #{tool[:install_cmd]}"
+      Jekyll.logger.error "❌ #{name}: not installed"
     end
+    available.success?
   end
 
-  Jekyll.logger.info "═══════════════════════════════════════════════════════════════"
-  Jekyll.logger.info "  SUMMARY"
-  Jekyll.logger.info "═══════════════════════════════════════════════════════════════"
-  Jekyll.logger.info ""
-  Jekyll.logger.info "✅ ALL PROVIDERS WORK PROGRAMMATICALLY:"
-  Jekyll.logger.info "   • Imgproxy (HTTP API)"
-  Jekyll.logger.info "   • Weserv (HTTP API)"
-  Jekyll.logger.info "   • Flyimg (HTTP API)"
-  Jekyll.logger.info "   • ImageMagick (CLI)"
-  Jekyll.logger.info "   • LibVips (CLI)"
-  Jekyll.logger.info "   • Sharp (CLI)"
-  Jekyll.logger.info ""
-  Jekyll.logger.info "🚀 To start all test services:"
-  Jekyll.logger.info "   docker-compose -f docker-compose.test.yml --env-file .env.test up -d"
-  Jekyll.logger.info ""
-  Jekyll.logger.info "🛑 To stop all test services:"
-  Jekyll.logger.info "   docker-compose -f docker-compose.test.yml down"
+  http_ready = statuses.values.all? { |item| DockerServiceStatus.ready?(item) }
+  if http_ready && cli_results.all?
+    Jekyll.logger.info "✅ All configured HTTP providers and CLI tools are available"
+  else
+    abort "❌ One or more ImgFlow test providers are unavailable"
+  end
 end
 
 desc "Generate YARD documentation"
@@ -1593,66 +1740,9 @@ task :doc do
   sh "yard doc"
 end
 
-desc "Generate documentation from templates"
-task :generate_docs do
-  Jekyll.logger.info "📚 Generating documentation from templates..."
-
-  # Define template mappings
-  template_mappings = [
-    {
-      template: "docs/template/tags.md",
-      targets: [
-        "docs/usage/tags.md"
-      ]
-    },
-    {
-      template: "docs/template/presets.md",
-      targets: [
-        "docs/usage/presets.md"
-      ]
-    },
-    {
-      template: "docs/template/preset-examples.md",
-      targets: [
-        "docs/usage/preset-examples.md"
-      ]
-    }
-  ]
-
-  template_mappings.each do |mapping|
-    if File.exist?(mapping[:template])
-      Jekyll.logger.info "   📝 Processing: #{File.basename(mapping[:template])}"
-
-      mapping[:targets].each do |target|
-        # Ensure target directory exists
-        target_dir = File.dirname(target)
-        FileUtils.mkdir_p(target_dir)
-
-        # Copy from template to target
-        FileUtils.cp(mapping[:template], target)
-        Jekyll.logger.info "     ✅ Generated: #{target}"
-      end
-    else
-      Jekyll.logger.info "   ❌ Template not found: #{mapping[:template]}"
-    end
-  end
-
-  Jekyll.logger.info ""
-  Jekyll.logger.info "✅ Documentation generation complete!"
-  Jekyll.logger.info "   Templates: docs/template/"
-  Jekyll.logger.info "   Generated: docs/usage/"
-  Jekyll.logger.info ""
-  Jekyll.logger.info "💡 Run 'rake generate_docs' after editing templates"
-  Jekyll.logger.info "💡 Templates are the single source of truth"
-end
-
 desc "Build and install the gem locally"
 task :install_local do
   Jekyll.logger.info "🔨 Building and installing ImgFlow gem..."
-  Jekyll.logger.info "   Generating documentation first..."
-
-  # Generate docs before building
-  Rake::Task[:generate_docs].invoke
 
   Jekyll.logger.info "   Building gem..."
   sh "gem build jekyll-imgflow.gemspec"
@@ -1661,7 +1751,6 @@ task :install_local do
   sh "gem install jekyll-imgflow-*.gem"
 
   Jekyll.logger.info "✅ Gem built and installed successfully!"
-  Jekyll.logger.info "   Documentation synced from templates"
 end
 
 desc "Open documentation in browser"
@@ -1677,16 +1766,10 @@ task :docs do
   Jekyll.logger.info "   docs/docker.md              # Docker setup"
   Jekyll.logger.info "   docs/providers.md           # Provider configuration"
   Jekyll.logger.info ""
-  Jekyll.logger.info "📖 Usage & Features (Generated from Templates):"
+  Jekyll.logger.info "📖 Usage & Features:"
   Jekyll.logger.info "   docs/usage/tags.md           # Jekyll tags reference"
   Jekyll.logger.info "   docs/usage/presets.md        # Presets system"
   Jekyll.logger.info "   docs/usage/preset-examples.md # Preset examples"
-  Jekyll.logger.info ""
-  Jekyll.logger.info "📝 Templates (Single Source of Truth):"
-  Jekyll.logger.info "   docs/template/tags.md        # Tags template"
-  Jekyll.logger.info "   docs/template/presets.md     # Presets template"
-  Jekyll.logger.info "   docs/template/preset-examples.md # Examples template"
-  Jekyll.logger.info "   docs/template/performance.md # Performance template"
   Jekyll.logger.info ""
   Jekyll.logger.info "👨‍💻 Development:"
   Jekyll.logger.info "   docs/development.md         # Development guide"
@@ -1697,16 +1780,10 @@ task :docs do
   Jekyll.logger.info "   docs/performance/           # Performance reports"
   Jekyll.logger.info ""
   Jekyll.logger.info "💡 Quick Commands:"
-  Jekyll.logger.info "   rake generate_docs          # Generate docs from templates"
   Jekyll.logger.info "   rake download_test_images   # Setup test images"
   Jekyll.logger.info "   rake check_services         # Check services"
   Jekyll.logger.info "   rake performance_quick      # Quick performance test"
   Jekyll.logger.info "   rake test                   # Run tests"
-  Jekyll.logger.info ""
-  Jekyll.logger.info "🔄 Documentation Workflow:"
-  Jekyll.logger.info "   1. Edit templates in docs/template/"
-  Jekyll.logger.info "   2. Run 'rake generate_docs'"
-  Jekyll.logger.info "   3. Docs synced to docs/usage/"
   Jekyll.logger.info ""
   Jekyll.logger.info "📋 Need Rake help? See docs/rake.md for simple task guide"
   Jekyll.logger.info ""
@@ -1754,7 +1831,6 @@ task :help do
   Jekyll.logger.info ""
   Jekyll.logger.info "📚 Documentation:"
   Jekyll.logger.info "  rake docs         # Show documentation structure and open in browser"
-  Jekyll.logger.info "  rake generate_docs # Generate docs from templates"
   Jekyll.logger.info "  rake doc          # Generate YARD API documentation"
   Jekyll.logger.info ""
   Jekyll.logger.info "🔧 Individual Checks:"
@@ -1763,7 +1839,9 @@ task :help do
   Jekyll.logger.info "  rake bundler_audit # Security scan"
   Jekyll.logger.info ""
   Jekyll.logger.info "📦 Other:"
-  Jekyll.logger.info "  rake install_local # Install gem locally (auto-generates docs)"
+  Jekyll.logger.info "  rake install_local # Build and install gem locally"
+  Jekyll.logger.info "  rake imgflow:presets        # List built-in presets and install status"
+  Jekyll.logger.info "  rake imgflow:install_presets # Copy built-in presets into the site"
   Jekyll.logger.info "  rake help         # Show this help"
 end
 

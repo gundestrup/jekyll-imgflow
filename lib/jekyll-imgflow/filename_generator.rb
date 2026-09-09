@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "digest"
-require "json"
 
 module JekyllImgFlow
   # Generates unique filenames for processed images
@@ -11,24 +10,23 @@ module JekyllImgFlow
     # @param original_name [String] Original image filename
     # @param operations [Hash] Operations applied to image
     # @return [String] Generated filename (without path)
+    # Formats that are valid for output (raster only).
+    # SVG and other vector formats are input-only — image providers
+    # always produce raster output (webp, avif, jpg, png).
+    VECTOR_FORMATS = %w[svg].freeze
+
     def generate_filename(original_name, operations)
       base_name = File.basename(original_name, ".*")
       width = operations[:width]
       format = operations[:format] || File.extname(original_name).delete(".")
+      # Vector formats (e.g. SVG) are input-only — never use them as
+      # output format. Fall back to jpg (universal <img> fallback).
+      format = "jpg" if VECTOR_FORMATS.include?(format.to_s.downcase)
 
       # Generate hash using Jekyll Picture Tag approach
       hash = generate_jpt_hash(original_name, operations)
 
       "#{base_name}-#{width}-#{hash}.#{format}"
-    end
-
-    # Generate cache key for operations (SHA256 for manifest tracking)
-    # @param operations [Hash] Operations hash
-    # @return [String] Cache key
-    def generate_cache_key(operations)
-      # Sort keys to ensure consistent hashing
-      sorted_operations = operations.sort.to_h
-      Digest::SHA256.hexdigest(sorted_operations.to_json)
     end
 
     # Get file digest for manifest tracking

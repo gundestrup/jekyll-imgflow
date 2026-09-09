@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "shellwords"
+
 module Jekyll
   class ImgflowTag < Liquid::Tag
     def initialize(tag_name, markup, tokens)
@@ -36,7 +38,7 @@ module Jekyll
 
     def expand_preset_markup(markup, preset_manager)
       # Parse markup to extract image path, preset name, and user options
-      parts = markup.split
+      parts = Shellwords.split(markup)
       image_path = parts.first
 
       # Extract preset name and user options
@@ -55,8 +57,14 @@ module Jekyll
       # Get preset markup from PresetManager
       preset_markup = preset_manager.build_markup_from_preset(preset_name, user_options)
 
-      # Combine image path with preset markup
-      "#{image_path} #{preset_markup}"
+      # Combine image path with preset markup. Keep the path quoted because
+      # filenames may contain spaces.
+      image_markup = if image_path.include?(" ")
+                       "\"#{image_path.gsub('"', '\\"')}\""
+                     else
+                       image_path
+                     end
+      "#{image_markup} #{preset_markup}"
     end
 
     def process_operations(components, parsed, context)
@@ -82,73 +90,77 @@ module Jekyll
                     "unknown"
                   end
 
-      # Process operations using clean architecture
       operations = parsed[:operations]
+      results = if operations.empty?
+                  [input_path]
+                else
+                  process_variants(components, operations.first, original_name, input_path,
+                                   page_path)
+                end
 
-      result = if operations.empty?
-                 # No operations - use original image
-                 input_path
-               else
-                 # Generate filename early to check existence
-                 operation = operations.first
-                 params = operation[:params]
+      relative_results = results.uniq.map { |result| relative_result_path(result, site) }
+      parsed = parsed.merge(markup_format: "picture") if relative_results.length > 1
+      generate_html(relative_results, parsed, context)
+    end
 
-                 # For default versions, include default format and quality for proper identification
-                 if determine_version_type(params, components[:config]) == :default
-                   params = params.dup
-                   params[:format] ||= components[:config].formats.first  # Use default format
-                   params[:quality] ||= components[:config].quality       # Use default quality
-                 end
+    def process_variants(components, operation, original_name, input_path, page_path)
+      params = operation[:params].dup
+      formats = Array(params.delete(:formats) || params[:format])
+      # When no format is explicitly specified, generate all configured formats
+      # (avif, webp, png, jpg) so browsers get a <picture> with <source> tags for
+      # modern formats and an <img> fallback. This applies to both default-width
+      # versions (which find pre-generated files in the manifest cache) and
+      # specialized versions (which are generated on-demand).
+      formats = components[:config].formats if formats.empty?
 
-                 # Preserve original directory structure under output
-                 subdir = File.dirname(original_name)
-                 subdir = nil if subdir == "."
+      formats.map do |format|
+        variant_params = params.dup
+        variant_params[:format] = format
+        process_variant(components, operation, variant_params, original_name, input_path, page_path)
+      end
+    end
 
-                 filename = components[:filename_generator].generate_filename(input_path, params)
-                 output_path = components[:path_resolver].resolve_source_output_path(filename, subdir)
+    def process_variant(components, operation, params, original_name, input_path, page_path)
+      config = components[:config]
+      if determine_version_type(params, config) == :default
+        params[:format] ||= config.formats.first
+        params[:quality] ||= config.quality
+      end
 
-                 # Determine version type
-                 version_type = determine_version_type(params, components[:config])
+      digest = components[:filename_generator].file_digest(input_path)
+      variant = operation.merge(params: params, file_digest: digest)
+      subdir = File.dirname(original_name)
+      subdir = nil if subdir == "."
+      filename = components[:filename_generator].generate_filename(input_path, params)
+      output_path = components[:path_resolver].resolve_source_output_path(filename, subdir)
+      version_type = determine_version_type(params, config)
 
-                 # Check if version exists in manifest
-                 Jekyll.logger.debug "🔍 ImgflowTag: Checking existence - original_name: #{original_name}, version_type: #{version_type}, page_path: #{page_path}"
-                 Jekyll.logger.debug "🔍 ImgflowTag: Params being checked: #{params.inspect}"
+      if components[:manifest].version_exists?(original_name, params, version_type, digest) &&
+         File.file?(output_path)
+        components[:stats]&.record_cache_hit
+        components[:manifest].update_page_usage(original_name, params, version_type, page_path)
+        return output_path
+      end
 
-                 if components[:manifest].version_exists?(original_name, params, version_type)
-                   # Version exists - update page usage and return path
-                   Jekyll.logger.debug "✅ ImgflowTag: Version exists! Updating page usage"
-                   components[:manifest].update_page_usage(original_name, params, version_type,
-                                                           page_path)
-                   output_path
-                 else
-                   # Version doesn't exist - create it
-                   Jekyll.logger.debug "❌ ImgflowTag: Version doesn't exist - creating"
-                   versions = components[:manifest].get_versions(original_name)
-                   Jekyll.logger.debug "🔍 ImgflowTag: Manifest has - default: #{versions['default']&.length || 0}, specialized: #{versions['specialized']&.length || 0}"
+      unless components[:operation_processor]
+        Jekyll.logger.warn "ImgFlow:", "No image provider available — " \
+                                       "rendering original without optimization."
+        return input_path
+      end
 
-                   components[:operation_processor].process_operation(
-                     original_name,
-                     operation,
-                     input_path,
-                     page_path
-                   )
-                 end
-               end
+      components[:operation_processor].process_operation(
+        original_name, variant.merge(force_processing: true), input_path, page_path
+      )
+    end
 
-      # Convert absolute paths to relative for HTML generation
-      relative_result = if result.start_with?(site.dest)
-                          # Processed images - remove site.dest and leading /
-                          result.sub(%r{^#{Regexp.escape(site.dest)}/}, "")
-                        elsif result.start_with?(site.source)
-                          # Original images - convert from source to relative and remove leading /
-                          result.sub(%r{^#{Regexp.escape(site.source)}/}, "")
-                        else
-                          # Already relative or other format - remove leading / if present
-                          result.start_with?("/") ? result[1..] : result
-                        end
-
-      # Generate HTML for the result
-      generate_html([relative_result], parsed, context)
+    def relative_result_path(result, site)
+      if result.start_with?(site.dest)
+        result.sub(%r{^#{Regexp.escape(site.dest)}/}, "")
+      elsif result.start_with?(site.source)
+        result.sub(%r{^#{Regexp.escape(site.source)}/}, "")
+      else
+        result.delete_prefix("/")
+      end
     end
 
     def generate_html(results, parsed, context)
@@ -232,8 +244,10 @@ module Jekyll
         filename_generator = JekyllImgFlow::FilenameGenerator.new
         registry = JekyllImgFlow::ProviderRegistry.new(config)
         provider = registry.current_provider
-        operation_processor = JekyllImgFlow::OperationProcessor.new(provider, path_resolver,
-                                                                    manifest, config)
+        if provider
+          operation_processor = JekyllImgFlow::OperationProcessor.new(provider, path_resolver,
+                                                                      manifest, config)
+        end
         preset_manager = JekyllImgFlow::PresetManager.new(site, config)
 
         site.imgflow_components = {
@@ -244,6 +258,7 @@ module Jekyll
           registry: registry,
           provider: provider,
           operation_processor: operation_processor,
+          stats: operation_processor&.stats,
           preset_manager: preset_manager
         }
       end

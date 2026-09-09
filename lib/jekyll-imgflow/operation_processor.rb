@@ -1,17 +1,21 @@
 # frozen_string_literal: true
 
 require_relative "filename_generator"
+require "benchmark"
 
 module JekyllImgFlow
   # OperationProcessor - processes image operations using providers
   # Handles both single operations and batch operations
   class OperationProcessor
+    attr_accessor :stats
+
     def initialize(provider, path_resolver, manifest = nil, config = nil)
       @provider = provider
       @path_resolver = path_resolver
       @filename_generator = FilenameGenerator.new
       @manifest = manifest
       @config = config
+      @stats = ProcessingStats.new
     end
 
     # Process a single operation on an image
@@ -41,6 +45,7 @@ module JekyllImgFlow
     def process_operation(original_name, operation, input_path, page_path = nil)
       type = operation[:type]
       params = operation[:params]
+      file_digest = operation[:file_digest] || @filename_generator.file_digest(input_path)
 
       # Determine version type
       version_type = determine_version_type(params)
@@ -58,17 +63,37 @@ module JekyllImgFlow
       # Ensure output directory exists before processing
       FileUtils.mkdir_p(File.dirname(actual_output_path))
 
-      # Animated GIFs must not be resized or converted — the operation
-      # would destroy the animation. Copy the original file as-is so the
-      # manifest can track it and HTML references stay valid.
-      if AnimatedGifDetector.animated?(input_path)
+      # Skip processing if the output file already exists and is up-to-date.
+      # This handles legacy manifests, corrupted manifests, and any case where
+      # optimized files exist on disk but the manifest is out of sync — the
+      # version is registered in the manifest without re-running the provider.
+      if !operation[:force_processing] && output_up_to_date?(input_path, actual_output_path)
+        Jekyll.logger.debug "⏭️  ImgFlow: Output exists and up-to-date, " \
+                            "skipping provider call for #{original_name}"
+        @stats.record_cache_hit
+      elsif AnimatedGifDetector.animated?(input_path)
+        # Animated GIFs must not be resized or converted — the operation
+        # would destroy the animation. Copy the original file as-is so the
+        # manifest can track it and HTML references stay valid.
         Jekyll.logger.warn "🖼️  ImgFlow: Skipping resize for animated GIF " \
                            "'#{original_name}' — copying original as-is to " \
                            "preserve animation."
         FileUtils.cp(input_path, actual_output_path)
+        @stats.record_cache_miss
       else
         # Process the operation (create the image)
-        process_single_operation(type, input_path, actual_output_path, params)
+        elapsed = Benchmark.measure do
+          process_single_operation(type, input_path, actual_output_path, params)
+        end
+        @stats.record_operation_time(type, elapsed.real)
+        @stats.record_cache_miss
+
+        # Record compression ratio if we have the original size
+        if File.file?(input_path) && File.file?(actual_output_path)
+          format = params[:format] || File.extname(input_path).delete(".")
+          @stats.record_compression_ratio(format.to_s, File.size(input_path),
+                                          File.size(actual_output_path))
+        end
       end
 
       # Register in manifest
@@ -76,14 +101,14 @@ module JekyllImgFlow
         # Store relative path (with leading /) for manifest storage
         relative_path = "/#{@path_resolver.resolve_relative_output_path(filename, subdir)}"
 
-        provider_name = @provider.class.provider_name
+        provider_name = @provider&.class&.provider_name || "unknown"
         @manifest.register_version(
           original_name,
           relative_path,
           params,
           version_type,
           page_path,
-          nil, # file_digest
+          file_digest,
           provider_name
         )
       end
@@ -170,26 +195,22 @@ module JekyllImgFlow
     # @param output_path [String] Path to output image
     # @param operations [Hash] Operations to apply
     # @return [Boolean] True if processing needed
-    def needs_processing?(input_path, output_path, operations)
+    def needs_processing?(input_path, output_path, _operations = nil)
       # If output doesn't exist, needs processing
       return true unless File.exist?(output_path)
 
       # If input is newer than output, needs processing
-      return true if File.mtime(input_path) > File.mtime(output_path)
+      File.mtime(input_path) > File.mtime(output_path)
+    end
 
-      # Check if operations changed by comparing cache key
-      # stored alongside the output file
-      cache_key = @filename_generator.generate_cache_key(operations)
-      cache_file = "#{output_path}.cache_key"
-
-      return true unless File.exist?(cache_file)
-
-      stored_key = File.read(cache_file).strip
-      return true if stored_key != cache_key
-
-      # No cache key file - needs processing to create it
-
-      false
+    # Check if the output file exists and the input is not newer than the
+    # output. Used to skip provider calls when the optimized file is already
+    # on disk (e.g. legacy manifest, manifest out of sync).
+    # @param input_path [String] Path to input image
+    # @param output_path [String] Path to output image
+    # @return [Boolean] True if output exists and is up-to-date
+    def output_up_to_date?(input_path, output_path)
+      File.file?(output_path) && File.mtime(input_path) <= File.mtime(output_path)
     end
 
     # Build operation structure from params hash

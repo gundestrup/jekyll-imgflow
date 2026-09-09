@@ -32,37 +32,24 @@ TEST_SIZES = { "sm" => 400, "md" => 800 }.freeze
 TEST_FORMATS = %w[webp jpg].freeze
 
 RSpec.describe "Realworld Jekyll build — optimized image placement", :integration, :slow, :system do
-  let(:test_site_dir) { create_test_dir("realworld-build") }
+  let(:test_site_dir) { @test_site_dir }
   let(:originals_dir) { File.join(test_site_dir, "assets/images/originals") }
   let(:source_optimized_dir) { File.join(test_site_dir, "assets/images/optimized") }
   let(:site_optimized_dir) { File.join(test_site_dir, "_site/assets/images/optimized") }
-  let(:manifest_path) { File.join(test_site_dir, "_site/assets/images/imgflow-manifest.json") }
+  let(:manifest_path) { File.join(test_site_dir, ".cache/imgflow/imgflow-manifest.json") }
   let(:index_html_path) { File.join(test_site_dir, "_site/index.html") }
 
   # Check once whether any provider from the standard backend_priority list
   # is available. The test is skipped if none are installed — this keeps it
   # portable across machines and CI environments.
   before(:all) do
-    @provider_available = begin
-      config = JekyllImgFlow::Config.new(MockSite.new(TEST_CONFIG))
-      registry = JekyllImgFlow::ProviderRegistry.new(config)
-      !registry.current_provider.nil?
-    rescue StandardError
-      false
+    @provider_available = TestEnvironment::CLI_PROVIDERS.any? do |provider|
+      provider_available_for_test?(provider)
     end
   end
 
   before do
-    unless @provider_available
-      skip "No image provider available from backend_priority " \
-           "(need sharp/imagemagick/libvips/etc.)"
-    end
-
-    scaffold_realworld_site(test_site_dir)
-  end
-
-  after do
-    FileUtils.rm_rf(test_site_dir)
+    skip "No image provider available from backend_priority (need a local CLI provider)" unless @provider_available
   end
 
   # ------------------------------------------------------------------
@@ -97,7 +84,9 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
     base_imgflow = TEST_CONFIG["imgflow"].dup
     imgflow_config = {
       "quality" => base_imgflow["quality"],
-      "backend_priority" => base_imgflow["backend_priority"],
+      "backend_priority" => base_imgflow["backend_priority"].select do |provider|
+        TestEnvironment.cli_provider?(provider)
+      end,
       "originals" => TEST_CONFIG["shared_images_configs"]["originals"],
       "output" => TEST_CONFIG["shared_images_configs"]["output"],
       "input_formats" => TEST_CONFIG["shared_images_configs"]["input_formats"],
@@ -106,7 +95,7 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
     }
     config = {
       "title" => "Realworld Build Test",
-      "url" => "http://localhost:4000",
+      "url" => "http://localhost:#{test_port}",
       "baseurl" => "",
       "source" => ".",
       "destination" => "_site",
@@ -149,9 +138,7 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
   end
 
   def run_jekyll_build(site_dir)
-    Dir.chdir(site_dir) do
-      system("bundle exec jekyll build --trace")
-    end
+    build_provider_test_site(site_dir)
   end
 
   def optimized_files_in(dir)
@@ -172,8 +159,14 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
   # ------------------------------------------------------------------
 
   describe "after the first build" do
-    before do
-      run_jekyll_build(test_site_dir)
+    before(:all) do
+      @test_site_dir = create_test_dir("realworld-build-first")
+      scaffold_realworld_site(@test_site_dir)
+      run_jekyll_build(@test_site_dir)
+    end
+
+    after(:all) do
+      FileUtils.rm_rf(@test_site_dir) if @test_site_dir
     end
 
     it "writes optimized images to the SOURCE optimized directory" do
@@ -249,14 +242,20 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
   # ------------------------------------------------------------------
 
   describe "after a rebuild (regression for v0.1.6 wipe bug)" do
-    before do
-      # First build
-      run_jekyll_build(test_site_dir)
-      # Record what _site had after the first build
-      @site_files_after_first = optimized_files_in(site_optimized_dir).map { |f| File.basename(f) }
+    before(:all) do
+      @test_site_dir = create_test_dir("realworld-build-rebuild")
+      scaffold_realworld_site(@test_site_dir)
+      run_jekyll_build(@test_site_dir)
+      rebuild_site_output = File.join(@test_site_dir, "_site/assets/images/optimized")
+      @site_files_after_first = optimized_files_in(rebuild_site_output).map { |f| File.basename(f) }
+      @manifest_mtime_after_first = File.mtime(File.join(
+                                                 @test_site_dir, ".cache", "imgflow", "imgflow-manifest.json"
+                                               ))
+      run_jekyll_build(@test_site_dir)
+    end
 
-      # Second build — in 0.1.6 this wiped the optimized images from _site
-      run_jekyll_build(test_site_dir)
+    after(:all) do
+      FileUtils.rm_rf(@test_site_dir) if @test_site_dir
     end
 
     it "still has optimized images in _site after the second build" do
@@ -275,6 +274,10 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
       expect(source_files).not_to be_empty
       # Source files should survive (they're outside _site, never cleaned)
       expect(source_files.length).to be >= 4
+    end
+
+    it "does not rewrite an unchanged manifest" do
+      expect(File.mtime(manifest_path)).to eq(@manifest_mtime_after_first)
     end
 
     it "HTML still references valid files after rebuild" do

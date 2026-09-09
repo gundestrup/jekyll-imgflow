@@ -262,7 +262,7 @@ RSpec.describe "Watermark and Alpha Opacity Integration", :integration, :provide
           expect(cmd).to include("ensureAlpha")
         when "Libvips"
           cmd = provider.build_vips_command(test_image_path, output_path)
-          expect(cmd).to include("VipsResize")
+          expect(cmd).to include("thumbnail")
           expect(cmd).to include("composite2")
           expect(cmd).to include("&&")
         when "Imagemagick"
@@ -292,7 +292,7 @@ RSpec.describe "Watermark and Alpha Opacity Integration", :integration, :provide
           expect(cmd).to include("alpha")
         when "Libvips"
           cmd = provider.build_vips_command(test_image_path, output_path)
-          expect(cmd).to include("VipsResize")
+          expect(cmd).to include("thumbnail")
           expect(cmd).to include("linear")
           expect(cmd).to include("0.3")
           expect(cmd).to include("&&")
@@ -330,7 +330,7 @@ RSpec.describe "Watermark and Alpha Opacity Integration", :integration, :provide
         when "Libvips"
           cmd = provider.build_vips_command(test_image_path, output_path)
           expect(cmd).to include("extract_area")
-          expect(cmd).to include("VipsResize")
+          expect(cmd).to include("thumbnail")
           expect(cmd).to include("composite2")
           expect(cmd).to include("&&")
         when "Imagemagick"

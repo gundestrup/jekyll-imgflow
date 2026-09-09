@@ -131,7 +131,7 @@ RSpec.describe "Jekyll Integration", :integration, :system do
         html = tag.send(:generate_html, results, parsed, context)
 
         expect(html).to include("<img")
-        expect(html).to include("src=\"assets/images/optimized/#{expected_filename}\"")
+        expect(html).to include("src=\"/assets/images/optimized/#{expected_filename}\"")
         expect(html).to include('alt="Test Image"')
         expect(html).to include('class="hero"')
         expect(html).to include('loading="lazy"')
@@ -199,9 +199,8 @@ RSpec.describe "Jekyll Integration", :integration, :system do
 
       it "generates expected TestPictures filename patterns" do
         # Use real FilenameGenerator to get expected filename
-        # Note: Parser doesn't add default quality, only what's in markup
         filename_generator = JekyllImgFlow::FilenameGenerator.new
-        params = { width: 800, format: "webp" } # No quality unless specified in markup
+        params = { width: 800, format: "webp", quality: 85 }
         actual_filename = filename_generator.generate_filename(test_image_name, params)
 
         # Mock only the expensive image compression (Sharp processing)
@@ -221,7 +220,7 @@ RSpec.describe "Jekyll Integration", :integration, :system do
         result = tag.render(context)
 
         # Extract the actual filename from the HTML result
-        html_filename_match = result.match(%r{src="assets/images/optimized/([^"]+)"})
+        html_filename_match = result.match(%r{src="/assets/images/optimized/([^"]+)"})
         html_filename = html_filename_match ? html_filename_match[1] : nil
 
         expect(result).to include("<img")
@@ -235,9 +234,6 @@ RSpec.describe "Jekyll Integration", :integration, :system do
 
         # The actual filename should match what the HTML contains (parser behavior)
         expect(actual_filename).to eq(html_filename)
-
-        # NOTE: TestPictures expects quality=85 hash, but parser doesn't add default quality
-        # This is expected behavior - we validate actual parser output, not TestPictures
 
         # The HTML should contain the actual filename
         expect(result).to include(html_filename)

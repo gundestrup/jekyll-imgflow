@@ -8,7 +8,7 @@
 gem build jekyll-imgflow.gemspec
 ```
 
-This creates `jekyll-imgflow-0.1.0.gem`
+This creates `jekyll-imgflow-0.1.11.gem`
 
 ### 2. Install in Your Jekyll Site
 
@@ -17,7 +17,7 @@ This creates `jekyll-imgflow-0.1.0.gem`
 cd /path/to/your/jekyll/site
 
 # Install the gem
-gem install /path/to/jekyll-imgflow-0.1.0.gem
+gem install /path/to/jekyll-imgflow-0.1.11.gem
 ```
 
 ### 3. Add to Gemfile
@@ -46,11 +46,12 @@ That's it. Everything else has sensible defaults:
 | Setting | Default | Description |
 | --- | --- | --- |
 | `quality` | `85` | JPEG/WebP quality (1-100) |
-| `backend_priority` | `sharp, libvips, imagemagick, imgproxy, weserv, flyimg` | Provider order (fastest first, see [providers.md](providers.md)) |
+| `backend_priority` | `sharp, libvips, imagemagick, imgproxy, weserv, flyimg` | Provider preference order (first available wins; see [providers.md](providers.md)) |
 | `formats` | `avif, webp, png, jpg` | Output formats (priority order — browser picks first supported) |
 | `fallback_format` | `jpg` | Format for `<img>` fallback in `<picture>` (all others get `<source>` tags) |
 | `sizes` | `sm: 400, md: 800, lg: 1200, xl: 2000` | Responsive widths in pixels |
 | `input_formats` | `jpg, jpeg, png, webp, avif, gif, tiff, tif, svg` | Accepted input formats |
+| `cache_dir` | `.cache/imgflow` | Persistent manifest directory, excluded from Jekyll output and watch processing |
 
 **Full config** (override any default):
 
@@ -58,6 +59,7 @@ That's it. Everything else has sensible defaults:
 imgflow:
   originals: "assets/images/originals"
   output: "assets/images/optimized"
+  cache_dir: ".cache/imgflow"
   quality: 85
   backend_priority:
     - sharp
@@ -93,15 +95,8 @@ imgflow:
   quality: 90  # override only what you need
 ```
 
-**Backend priority** is ordered by benchmark speed (see
-[providers.md](providers.md)):
-
-1. **Sharp** — fastest (Node.js/libvips, ~14s)
-2. **LibVips** — very fast CLI (~22s)
-3. **ImageMagick** — CLI (~31s)
-4. **Imgproxy** — HTTP API (~31s)
-5. **Weserv** — HTTP API (~30s)
-6. **Flyimg** — HTTP API (PHP/ImageMagick)
+**Backend priority** determines which provider is used (first available wins).
+See [providers.md](providers.md) for the benchmark-ordered comparison.
 
 ### 5. Install Image Processing Tools
 
@@ -119,7 +114,7 @@ sudo apt-get install imagemagick libvips-tools
 
 ```bash
 # In the jekyll-imgflow directory
-docker-compose up -d
+rake start_services
 ```
 
 ### 6. Create Directory Structure
@@ -192,7 +187,7 @@ gem list jekyll-imgflow
 
 # Reinstall if needed
 gem uninstall jekyll-imgflow
-gem install /path/to/jekyll-imgflow-0.1.0.gem
+gem install /path/to/jekyll-imgflow-0.1.11.gem
 ```
 
 ### Images not processing
@@ -215,25 +210,13 @@ vips --version
 docker-compose ps
 ```
 
-## Publishing to RubyGems (Optional)
+## Publishing to RubyGems
 
-To publish the gem publicly:
+Publishing is automated via GitHub Actions trusted publishing. See the
+[AGENTS.md Release Process](../AGENTS.md#release-process) section for the
+full procedure.
 
-1. Update gemspec with your details:
-   - `s.authors`
-   - `s.email`
-   - `s.homepage`
-
-2. Create RubyGems account at <https://rubygems.org>
-
-3. Build and push:
-
-```bash
-gem build jekyll-imgflow.gemspec
-gem push jekyll-imgflow-0.1.0.gem
-```
-
-1. Users can then install with:
+Users can install the published gem with:
 
 ```bash
 gem install jekyll-imgflow
@@ -245,17 +228,18 @@ For development work on the gem itself:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/jekyll-imgflow.git
+git clone https://github.com/gundestrup/jekyll-imgflow.git
 cd jekyll-imgflow
 
-# Install dependencies
+# Install dependencies (runtime deps come from the gemspec via `gemspec`
+# directive in the Gemfile; dev deps are declared in the Gemfile)
 bundle install
 
 # Build gem
 gem build jekyll-imgflow.gemspec
 
 # Install locally
-gem install jekyll-imgflow-0.1.0.gem
+gem install jekyll-imgflow-0.1.11.gem
 
 # Or use in a Jekyll site with local path
 # In Jekyll site's Gemfile:

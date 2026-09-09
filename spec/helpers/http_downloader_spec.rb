@@ -105,6 +105,10 @@ RSpec.describe JekyllImgFlow::Helpers::HttpDownloader, :external, :unit do
       it "cleans up temp file on error" do
         stub_request(:get, http_url)
           .to_return(status: 500)
+        token = "cleanup-test-#{Process.pid}"
+        temp_path = File.join(Dir.tmpdir, "imgflow-#{token}.jpg")
+        allow(SecureRandom).to receive(:hex).and_return(token)
+        FileUtils.rm_f(temp_path)
 
         begin
           described_class.download(http_url)
@@ -112,9 +116,8 @@ RSpec.describe JekyllImgFlow::Helpers::HttpDownloader, :external, :unit do
           # Expected to fail
         end
 
-        # Check that no temp files were left behind
-        temp_files = Dir.glob(File.join(Dir.tmpdir, "imgflow-*.jpg"))
-        expect(temp_files).to be_empty
+        # Check that this download left no temp files behind
+        expect(File.exist?(temp_path)).to be false
       end
     end
 

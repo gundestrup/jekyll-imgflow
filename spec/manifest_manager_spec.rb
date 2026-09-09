@@ -44,6 +44,11 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       expect(manifest_manager.instance_variable_get(:@site)).to eq(@site)
     end
 
+    it "stores the manifest in the configured cache directory" do
+      expected = File.join(@site.source, @config.cache_dir, "imgflow-manifest.json")
+      expect(manifest_path).to eq(expected)
+    end
+
     it "loads existing manifest if present" do
       manifest_data = {
         "test.jpg" => {
@@ -64,8 +69,10 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
     end
 
     it "creates empty manifest if none exists" do
-      # Delete manifest file to ensure clean state
+      # Delete manifest files to ensure clean state
       FileUtils.rm_f(manifest_path)
+      FileUtils.rm_f(File.join(@site.source, "assets/images/imgflow-manifest.json"))
+      FileUtils.rm_f(File.join(@site.dest, "assets/images/imgflow-manifest.json"))
 
       # Create a fresh manifest manager
       fresh_manager = described_class.new(@site)
@@ -73,6 +80,24 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
 
       expect(manifest).to be_a(Hash)
       expect(manifest).to eq({})
+    end
+
+    it "migrates a legacy source manifest into the configured cache" do
+      FileUtils.rm_f(manifest_path)
+      legacy_path = File.join(@site.source, "assets/images/imgflow-manifest.json")
+      legacy_data = {
+        "provider" => manifest_manager.current_provider,
+        "images" => { "legacy.jpg" => { "versions" => { "default" => [] } } }
+      }
+      FileUtils.mkdir_p(File.dirname(legacy_path))
+      File.write(legacy_path, JSON.pretty_generate(legacy_data))
+
+      migrated = described_class.new(@site)
+      migrated.save
+
+      expect(migrated.get_versions("legacy.jpg")).to eq({ "default" => [] })
+      expect(File.exist?(manifest_path)).to be true
+      expect(File.exist?(legacy_path)).to be false
     end
   end
 
@@ -230,6 +255,19 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       expect(manifest_manager.version_exists?(original_name, operations, :default)).to be false
     end
 
+    it "returns false when the source digest changed" do
+      manifest_manager.register_version(
+        original_name, "/output.webp", operations, :specialized, "/page.md", "old-digest"
+      )
+
+      expect(manifest_manager.version_exists?(
+               original_name, operations, :specialized, "new-digest"
+             )).to be false
+      expect(manifest_manager.version_exists?(
+               original_name, operations, :specialized, "old-digest"
+             )).to be true
+    end
+
     it "distinguishes between default and specialized versions" do
       test_filename = filename_generator.generate_filename(original_name, operations)
       test_path = File.join(@site.dest, path_resolver.resolve_output_path(test_filename))
@@ -245,6 +283,25 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       expect(manifest_manager.version_exists?(original_name, operations, :default)).to be true
       expect(manifest_manager.version_exists?(original_name, operations,
                                               :specialized)).to be false
+    end
+
+    it "matches nested symbol operations after JSON persistence" do
+      nested_operations = { width: 800, crop: { position: :center } }
+      manifest_manager.register_version(
+        original_name, "/output.webp", nested_operations, :specialized, "/page.md"
+      )
+      manifest_manager.save
+
+      reloaded = described_class.new(@site)
+      reloaded.register_version(
+        original_name, "/output.webp", nested_operations, :specialized, "/page.md"
+      )
+
+      versions = reloaded.get_versions(original_name)["specialized"]
+      matches = versions.select do |version|
+        reloaded.same_operations?(version["operations"], nested_operations)
+      end
+      expect(matches.length).to eq(1)
     end
   end
 
@@ -383,6 +440,16 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       expect(saved_data.fetch("images").fetch(test_image_name)).to have_key("versions")
     end
 
+    it "does not rewrite an unchanged manifest" do
+      manifest_manager.save
+      initial_mtime = File.mtime(manifest_path)
+      sleep 0.02
+
+      manifest_manager.save
+
+      expect(File.mtime(manifest_path)).to eq(initial_mtime)
+    end
+
     it "validates TestPictures filename patterns in manifest" do
       # Clear existing manifest and use fresh manifest manager
       FileUtils.rm_f(manifest_path)
@@ -443,21 +510,154 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
   describe "#cleanup_deleted_originals" do
     let(:original_name) { test_image_name }
 
-    it "removes manifest entries for deleted originals" do
-      manifest_manager.register_version(original_name, "/tmp/out.jpg",
-                                        { width: 800 }, :default, nil)
-      expect(manifest_manager.versions?(original_name)).to be true
+    it "removes manifest entries and generated files for deleted originals" do
+      output = "/#{@config.output}/deleted/out.jpg"
+      source_output = File.join(@site.source, output)
+      destination_output = File.join(@site.dest, output)
+      [source_output, destination_output].each do |path|
+        FileUtils.mkdir_p(File.dirname(path))
+        FileUtils.touch(path)
+      end
+      manifest_manager.register_version(original_name, output, { width: 800 }, :default, nil)
 
       manifest_manager.cleanup_deleted_originals(["nonexistent"])
+
       expect(manifest_manager.versions?(original_name)).to be false
+      expect(File.exist?(source_output)).to be false
+      expect(File.exist?(destination_output)).to be false
     end
 
     it "keeps entries for existing originals" do
       manifest_manager.register_version(original_name, "/tmp/out.jpg",
                                         { width: 800 }, :default, nil)
-      basename = File.basename(original_name, ".*")
-      manifest_manager.cleanup_deleted_originals([basename])
+      manifest_manager.cleanup_deleted_originals([original_name])
       expect(manifest_manager.versions?(original_name)).to be true
+    end
+  end
+
+  describe "#cleanup_obsolete_defaults" do
+    it "removes defaults and files that are no longer configured" do
+      kept_operations = { width: 400, format: "webp", quality: 85 }
+      obsolete_operations = { width: 800, format: "jpg", quality: 85 }
+      kept_output = "/#{@config.output}/kept.webp"
+      obsolete_output = "/#{@config.output}/obsolete.jpg"
+      obsolete_file = File.join(@site.source, obsolete_output)
+      FileUtils.mkdir_p(File.dirname(obsolete_file))
+      FileUtils.touch(obsolete_file)
+      relative = obsolete_file.delete_prefix("#{@site.source}/")
+      @site.static_files << Jekyll::StaticFile.new(
+        @site, @site.source, File.dirname(relative), File.basename(relative)
+      )
+      manifest_manager.register_version(test_image_name, kept_output, kept_operations,
+                                        :default, nil)
+      manifest_manager.register_version(test_image_name, obsolete_output, obsolete_operations,
+                                        :default, nil)
+
+      manifest_manager.cleanup_obsolete_defaults([kept_operations])
+
+      defaults = manifest_manager.get_versions(test_image_name)["default"]
+      expect(defaults.length).to eq(1)
+      expect(manifest_manager.same_operations?(defaults.first["operations"], kept_operations))
+        .to be true
+      expect(File.exist?(obsolete_file)).to be false
+      expect(@site.static_files.none? { |static_file| static_file.path == obsolete_file }).to be true
+    end
+
+    it "deletes obsolete format files when formats config shrinks (avif,webp,png,jpg → avif,png)" do
+      # Simulate manifest with all 4 formats at width 400
+      formats_before = %w[avif webp png jpg]
+      formats_after = %w[avif png]
+      expected_operations = formats_after.map do |format|
+        { width: 400, format: format, quality: 85 }
+      end
+
+      created_files = []
+      formats_before.each do |format|
+        output = "/#{@config.output}/test-400-#{format}.#{format}"
+        file = File.join(@site.source, output)
+        FileUtils.mkdir_p(File.dirname(file))
+        FileUtils.touch(file)
+        created_files << file
+        manifest_manager.register_version(test_image_name, output,
+                                          { width: 400, format: format, quality: 85 },
+                                          :default, nil)
+      end
+
+      manifest_manager.cleanup_obsolete_defaults(expected_operations)
+
+      defaults = manifest_manager.get_versions(test_image_name)["default"]
+      remaining_formats = defaults.map { |v| v["operations"]["format"] }
+      expect(remaining_formats).to contain_exactly("avif", "png")
+      # webp and jpg files should be deleted
+      expect(File.exist?(created_files.find { |f| f.end_with?(".webp") })).to be false
+      expect(File.exist?(created_files.find { |f| f.end_with?(".jpg") })).to be false
+      # avif and png files should remain
+      expect(File.exist?(created_files.find { |f| f.end_with?(".avif") })).to be true
+      expect(File.exist?(created_files.find { |f| f.end_with?(".png") })).to be true
+    ensure
+      created_files.each { |f| FileUtils.rm_f(f) }
+    end
+
+    it "keeps existing formats and does not delete when formats config grows (avif,png → avif,png,jpg)" do
+      # Simulate manifest with only 2 formats at width 400
+      formats_before = %w[avif png]
+      expected_operations = %w[avif png jpg].map do |format|
+        { width: 400, format: format, quality: 85 }
+      end
+
+      created_files = []
+      formats_before.each do |format|
+        output = "/#{@config.output}/test-grow-400-#{format}.#{format}"
+        file = File.join(@site.source, output)
+        FileUtils.mkdir_p(File.dirname(file))
+        FileUtils.touch(file)
+        created_files << file
+        manifest_manager.register_version(test_image_name, output,
+                                          { width: 400, format: format, quality: 85 },
+                                          :default, nil)
+      end
+
+      manifest_manager.cleanup_obsolete_defaults(expected_operations)
+
+      defaults = manifest_manager.get_versions(test_image_name)["default"]
+      # Existing formats should remain (new jpg will be generated by needs_processing?)
+      remaining_formats = defaults.map { |v| v["operations"]["format"] }
+      expect(remaining_formats).to contain_exactly("avif", "png")
+      # All existing files should still exist
+      created_files.each { |f| expect(File.exist?(f)).to be true }
+    ensure
+      created_files.each { |f| FileUtils.rm_f(f) }
+    end
+
+    it "does not remove specialized versions when cleaning up obsolete defaults" do
+      expected_default = { width: 400, format: "avif", quality: 85 }
+      obsolete_default = { width: 400, format: "webp", quality: 85 }
+      specialized_ops = { width: 300, format: "webp" }
+
+      obsolete_file = File.join(@site.source, @config.output, "obsolete-default.webp")
+      specialized_file = File.join(@site.source, @config.output, "specialized.webp")
+      [obsolete_file, specialized_file].each do |f|
+        FileUtils.mkdir_p(File.dirname(f))
+        FileUtils.touch(f)
+      end
+
+      manifest_manager.register_version(test_image_name,
+                                        obsolete_file.delete_prefix("#{@site.source}/"),
+                                        obsolete_default, :default, nil)
+      manifest_manager.register_version(test_image_name,
+                                        specialized_file.delete_prefix("#{@site.source}/"),
+                                        specialized_ops, :specialized, "/page.html")
+
+      manifest_manager.cleanup_obsolete_defaults([expected_default])
+
+      # Obsolete default should be removed
+      expect(File.exist?(obsolete_file)).to be false
+      # Specialized version should be untouched
+      expect(File.exist?(specialized_file)).to be true
+      specialized = manifest_manager.get_versions(test_image_name)["specialized"]
+      expect(specialized.length).to eq(1)
+    ensure
+      FileUtils.rm_f([obsolete_file, specialized_file])
     end
   end
 
@@ -487,8 +687,11 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       test_ops = { width: 800, format: "webp", quality: 85 }
       test_filename = filename_generator.generate_filename(test_image_name, test_ops)
       test_path = path_resolver.resolve_source_output_path(test_filename)
-      FileUtils.mkdir_p(File.dirname(test_path))
-      FileUtils.touch(test_path)
+      destination_path = path_resolver.resolve_output_path(test_filename)
+      [test_path, destination_path].each do |path|
+        FileUtils.mkdir_p(File.dirname(path))
+        FileUtils.touch(path)
+      end
       manifest_manager.register_version(test_image_name, test_path, test_ops, :default, nil)
 
       # Simulate provider change by setting cached provider to different value
@@ -500,8 +703,9 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
 
       # Manifest should be cleared
       expect(manifest_manager.versions?(test_image_name)).to be false
-      # File in optimized dir should be deleted
+      # Files in optimized dirs should be deleted
       expect(File.exist?(test_path)).to be false
+      expect(File.exist?(destination_path)).to be false
     end
   end
 
@@ -571,6 +775,21 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
     end
   end
 
+  describe "#reset_page_usage" do
+    it "clears specialized usage while preserving default versions" do
+      manifest_manager.register_version(test_image_name, "/default.jpg", { width: 400 },
+                                        :default, nil)
+      manifest_manager.register_version(test_image_name, "/specialized.jpg", { width: 500 },
+                                        :specialized, "page.html")
+
+      manifest_manager.reset_page_usage
+
+      versions = manifest_manager.get_versions(test_image_name)
+      expect(versions["default"].length).to eq(1)
+      expect(versions["specialized"].first["used_on"]).to be_empty
+    end
+  end
+
   describe "#remove_page_usage" do
     let(:original_name) { test_image_name }
 
@@ -606,6 +825,8 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
                                         :default, nil, digest)
       data = manifest_manager.instance_variable_get(:@manifest)
       expect(data[original_name]["file_digest"]).to eq(digest)
+      version = data.dig(original_name, "versions", "default").first
+      expect(version["file_digest"]).to eq(digest)
     end
 
     it "updates file_digest when provided on subsequent calls" do
@@ -651,6 +872,98 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
       expect(manifest).to have_key("test.jpg")
       cached = manager.instance_variable_get(:@cached_provider)
       expect(cached).to be_nil
+    end
+  end
+
+  describe "legacy manifest migration (v0.1.10 → v0.1.11)" do
+    it "clears entries without file_digest so they get re-registered" do
+      # Simulate a v0.1.10 manifest: operations have no format/quality,
+      # no file_digest on versions
+      legacy = {
+        "provider" => "sharp",
+        "images" => {
+          "test.jpg" => {
+            "versions" => {
+              "default" => [{
+                "output" => "/assets/images/optimized/test-400-abc123.webp",
+                "operations" => { "width" => 400 },
+                "type" => "default",
+                "used_on" => [],
+                "created_at" => 1_700_000_000,
+                "provider" => "sharp"
+              }],
+              "specialized" => []
+            }
+          }
+        }
+      }
+      File.write(manifest_path, JSON.pretty_generate(legacy))
+
+      manager = described_class.new(@site)
+      manifest = manager.instance_variable_get(:@manifest)
+
+      # Legacy entries should be cleared
+      expect(manifest).to be_empty
+    end
+
+    it "clears entries where operations lack format key" do
+      legacy = {
+        "provider" => "sharp",
+        "images" => {
+          "photo.jpg" => {
+            "versions" => {
+              "default" => [{
+                "output" => "/assets/images/optimized/photo-800-def456.jpg",
+                "operations" => { "width" => 800 },
+                "type" => "default",
+                "used_on" => [],
+                "created_at" => 1_700_000_000,
+                "file_digest" => "abc123",
+                "provider" => "sharp"
+              }],
+              "specialized" => []
+            }
+          }
+        }
+      }
+      File.write(manifest_path, JSON.pretty_generate(legacy))
+
+      manager = described_class.new(@site)
+      manifest = manager.instance_variable_get(:@manifest)
+
+      # Has file_digest but operations lack format → still legacy
+      expect(manifest).to be_empty
+    end
+
+    it "preserves entries that already have file_digest and format" do
+      modern = {
+        "provider" => "sharp",
+        "images" => {
+          "test.jpg" => {
+            "versions" => {
+              "default" => [{
+                "output" => "/assets/images/optimized/test-400-abc123.webp",
+                "operations" => { "width" => 400, "format" => "webp", "quality" => 85 },
+                "type" => "default",
+                "used_on" => [],
+                "created_at" => 1_700_000_000,
+                "file_digest" => "sha256hash",
+                "provider" => "sharp"
+              }],
+              "specialized" => []
+            }
+          }
+        }
+      }
+      File.write(manifest_path, JSON.pretty_generate(modern))
+
+      manager = described_class.new(@site)
+      manifest = manager.instance_variable_get(:@manifest)
+
+      expect(manifest).to have_key("test.jpg")
+      versions = manifest["test.jpg"]["versions"]["default"]
+      expect(versions.length).to eq(1)
+      expect(versions.first["file_digest"]).to eq("sha256hash")
     end
   end
 end

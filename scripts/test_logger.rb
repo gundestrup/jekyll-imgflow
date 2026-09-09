@@ -12,6 +12,8 @@ class TestLogger
     def auto_start
       @log_dir = File.join(Dir.pwd, "test_logs")
       @start_time = Time.now
+      session_timestamp = @start_time.strftime("%Y%m%d%H%M%S%L")
+      @session_id = "#{Process.pid}-#{session_timestamp}"
 
       ensure_log_directory
       start_test_session
@@ -52,6 +54,10 @@ class TestLogger
       @current_session[:test_files].uniq!
     end
 
+    def rspec_result_path(kind)
+      File.join(@log_dir, "rspec-#{@session_id}-#{kind}.json")
+    end
+
     private
 
     def ensure_log_directory
@@ -69,34 +75,34 @@ class TestLogger
     end
 
     def load_rspec_results_from_output
-      # Parse results from our custom logging files instead of RSpec JSON formatter
-      success_file = File.join(@log_dir, "latest_success.json")
-      failure_file = File.join(@log_dir, "latest_failures.json")
+      success_file = rspec_result_path(:success)
+      failure_file = rspec_result_path(:failure)
 
       if File.exist?(success_file)
+        success_data = JSON.parse(File.read(success_file))
+        example_count = success_data.fetch("total_examples", 0)
         @current_session[:rspec_results] = {
           "summary" => {
-            "example_count" => JSON.parse(File.read(success_file))["total_examples"],
+            "example_count" => example_count,
             "failure_count" => 0,
-            "pending_count" => 0,
+            "pending_count" => success_data.fetch("pending_count", 0),
             "duration" => @current_session[:duration_seconds]
           },
-          "status" => "passed"
+          "status" => example_count.positive? ? "passed" : "no_tests"
         }
       elsif File.exist?(failure_file)
         failure_data = JSON.parse(File.read(failure_file))
         @current_session[:rspec_results] = {
           "summary" => {
-            "example_count" => failure_data["total_examples"],
-            "failure_count" => failure_data["total_failures"],
-            "pending_count" => 0,
+            "example_count" => failure_data.fetch("total_examples", 0),
+            "failure_count" => failure_data.fetch("total_failures", 0),
+            "pending_count" => failure_data.fetch("pending_count", 0),
             "duration" => @current_session[:duration_seconds]
           },
           "status" => "failed",
           "failures" => failure_data["test_failures"]
         }
       else
-        # Fallback: try to parse from terminal output or use defaults
         @current_session[:rspec_results] = {
           "summary" => {
             "example_count" => 0,
@@ -110,16 +116,11 @@ class TestLogger
     end
 
     def save_results
-      # Save latest run only (timestamp files are redundant with our new logging system)
+      content = JSON.pretty_generate(@current_session)
+      session_file = File.join(@log_dir, "test_run_#{@session_id}.json")
       latest_file = File.join(@log_dir, "latest_test_run.json")
-      File.write(latest_file, JSON.pretty_generate(@current_session))
-
-      # Only create timestamp file if explicitly needed for debugging
-      return unless ENV["DEBUG_TEST_LOGGING"] == "true"
-
-      timestamp_file = File.join(@log_dir,
-                                 "test_run_#{@current_session[:timestamp].tr(':', '-')}.json")
-      File.write(timestamp_file, JSON.pretty_generate(@current_session))
+      File.write(session_file, content)
+      File.write(latest_file, content)
     end
 
     def update_history
@@ -128,8 +129,7 @@ class TestLogger
 
       history_entry = {
         timestamp: @current_session[:timestamp],
-        success: @current_session[:rspec_results]&.dig("summary",
-                                                       "failure_count")&.zero?,
+        success: @current_session[:rspec_results]&.dig("status") == "passed",
         duration_seconds: @current_session[:duration_seconds],
         total_tests: @current_session[:rspec_results]&.dig("summary", "example_count") || 0,
         failed_tests: @current_session[:rspec_results]&.dig("summary", "failure_count") || 0,
@@ -156,7 +156,14 @@ class TestLogger
         pending = summary["pending_count"] || 0
         passed = total - failed - pending
 
-        puts "✅ Status: #{failed.zero? ? 'PASSED' : 'FAILED'}"
+        status = if total.zero?
+                   "NO TESTS"
+                 elsif failed.zero?
+                   "PASSED"
+                 else
+                   "FAILED"
+                 end
+        puts "✅ Status: #{status}"
         puts "⏰  Duration: #{@current_session[:duration_seconds]}s"
         puts "📅 Timestamp: #{@current_session[:timestamp]}"
         puts "🌿 Git Branch: #{@current_session[:environment][:git_branch]}"
@@ -202,7 +209,14 @@ class TestLogger
           summary = latest["rspec_results"]["summary"] || {}
           failed = summary["failure_count"] || 0
           total = summary["example_count"] || 0
-          puts "📈 Status: #{failed.zero? ? '✅ PASSED' : '❌ FAILED'}"
+          status = if total.zero?
+                     "⚠️ NO TESTS"
+                   elsif failed.zero?
+                     "✅ PASSED"
+                   else
+                     "❌ FAILED"
+                   end
+          puts "📈 Status: #{status}"
           puts "📊 Results: #{total - failed}/#{total} passed"
         else
           puts "📈 Status: ℹ️  Completed"

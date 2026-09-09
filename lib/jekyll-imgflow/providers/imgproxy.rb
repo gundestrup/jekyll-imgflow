@@ -26,8 +26,9 @@ module JekyllImgFlow
 
         # Fetch the result in one request
         fetch_and_save(url, output_path)
-        reset_operations
         output_path
+      ensure
+        reset_operations
       end
 
       def build_combined_imgproxy_url(input_path)

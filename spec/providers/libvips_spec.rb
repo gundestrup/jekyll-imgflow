@@ -6,6 +6,11 @@ require_relative "../../lib/jekyll-imgflow/providers/libvips"
 RSpec.describe JekyllImgFlow::Providers::Libvips, :unit do
   let(:provider) { described_class.new }
 
+  # Helper: flatten command arrays to a single string for assertion
+  def cmd_str(commands)
+    commands.map { |cmd| cmd.is_a?(Array) ? cmd.join(" ") : cmd.to_s }.join(" && ")
+  end
+
   describe "#build_alpha_pipeline" do
     it "builds crop+resize base for alpha pipeline" do
       provider.instance_variable_set(:@operations, [
@@ -16,10 +21,11 @@ RSpec.describe JekyllImgFlow::Providers::Libvips, :unit do
                                      ])
 
       result = provider.build_alpha_pipeline("/input.jpg", "/output.jpg", true, true)
-      expect(result).to include("extract_area")
-      expect(result).to include("VipsResize")
-      expect(result).to include("linear")
-      expect(result).to include("rm -f")
+      flat = cmd_str(result)
+      expect(flat).to include("extract_area")
+      expect(flat).to include("thumbnail")
+      expect(flat).to include("linear")
+      expect(result).to include([:cleanup, "/input.tmp_base.jpg"])
     end
 
     it "builds crop-only base for alpha pipeline" do
@@ -30,9 +36,10 @@ RSpec.describe JekyllImgFlow::Providers::Libvips, :unit do
                                      ])
 
       result = provider.build_alpha_pipeline("/input.jpg", "/output.jpg", true, false)
-      expect(result).to include("extract_area")
-      expect(result).to include("linear")
-      expect(result).to include("rm -f")
+      flat = cmd_str(result)
+      expect(flat).to include("extract_area")
+      expect(flat).to include("linear")
+      expect(result).to include([:cleanup, "/input.tmp_base.jpg"])
     end
   end
 
@@ -45,9 +52,10 @@ RSpec.describe JekyllImgFlow::Providers::Libvips, :unit do
                                      ])
 
       result = provider.build_watermark_pipeline("/input.jpg", "/output.jpg", true, false)
-      expect(result).to include("extract_area")
-      expect(result).to include("composite2")
-      expect(result).to include("rm -f")
+      flat = cmd_str(result)
+      expect(flat).to include("extract_area")
+      expect(flat).to include("composite2")
+      expect(result).to include([:cleanup, "/input.tmp_base.jpg"])
     end
   end
 
@@ -59,23 +67,36 @@ RSpec.describe JekyllImgFlow::Providers::Libvips, :unit do
                                      ])
 
       result = provider.build_watermark_pipeline("/input.jpg", "/output.jpg", false, false)
-      expect(result).to include("linear")
-      expect(result).to include("composite2")
-      expect(result).to include("rm -f")
+      flat = cmd_str(result)
+      expect(flat).to include("linear")
+      expect(flat).to include("composite2")
     end
   end
 
   describe "#position_to_vips_xy" do
     it "translates southwest position" do
       result = provider.position_to_vips_xy("southwest", "/base.jpg", "/wm.png")
-      expect(result).to include("--x 0")
-      expect(result).to include("--y $(vips header")
+      expect(result).to include("--x")
+      expect(result).to include("0")
+      expect(result).to include("--y")
     end
 
     it "translates southeast position" do
       result = provider.position_to_vips_xy("southeast", "/base.jpg", "/wm.png")
-      expect(result).to include("--x $(vips header")
-      expect(result).to include("--y $(vips header")
+      expect(result).to include("--x")
+      expect(result).to include("--y")
+    end
+
+    it "translates northeast position" do
+      result = provider.position_to_vips_xy("northeast", "/base.jpg", "/wm.png")
+      expect(result).to include("--x")
+      expect(result).to include("--y")
+      expect(result).to include("0")
+    end
+
+    it "defaults to northwest for unknown positions" do
+      result = provider.position_to_vips_xy("unknown", "/base.jpg", "/wm.png")
+      expect(result).to eq(["--x", "0", "--y", "0"])
     end
   end
 end

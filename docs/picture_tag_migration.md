@@ -44,7 +44,7 @@ end
 ## Syntax Translation
 
 | Picture Tag | ImgFlow | Description |
-|-------------|---------|-------------|
+| --- | --- | --- |
 | `preset_name image.jpg` | `image.jpg preset:preset_name` | Preset usage |
 | `16:9` | `ratio:16:9` | Crop ratio |
 | `16:9 center` | `ratio:16:9 position:center` | Ratio + position |

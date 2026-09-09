@@ -16,6 +16,7 @@ _site/
 
 # ImgFlow output (generated during build/test — don't commit)
 assets/images/optimized/
+.cache/imgflow/
 
 # Test coverage
 /coverage/

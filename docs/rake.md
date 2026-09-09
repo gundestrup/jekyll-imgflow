@@ -22,7 +22,6 @@ rake performance_benchmark # Full benchmark (5-10 minutes)
 
 # Documentation
 rake docs                 # Show docs structure
-rake generate_docs        # Update docs from templates
 ```
 
 ## 📋 All Tasks
@@ -35,8 +34,17 @@ rake generate_docs        # Update docs from templates
 - `rake test_picture` - Run Picture Tag integration tests only
 - `rake test` - Run tests only
 - `rake spec` - Run tests with coverage
+- `rake spec_slow` - Run slow tests sequentially (tagged `:slow`)
+- `rake spec_fast` - Run fast tests only (excludes `:slow`, `:external`, `:provider`)
 - `rake quick` - Style + tests (fast)
 - `rake quality` - All quality checks (slow)
+
+### ⚡ Parallel Testing
+
+- `rake parallel:test` - Run fast tests in parallel (n-1 cores, excludes slow/external)
+- `rake parallel:test_coverage` - Run fast tests in parallel with coverage (n-2 cores)
+- `rake parallel:slow` - Run slow tests in parallel (dynamic work queue across providers and test categories)
+- `rake parallel:test_files[files]` - Run specific test files in parallel
 
 ### 🚀 Performance
 
@@ -47,13 +55,15 @@ rake generate_docs        # Update docs from templates
 ### 🔧 Setup & Services
 
 - `rake download_test_images` - Download test images
+- `rake start_services` - Start Docker test services (pulls missing images, recreates stale containers, removes orphans)
+- `rake stop_services` - Stop Docker test services
 - `rake check_services` - Check service availability
+- `rake check_docker_images` - Check if pinned Docker images are outdated (run before releases)
 - `rake check_gems` - Check gem dependencies
 
 ### 📚 Documentation
 
 - `rake docs` - Show documentation structure
-- `rake generate_docs` - Generate docs from templates
 - `rake doc` - Generate YARD API docs
 
 ### 🛠️ Code Quality
@@ -64,7 +74,13 @@ rake generate_docs        # Update docs from templates
 
 ### 📦 Build & Install
 
+The preset tasks are enabled in consuming sites by adding
+`require "jekyll-imgflow/tasks"` to the site's `Rakefile`.
+
 - `rake install_local` - Build and install gem locally
+- `rake imgflow:presets` - List built-in presets and their install status
+- `rake imgflow:install_presets` - Copy built-in presets into the site's `_data/imgflow/presets/`
+- `rake 'imgflow:install_presets[true]'` - Overwrite modified preset copies
 - `rake help` - Show this help
 
 ## 🎯 Common Workflows
@@ -100,18 +116,10 @@ rake test_comprehensive
 rake performance_benchmark
 ```
 
-### Development Documentation
-
-```bash
-# Edit templates in docs/template/
-rake generate_docs
-rake docs
-```
-
 ## ⚡ Performance Tasks Explained
 
 | Task | Duration | What it tests | When to use |
-|------|----------|---------------|------------|
+| --- | --- | --- | --- |
 | `performance_quick` | 10s | CLI tools only | Quick checks |
 | `performance_benchmark` | 5-10m | All providers | Detailed analysis |
 | `performance_test` | 5-10m | Via RSpec | CI/CD testing |
@@ -121,10 +129,24 @@ rake docs
 `rake check_services` tests:
 
 - **CLI Tools**: vips, magick, sharp
-- **HTTP Services**: Imgproxy, Weserv, Flyimg, ImageCompressor
-- **Docker**: ImageCompressor CLI image
+- **HTTP Services**: Imgproxy, Weserv, Flyimg
 
-## 🔄 Migration from Shell Scripts
+## Docker Image Version Check
+
+`rake check_docker_images` queries each upstream registry (GHCR, Docker Hub) for
+the latest version tags and compares them against the pins in
+`docker-compose.base.yml`. Run this before releasing to catch stale image pins.
+
+```bash
+rake check_docker_images              # report only
+STRICT=true rake check_docker_images  # exit 1 if any pin is outdated
+```
+
+If updates are found, edit `docker-compose.base.yml`, then run `rake start_services`
+to recreate containers with the new images before proceeding with the release.
+`start_services` uses `--pull missing` so only newly-pinned images are fetched.
+
+## Migration from Shell Scripts
 
 **Replaced `run_all_tests.sh`:**
 
@@ -140,14 +162,6 @@ rake docs
 - ✅ Integrated with existing Rake tasks
 - ✅ Consistent interface
 
-## 📝 Documentation System
-
-ImgFlow uses templates:
-
-1. Edit files in `docs/template/`
-2. Run `rake generate_docs`
-3. Docs sync to `docs/usage/` and `lib/jekyll-imgflow/`
-
 ## 🆘 Troubleshooting
 
 **Tests failing?**
@@ -156,12 +170,6 @@ ImgFlow uses templates:
 rake check_services  # Check services
 rake check_gems      # Check gems
 rake download_test_images  # Get test images
-```
-
-**Documentation outdated?**
-
-```bash
-rake generate_docs
 ```
 
 **Performance issues?**

@@ -24,6 +24,31 @@ RSpec.describe JekyllImgFlow::BuildTimeProcessor, :unit do
   let(:originals_dir) { File.join(test_site_dir, config.originals) }
   let(:output_dir) { File.join(test_site_dir, config.output) }
 
+  def current_default_versions(processor, image_path)
+    config = processor.instance_variable_get(:@config)
+    registry = processor.instance_variable_get(:@registry)
+    resolver = processor.instance_variable_get(:@path_resolver)
+    generator = JekyllImgFlow::FilenameGenerator.new
+    provider = registry.current_provider.class.provider_name
+    file_digest = generator.file_digest(image_path)
+
+    config.sizes.each_value.flat_map do |width|
+      config.formats.map do |format|
+        operations = { width: width, format: format, quality: config.quality }
+        filename = generator.generate_filename(image_path, operations)
+        output_path = resolver.resolve_source_output_path(filename)
+        FileUtils.mkdir_p(File.dirname(output_path))
+        FileUtils.touch(output_path, mtime: File.mtime(image_path) + 1)
+        {
+          "operations" => operations,
+          "output" => output_path.delete_prefix(site.source),
+          "file_digest" => file_digest,
+          "provider" => provider
+        }
+      end
+    end
+  end
+
   before do
     # Mock batch manager to avoid real image processing (unit test approach)
     components = get_processor_components(processor)
@@ -46,6 +71,17 @@ RSpec.describe JekyllImgFlow::BuildTimeProcessor, :unit do
       expect(processor.instance_variable_get(:@registry)).to be_a(JekyllImgFlow::ProviderRegistry)
       expect(processor.instance_variable_get(:@operation_processor)).to be_a(JekyllImgFlow::OperationProcessor)
       expect(processor.instance_variable_get(:@batch_manager)).to be_a(JekyllImgFlow::BatchManager)
+    end
+
+    it "exposes ProcessingStats via site.imgflow_components" do
+      components = site.imgflow_components
+      expect(components).to have_key(:stats)
+      expect(components[:stats]).to be_a(JekyllImgFlow::ProcessingStats)
+    end
+
+    it "exposes the same stats instance as the operation processor" do
+      op = processor.instance_variable_get(:@operation_processor)
+      expect(site.imgflow_components[:stats]).to eq(op.stats)
     end
   end
 
@@ -112,50 +148,67 @@ RSpec.describe JekyllImgFlow::BuildTimeProcessor, :unit do
       processor.process_changed_images
     end
 
-    it "registers completed tasks in manifest" do
+    it "saves manifest after processing and cleans up deleted originals" do
       components = get_processor_components(processor)
 
-      # Use TestPictures to generate realistic completed tasks with correct filenames
-      image_name = "mars-crater-large.jpg"
-      mock_completed_tasks = TestPictures.mock_completed_tasks(
-        image_name,
-        sizes: %i[md lg],
-        formats: %i[webp avif],
-        output_dir: File.join(test_site_dir, "assets/images/optimized")
-      )
-
-      # Override the batch_manager mock to return our completed tasks
-      allow(components[:batch_manager]).to receive(:completed).and_return(mock_completed_tasks)
-
-      # Track the actual calls to manifest.register_version
-      registered_versions = []
-      allow(components[:manifest]).to receive(:register_version) do |*args|
-        registered_versions << args
-      end
+      # OperationProcessor#process_operation registers versions internally.
+      # BuildTimeProcessor's responsibility is to save the manifest after
+      # processing is complete.
+      allow(components[:manifest]).to receive(:save)
+      allow(components[:manifest]).to receive(:cleanup_deleted_originals)
+      allow(components[:manifest]).to receive(:cleanup_obsolete_defaults)
+      allow(components[:manifest]).to receive(:reset_page_usage)
 
       processor.process_changed_images
 
-      # Verify that register_version was called with the correct parameters
-      expect(registered_versions.length).to eq(4) # 2 sizes × 2 formats = 4 tasks
+      expect(components[:manifest]).to have_received(:save)
+      expect(components[:manifest]).to have_received(:cleanup_deleted_originals)
+      expect(components[:manifest]).to have_received(:cleanup_obsolete_defaults)
+      expect(components[:manifest]).to have_received(:reset_page_usage)
+    end
 
-      # Get expected filenames from TestPictures
-      expected_md_webp = TestPictures.expected_filename(image_name, :md, :webp)
-      expected_md_avif = TestPictures.expected_filename(image_name, :md, :avif)
-      expected_lg_webp = TestPictures.expected_filename(image_name, :lg, :webp)
-      expected_lg_avif = TestPictures.expected_filename(image_name, :lg, :avif)
+    it "records skipped existing outputs as cache hits" do
+      components = get_processor_components(processor)
+      task = JekyllImgFlow::BatchManager.build_default_tasks(
+        test_images.first, File.join(originals_dir, test_images.first), config, site
+      ).first
+      allow(components[:manifest]).to receive(:register_version)
+      components[:operation_processor].stats.reset
 
-      # Verify the registered versions contain the expected filenames
-      registered_paths = registered_versions.map { |args| args[1] }
-      expect(registered_paths).to include("/assets/images/optimized/#{expected_md_webp}")
-      expect(registered_paths).to include("/assets/images/optimized/#{expected_md_avif}")
-      expect(registered_paths).to include("/assets/images/optimized/#{expected_lg_webp}")
-      expect(registered_paths).to include("/assets/images/optimized/#{expected_lg_avif}")
+      processor.send(:register_skipped_tasks, [{ status: :skipped, task: task }])
 
-      # Verify all calls have correct original name and type
-      registered_versions.each do |args|
-        expect(args[0]).to eq(image_name) # original_name
-        expect(args[3]).to eq(:default)   # type
-      end
+      expect(components[:operation_processor].stats.cache_hits).to eq(1)
+    end
+
+    it "registers skipped existing outputs in the manifest" do
+      components = get_processor_components(processor)
+      task = JekyllImgFlow::BatchManager.build_default_tasks(
+        test_images.first, File.join(originals_dir, test_images.first), config, site
+      ).first
+      completed = [{ status: :skipped, task: task }]
+      allow(components[:batch_manager]).to receive(:completed).and_return(completed)
+      allow(components[:manifest]).to receive(:register_version)
+
+      processor.process_changed_images
+
+      expect(components[:manifest]).to have_received(:register_version).with(
+        task[:original_name], task[:output_path].sub(site.source, ""), task[:params],
+        :default, nil, nil, kind_of(String)
+      )
+    end
+
+    it "keeps animated GIF manifest entries during deleted-original cleanup" do
+      animated_name = "ang-head-animation.gif"
+      animated_path = File.join(originals_dir, animated_name)
+      FileUtils.cp(File.expand_path("fixtures/originals/#{animated_name}", __dir__), animated_path)
+      manifest = processor.instance_variable_get(:@manifest)
+      manifest.register_version(animated_name, "/animated.gif", { width: 400 }, :specialized, nil)
+
+      processor.process_changed_images
+
+      expect(manifest.versions?(animated_name)).to be true
+    ensure
+      FileUtils.rm_f(animated_path)
     end
 
     it "creates output directory structure" do
@@ -164,6 +217,21 @@ RSpec.describe JekyllImgFlow::BuildTimeProcessor, :unit do
 
       # Verify output directory exists
       expect(Dir.exist?(output_dir)).to be true
+    end
+
+    it "records all current default versions as cache hits" do
+      components = get_processor_components(processor)
+      image_path = File.join(originals_dir, test_images.first)
+      allow(processor).to receive_messages(
+        find_original_images: [image_path], needs_processing?: false
+      )
+      components[:operation_processor].stats.reset
+
+      processor.process_changed_images
+
+      expected = config.sizes.length * config.formats.length
+      expect(components[:operation_processor].stats.cache_hits).to eq(expected)
+      expect(components[:operation_processor].stats.cache_misses).to eq(0)
     end
   end
 
@@ -176,35 +244,84 @@ RSpec.describe JekyllImgFlow::BuildTimeProcessor, :unit do
       expect(result).to be true
     end
 
-    it "returns false when image is up-to-date" do
-      # Mock manifest to indicate image is up-to-date with matching provider
+    it "returns false when every configured output is up-to-date" do
       manifest = processor.instance_variable_get(:@manifest)
-      registry = processor.instance_variable_get(:@registry)
-      current_provider_name = registry.current_provider.class.provider_name
-      allow(manifest).to receive_messages(versions?: true, get_versions: {
-                                            "default" => [
-                                              { "created_at" => Time.now.to_i,
-                                                "provider" => current_provider_name }
-                                            ]
-                                          })
+      versions = current_default_versions(processor, image_path)
+      allow(manifest).to receive(:get_versions).and_return({ "default" => versions })
 
       result = processor.send(:needs_processing?, image_path)
 
       expect(result).to be false
     end
 
-    it "returns true when original file is modified" do
-      # Process once
-      processor.process_changed_images
+    it "returns true when a configured output is missing" do
+      manifest = processor.instance_variable_get(:@manifest)
+      versions = current_default_versions(processor, image_path)
+      FileUtils.rm_f(File.join(site.source, versions.first["output"]))
+      allow(manifest).to receive(:get_versions).and_return({ "default" => versions })
 
-      # Modify the file
-      sleep 0.1
-      FileUtils.touch(image_path)
+      expect(processor.send(:needs_processing?, image_path)).to be true
+    end
 
-      # Check again
+    it "returns true when a format is added to config (missing format needs generation)" do
+      manifest = processor.instance_variable_get(:@manifest)
+      # Simulate manifest with only 2 of 4 formats (avif, webp) — png and jpg missing
+      versions = current_default_versions(processor, image_path)
+      removed_formats = %w[png jpg]
+      reduced_versions = versions.reject { |v| removed_formats.include?(v["operations"][:format]) }
+      allow(manifest).to receive(:get_versions).and_return({ "default" => reduced_versions })
+
+      expect(processor.send(:needs_processing?, image_path)).to be true
+    end
+
+    it "returns false when formats config shrinks (obsolete formats already cleaned up)" do
+      manifest = processor.instance_variable_get(:@manifest)
+      # Simulate manifest with only the 2 remaining formats after config changed
+      versions = current_default_versions(processor, image_path)
+      kept_formats = %w[avif png]
+      reduced_versions = versions.select { |v| kept_formats.include?(v["operations"][:format]) }
+      # Stub config to only expect avif and png
+      reduced_config = double("config", sizes: config.sizes, formats: %w[avif png],
+                                        quality: config.quality)
+      allow(processor).to receive_messages(
+        expected_default_operations: reduced_config.sizes.each_value.flat_map do |width|
+          reduced_config.formats.map do |format|
+            { width: width, format: format, quality: reduced_config.quality }
+          end
+        end
+      )
+      allow(manifest).to receive(:get_versions).and_return({ "default" => reduced_versions })
+
+      expect(processor.send(:needs_processing?, image_path)).to be false
+    end
+
+    it "returns true when original bytes change with the same mtime" do
+      manifest = processor.instance_variable_get(:@manifest)
+      versions = current_default_versions(processor, image_path)
+      allow(manifest).to receive(:get_versions).and_return({ "default" => versions })
+      original_bytes = File.binread(image_path)
+      original_mtime = File.mtime(image_path)
+      File.binwrite(image_path, "#{original_bytes}\0")
+      FileUtils.touch(image_path, mtime: original_mtime)
+
       result = processor.send(:needs_processing?, image_path)
 
       expect(result).to be true
+    ensure
+      File.binwrite(image_path, original_bytes) if original_bytes
+      FileUtils.touch(image_path, mtime: original_mtime) if original_mtime
+    end
+
+    it "returns false when only the original mtime changes" do
+      manifest = processor.instance_variable_get(:@manifest)
+      versions = current_default_versions(processor, image_path)
+      allow(manifest).to receive(:get_versions).and_return({ "default" => versions })
+      original_mtime = File.mtime(image_path)
+      FileUtils.touch(image_path, mtime: Time.now + 60)
+
+      expect(processor.send(:needs_processing?, image_path)).to be false
+    ensure
+      FileUtils.touch(image_path, mtime: original_mtime) if original_mtime
     end
   end
 
@@ -351,70 +468,45 @@ RSpec.describe JekyllImgFlow::BuildTimeProcessor, :unit do
       end
 
       it "returns false when image is up-to-date" do
-        # Mock manifest to indicate image is up-to-date
         manifest = processor.instance_variable_get(:@manifest)
-        registry = processor.instance_variable_get(:@registry)
-        current_provider_name = registry.current_provider.class.provider_name
-        allow(manifest).to receive_messages(versions?: true, get_versions: {
-                                              "default" => [
-                                                { "created_at" => Time.now.to_i,
-                                                  "provider" => current_provider_name }
-                                              ]
-                                            })
+        versions = current_default_versions(processor, image_path)
+        allow(manifest).to receive(:get_versions).and_return({ "default" => versions })
 
         result = processor.send(:needs_processing?, image_path)
-        expect(result).to be false # Image is up-to-date with recent timestamp and matching provider
+        expect(result).to be false
       end
 
-      it "returns true when original file is modified" do
-        # Mock manifest to indicate image was processed
+      it "returns true when original file content is modified" do
         manifest = processor.instance_variable_get(:@manifest)
-        allow(manifest).to receive_messages(versions?: true, get_versions: {
-                                              "default" => [
-                                                { "created_at" => (Time.now - 3600).to_i, "provider" => "Sharp" } # 1 hour ago
-                                              ]
-                                            })
+        versions = current_default_versions(processor, image_path)
+        allow(manifest).to receive(:get_versions).and_return({ "default" => versions })
+        original_bytes = File.binread(image_path)
+        File.binwrite(image_path, "#{original_bytes}\0")
 
-        # Touch file to make it newer
-        sleep 0.1
-        FileUtils.touch(image_path)
+        result = processor.send(:needs_processing?, image_path)
+        expect(result).to be true
+      ensure
+        File.binwrite(image_path, original_bytes) if original_bytes
+      end
+
+      it "handles a missing output path gracefully" do
+        manifest = processor.instance_variable_get(:@manifest)
+        versions = current_default_versions(processor, image_path)
+        versions.first.delete("output")
+        allow(manifest).to receive(:get_versions).and_return({ "default" => versions })
 
         result = processor.send(:needs_processing?, image_path)
         expect(result).to be true
       end
 
-      it "handles missing version_time gracefully" do
-        # Mock manifest to return versions without created_at
-        manifest = processor.instance_variable_get(:@manifest)
-        allow(manifest).to receive_messages(versions?: true, get_versions: {
-                                              "default" => [
-                                                { "provider" => "Sharp" } # No created_at
-                                              ]
-                                            })
-
-        result = processor.send(:needs_processing?, image_path)
-        expect(result).to be true # Should process when no timestamp
-      end
-
       it "handles provider change detection" do
-        # Mock registry to return different provider
-        registry = processor.instance_variable_get(:@registry)
-        allow(registry).to receive(:current_provider).and_return(
-          double("provider",
-                 class: double("class", provider_name: "newprovider"))
-        )
-
-        # Mock manifest with previous provider
-        allow(processor.instance_variable_get(:@manifest))
-          .to receive_messages(versions?: true, get_versions: {
-                                 "default" => [
-                                   { "created_at" => Time.now.to_i,
-                                     "provider" => "PreviousProvider" }
-                                 ]
-                               })
+        manifest = processor.instance_variable_get(:@manifest)
+        versions = current_default_versions(processor, image_path)
+        versions.each { |version| version["provider"] = "PreviousProvider" }
+        allow(manifest).to receive(:get_versions).and_return({ "default" => versions })
 
         result = processor.send(:needs_processing?, image_path)
-        expect(result).to be true # Should process when provider changed
+        expect(result).to be true
       end
 
       it "handles non-existent image gracefully" do

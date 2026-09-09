@@ -21,8 +21,9 @@ module JekyllImgFlow
         command = build_sharp_command(input_path, output_path)
         execute_command(command)
 
-        reset_operations
         output_path
+      ensure
+        reset_operations
       end
 
       def build_sharp_command(input_path, output_path)

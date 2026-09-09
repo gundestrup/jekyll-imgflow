@@ -12,6 +12,9 @@ module JekyllImgFlow
       self.class.discover_providers unless self.class.providers_discovered?
     end
 
+    # Files in providers/ that are not provider classes (modules, helpers)
+    NON_PROVIDER_FILES = %w[base_provider.rb].freeze
+
     # Dynamic provider discovery
     def self.discover_providers
       return if @providers_discovered
@@ -20,7 +23,8 @@ module JekyllImgFlow
       providers_dir = File.join(File.dirname(__FILE__), "providers")
 
       Dir.glob(File.join(providers_dir, "*.rb")).each do |file|
-        next if File.basename(file) == "base_provider.rb"
+        basename = File.basename(file)
+        next if NON_PROVIDER_FILES.include?(basename)
 
         provider_name = File.basename(file, ".rb")
         register_provider(provider_name)
@@ -72,9 +76,20 @@ module JekyllImgFlow
       end
     end
 
-    # Get current provider (first available from priority list)
+    # Get current provider (first available from priority list).
+    # If no provider is available, logs a warning and returns nil.
+    # The caller should check for nil and handle gracefully.
     def current_provider
-      providers.find(&:available?)
+      provider = providers.find(&:available?)
+      return provider if provider
+
+      configured = @config.backend_priority.join(", ")
+      Jekyll.logger.warn "ImgFlow:",
+                         "No available image provider found. " \
+                         "Configured backends: #{configured}. " \
+                         "Install one of: sharp, libvips, imagemagick, " \
+                         "or start the Docker HTTP providers."
+      nil
     end
 
     # Get list of available provider names

@@ -1,5 +1,9 @@
 # Test Docker Compose configuration for ImgFlow
 # Inherits from docker-compose.base.yml and adds test-specific settings
+#
+# Port allocation is defined in .env.test. Each provider block uses four
+# ports: base (Docker), base+1 (source server), base+2 (reserve), base+3.
+# Port 4000 is reserved for development Jekyll and never used in tests.
 
 include:
   - docker-compose.base.yml
@@ -8,14 +12,14 @@ services:
   imgproxy:
     container_name: imgflow-imgproxy-test
     ports:
-      - "${IMGPROXY_PORT:-33001}:8080"
+      - "${IMGPROXY_PORT}:8080"
     volumes:
       - ./spec/fixtures/originals:/app/images
 
   weserv:
     container_name: imgflow-weserv-test
     ports:
-      - "${WESERV_PORT:-33007}:80"
+      - "${WESERV_PORT}:80"
     volumes:
       - ./spec/fixtures/originals:/images
     # weserv denies requests to private/loopback IPs by default (SSRF protection),
@@ -23,20 +27,28 @@ services:
     # host.docker.internal (a Docker-injected /etc/hosts-only entry). Tests must
     # reach the host's WEBrick server via host.docker.internal, so both
     # restrictions are relaxed for the test container only.
+    # Weserv uses /dev/shm for its nginx proxy_cache (max_size=250m); the
+    # default 64MB /dev/shm is too small and causes "No space left on device"
+    # errors that return empty responses. Increase shm_size to accommodate.
+    shm_size: 512mb
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
         sed -i '/weserv_deny_ip/d' /etc/nginx/nginx.conf &&
         sed -i 's/resolver 8.8.8.8/resolver 127.0.0.11/' /etc/nginx/imagesweserv*.conf &&
+        for config in /etc/nginx/imagesweserv*.conf; do
+          sed -i '/^[[:space:]]*weserv_limit_input_pixels/d' "$$config";
+          sed -i '/weserv proxy;/a\        weserv_limit_input_pixels ${WESERV_LIMIT_INPUT_PIXELS};' "$$config";
+        done &&
         exec nginx -g 'daemon off;'
 
   flyimg:
     container_name: imgflow-flyimg-test
     ports:
-      - "${FLYIMG_PORT:-33008}:80"
+      - "${FLYIMG_PORT}:80"
     volumes:
       - ./spec/fixtures/originals:/images
 
 networks:
-  imgflow-test:
-    driver: bridge
+  imgflow-network:
+    name: imgflow-test-network

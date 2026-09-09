@@ -3,31 +3,19 @@
 ## Quick Start
 
 ```bash
-rake              # Run all checks
-rake quick        # Quick check (style + tests)
-```
-
-## Setup
-
-```bash
-./create-test-images.sh  # Download test images (one-time)
+bundle install        # Install dependencies
+rake quick            # Style + tests (fastest)
+rake                  # Full quality checks
 ```
 
 ## Architecture
 
-**See:** [ARCHITECTURE.md](ARCHITECTURE.md) for detailed component architecture and data flow
+**See:** [ARCHITECTURE.md](ARCHITECTURE.md) for the full file tree, component
+architecture, and data flow. Key points:
 
-### Key Components
-
-- **Parser** - Input validation and markup parsing
-- **Tags** - Operation parameter validation
-- **Providers** - Image processing services
-- **HTML Generator** - Unified HTML output generation
-
-### Processing Paths
-
-1. **Build-time** - Hooks → Processor → Image generation
-2. **Template-time** - Liquid tags → ImgflowTag → HTML output
+- **Two processing flows:** Build-Time (pre-generate defaults) and Runtime (on-demand)
+- **Providers:** Image processing backends (CLI tools and HTTP APIs)
+- **Tags:** Jekyll template tags for image optimization
 
 ## Development Workflow
 
@@ -35,93 +23,48 @@ rake quick        # Quick check (style + tests)
 2. Test changes: `rake quick`
 3. Full check before commit: `rake`
 
-### Quick Commands
-
-```bash
-rake quick                    # Style + tests (fastest)
-rake test                     # All tests
-rake quality                  # Full quality checks
-rake check_services            # Verify Docker services
-rake parallel:test            # Parallel testing (faster)
-```
+**Commands:** See [rake.md](rake.md) for the full Rake task reference.
 
 ## Testing
 
-### Run Tests
+**See:** [testing.md](testing.md) for the comprehensive testing guide and
+[parallel_testing.md](parallel_testing.md) for parallel test execution.
 
 ```bash
 bundle exec rspec              # All tests
 bundle exec rspec --parallel   # Parallel execution
+rake parallel:test             # Parallel testing via Rake
 ```
 
-**Testing Guide:** See [testing.md](testing.md) for comprehensive testing information
+## Docker Services
 
-### Test Services
+**See:** [docker.md](docker.md) for Docker service configuration, ports, and troubleshooting.
 
 ```bash
-docker-compose -f docker-compose.test.yml --env-file .env.test up -d
-./check-test-services.sh      # Verify services
+rake start_services           # Start services (pulls latest pinned images)
+rake check_services           # Verify services are running
+rake stop_services            # Stop services
 ```
 
-### Provider Types
+## Adding Dependencies
 
-- **HTTP API Services** (Docker): Imgproxy, Weserv, Flyimg
-- **CLI Tools** (Local): ImageMagick, LibVips, Sharp
+The project follows the [rubygems guide](https://github.com/rubygems/guides/blob/main/gemfile-and-gemspec.md)
+for dependency management:
 
-**Provider Details:** See [providers.md](providers.md) for complete provider comparison
-
-## Commands
-
-### Testing
+- **Runtime dependencies** (gems needed by users of the gem) go in the
+  **gemspec** (`s.add_dependency`). Keep version constraints wide (e.g.
+  `>= 4.0`) so the gem coexists with other gems in a user's application.
+- **Development dependencies** (gems needed only to develop/test the gem)
+  go in the **Gemfile** `:development` group, never in the gemspec. The
+  Gemfile uses the `gemspec` directive to pull runtime deps automatically,
+  so there is no duplication.
 
 ```bash
-rake test         # Tests only
-rake spec         # Tests + coverage
-rake quick        # Fast check (style + tests)
-```
+# Add a runtime dependency (edit gemspec, then bundle install)
+#   s.add_dependency "new_gem", "~> 1.0"
 
-### Code Quality
-
-```bash
-rake rubocop      # Code style
-rake rubocop_fix  # Auto-fix issues
-rake bundler_audit # Security check
-```
-
-### Development
-
-```bash
-rake install_local # Install gem locally
-```
-
-## File Structure
-
-```
-lib/jekyll-imgflow/
-├── config.rb                    # Configuration management
-├── parser.rb                    # Input validation and parsing
-├── html_generator.rb            # Unified HTML generation
-├── imgflow_tag.rb               # Main ImgFlow tag
-├── picture_tag_adaptor.rb       # Picture Tag compatibility
-├── picture_tag_preset_migrator.rb # Preset migration
-├── operation_processor.rb       # Image operations
-├── provider_registry.rb         # Provider management
-├── providers/                   # Image processing providers
-│   ├── base_provider.rb         # Base interface
-│   ├── sharp.rb                 # Sharp CLI provider
-│   ├── imagemagick.rb           # ImageMagick CLI provider
-│   ├── libvips.rb               # LibVips CLI provider
-│   ├── imgproxy.rb              # ImgProxy HTTP provider
-│   ├── weserv.rb                # Weserv HTTP provider
-│   └── flyimg.rb                # Flyimg HTTP provider
-├── tags/                        # Operation validators
-│   ├── base_tag.rb              # Shared functionality
-│   ├── resize_tag.rb            # Resize validation
-│   ├── crop_tag.rb              # Crop validation
-│   ├── quality_tag.rb           # Quality validation
-│   ├── format_tag.rb            # Format validation
-│   └── tag_registry.rb          # Tag registration
-└── hooks.rb                     # Jekyll build hooks
+# Add a development dependency (edit Gemfile, then bundle install)
+bundle add new_gem --group development
 ```
 
 ## Adding New Providers
@@ -133,43 +76,18 @@ lib/jekyll-imgflow/
 5. Add tests
 6. Update Docker services if HTTP API
 
+**See:** [providers.md](providers.md) for provider comparison and setup.
+
 ## Picture Tag Migration
 
-**Migration Guide:** See [picture_tag_migration.md](picture_tag_migration.md) for complete migration instructions
-
-### CLI Tool
-
-```bash
-bin/imgflow_migrate_presets --preview  # Preview migration
-bin/imgflow_migrate_presets            # Migrate presets
-```
+See [picture_tag_migration.md](picture_tag_migration.md) for the complete migration guide.
 
 ## Release Process
 
-The version bump and release scripts keep `version.rb`, `Gemfile.lock`, and
-`CHANGELOG.md` synchronized. The release script runs quality checks, builds the
-gem, pushes the commit, creates the GitHub tag and Release page together, and
-starts the RubyGems publishing workflow.
-
-Prerequisites:
-
-- Authenticate GitHub CLI once with `gh auth login`.
-- Keep the working tree free of untracked files.
-- Add or review the current notes under `## [Unreleased]`.
-
-```bash
-bundle exec rake 'version:bump[patch]'  # or minor/major
-# Add a '## [0.1.12] - YYYY-MM-DD' entry to CHANGELOG.md
-bundle exec rake version:check_changelog  # verify the entry exists
-git add lib/jekyll-imgflow/version.rb CHANGELOG.md Gemfile.lock
-git commit -m "Release v0.1.12"
-git tag v0.1.12
-git push origin main --tags  # triggers the release workflow
-```
-
-Do not create the GitHub Release page manually. The release workflow
-(`release.yml`) creates the GitHub release and publishes to RubyGems
-automatically via OIDC trusted publishing.
+See the [AGENTS.md Release Process](../AGENTS.md#release-process) section for the
+authoritative release procedure. In short: bump version with `rake version:bump`,
+add a CHANGELOG entry, commit, tag `v*`, and push — the GitHub Actions workflow
+handles building and publishing to RubyGems via OIDC trusted publishing.
 
 ## Troubleshooting
 
@@ -183,110 +101,18 @@ rm -rf tmp/         # Clear cache
 
 ### Docker Issues
 
-```bash
-./check-test-services.sh  # Diagnose
-docker-compose -f docker-compose.test.yml restart  # Restart
-```
+See [docker.md](docker.md#troubleshooting) for Docker troubleshooting.
 
 ## Scripts
 
 - `create-test-images.sh` - Download test images
-- `check-test-services.sh` - Health check
 - `bin/install-hooks.sh` - Install git hooks (pre-commit: rubocop, pre-push: rubocop + rspec)
 
----
+**See:** [scripts.md](scripts.md) for the full scripts reference.
 
-## Quick Reference
+## Configuration Files
 
-### Essential Files
-
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed component architecture
-- **[testing.md](testing.md)** - Comprehensive testing guide  
-- **[providers.md](providers.md)** - Provider comparison and setup
-- **[picture_tag_migration.md](picture_tag_migration.md)** - Picture Tag migration
-- **[PARALLEL_TESTING.md](PARALLEL_TESTING.md)** - Parallel testing setup
-- **[docker.md](docker.md)** - Docker services configuration
-- **[scripts.md](scripts.md)** - Development scripts and utilities
-
-### Core Code Files
-
-- **`lib/jekyll-imgflow.rb`** - Main module and requires
-- **`lib/jekyll-imgflow/config.rb`** - Configuration management
-- **`lib/jekyll-imgflow/parser.rb`** - Input validation and parsing
-- **`lib/jekyll-imgflow/html_generator.rb`** - Unified HTML generation
-- **`lib/jekyll-imgflow/imgflow_tag.rb`** - Main ImgFlow tag
-- **`lib/jekyll-imgflow/picture_tag_adaptor.rb`** - Picture Tag compatibility
-- **`lib/jekyll-imgflow/provider_registry.rb`** - Provider management
-
-### Test Files
-
-- **`spec/spec_helper.rb`** - Test configuration and setup
-- **`spec/imgflow_system_spec.rb`** - End-to-end system tests
-- **`spec/provider_interface_spec.rb`** - Provider compatibility tests
-- **`spec/picture_tag_integration_spec.rb`** - Picture Tag integration
-
-### Configuration Files
-
-- **`Rakefile`** - Build and test tasks
-- **`docker-compose.test.yml`** - Test Docker services
+- **`Gemfile`** - Development dependencies and Jekyll version pin. Uses the `gemspec` directive to pull runtime dependencies from the gemspec automatically. Development dependencies are declared here (not in the gemspec) to avoid version drift — see the [rubygems guide](https://github.com/rubygems/guides/blob/main/gemfile-and-gemspec.md).
+- **`jekyll-imgflow.gemspec`** - Gem manifest: metadata, runtime dependencies (`benchmark`, `fastimage`, `jekyll`), and packaged files. Development dependencies are intentionally not declared here.
+- **`Rakefile`** - Build and test tasks (see [rake.md](rake.md))
 - **`.env.test`** - Test environment variables
-- **`Gemfile`** - Ruby dependencies
-
-### Key Rake Tasks
-
-```bash
-# Development Workflow
-rake quick                    # Style + tests (fastest)
-rake quality                  # Full quality checks
-rake                         # Default = quality
-
-# Testing
-rake test                     # All tests  
-rake spec                     # RSpec tests
-rake parallel:test            # Parallel testing (faster)
-rake test_comprehensive       # Detailed test suite
-
-# Individual Test Groups
-rake test_core                # Core system tests
-rake test_tags                # Tag system tests
-rake test_integration         # Integration tests
-rake test_performance         # Performance benchmarks
-
-# Services & Setup
-rake check_services           # Verify Docker services
-rake check_gems               # Check dependencies
-rake download_test_images     # Download test images
-
-# Code Quality
-rake rubocop                  # Style check
-rake rubocop_fix              # Auto-fix style issues
-rake bundler_audit            # Security audit
-
-# Build & Install
-rake install_local            # Build and install gem
-rake build                    # Build gem package
-```
-
-### Docker Services
-
-```bash
-# Start test services
-docker-compose -f docker-compose.test.yml --env-file .env.test up -d
-
-# Check service status
-rake check_services
-
-# Stop services  
-docker-compose -f docker-compose.test.yml down
-```
-
----
-
-**Related Documents:**
-
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed component architecture
-- [testing.md](testing.md) - Comprehensive testing guide
-- [providers.md](providers.md) - Provider comparison and setup
-- [picture_tag_migration.md](picture_tag_migration.md) - Picture Tag migration
-- [PARALLEL_TESTING.md](PARALLEL_TESTING.md) - Parallel testing setup
-- [scripts.md](scripts.md) - Development scripts and utilities

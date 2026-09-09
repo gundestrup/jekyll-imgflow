@@ -119,7 +119,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       components = tag.send(:get_imgflow_components, liquid_context)
       expect(components).to be_a(Hash)
       expect(components).to include(:config, :manifest, :registry,
-                                    :operation_processor, :preset_manager)
+                                    :filename_generator, :operation_processor, :preset_manager)
     end
   end
 
@@ -130,6 +130,10 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
 
     before do
       FileUtils.mkdir_p(presets_dir)
+      unless site.respond_to?(:imgflow_components)
+        site.define_singleton_method(:imgflow_components) { @imgflow_components }
+        site.define_singleton_method(:imgflow_components=) { |value| @imgflow_components = value }
+      end
 
       # Create test preset
       File.write(File.join(presets_dir, "hero.yml"), <<~YAML)
@@ -156,6 +160,118 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       tag = template.root.nodelist.first
 
       expect(tag.instance_variable_get(:@markup)).to eq("#{test_image_name} preset:hero quality:90")
+    end
+
+    it "renders every configured preset format as an existing picture source" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse("{% imgflow #{test_image_name} preset:hero %}")
+
+      html = template.render(liquid_context)
+      paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
+
+      expect(html).to include("<picture", "type=\"image/webp\"")
+      expect(paths.map { |path| File.extname(path) }).to contain_exactly(".webp", ".jpg")
+      paths.each do |path|
+        expect(File.file?(File.join(site.source, path.delete_prefix("/")))).to be true
+      end
+    end
+
+    it "preserves quoted HTML attributes containing spaces" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse(
+        "{% imgflow #{test_image_name} preset:hero alt:\"Crater on Mars\" %}"
+      )
+
+      expect(template.render(liquid_context)).to include('alt="Crater on Mars"')
+    end
+  end
+
+  describe "explicit format selection through tags" do
+    let(:config) { JekyllImgFlow::Config.new(site) }
+
+    before do
+      unless site.respond_to?(:imgflow_components)
+        site.define_singleton_method(:imgflow_components) { @imgflow_components }
+        site.define_singleton_method(:imgflow_components=) { |value| @imgflow_components = value }
+      end
+    end
+
+    it "renders <picture> with all config formats when no format is specified" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 %}")
+
+      html = template.render(liquid_context)
+      paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
+
+      expect(html).to include("<picture")
+      # Non-fallback formats get <source> tags; fallback format (jpg) gets <img>
+      source_formats = config.formats - [config.fallback_format]
+      source_formats.each do |f|
+        expect(html).to include("type=\"image/#{f}\"")
+      end
+      expect(paths.map { |path| File.extname(path) }).to match_array(config.formats.map { |f| ".#{f}" })
+      paths.each do |path|
+        expect(File.file?(File.join(site.source, path.delete_prefix("/")))).to be true
+      end
+    end
+
+    it "renders <picture> with avif source and png fallback for formats:avif,png" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 formats:avif,png %}")
+
+      html = template.render(liquid_context)
+      paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
+
+      expect(html).to include("<picture", "type=\"image/avif\"")
+      # png is not the config fallback_format (jpg), so it gets a <source> tag too;
+      # png is also the <img> fallback since jpg is not in the requested formats
+      expect(paths.map { |path| File.extname(path) }).to contain_exactly(".avif", ".png", ".png")
+      paths.each do |path|
+        expect(File.file?(File.join(site.source, path.delete_prefix("/")))).to be true
+      end
+    end
+
+    it "renders <picture> with webp source and jpg fallback for formats:webp,jpg" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 formats:webp,jpg %}")
+
+      html = template.render(liquid_context)
+      paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
+
+      expect(html).to include("<picture", "type=\"image/webp\"")
+      expect(paths.map { |path| File.extname(path) }).to contain_exactly(".webp", ".jpg")
+      paths.each do |path|
+        expect(File.file?(File.join(site.source, path.delete_prefix("/")))).to be true
+      end
+    end
+
+    it "renders <img> with avif source for format:avif" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 format:avif %}")
+
+      html = template.render(liquid_context)
+      paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
+
+      expect(html).not_to include("<picture")
+      expect(html).to include("<img")
+      expect(paths.map { |path| File.extname(path) }).to contain_exactly(".avif")
+      paths.each do |path|
+        expect(File.file?(File.join(site.source, path.delete_prefix("/")))).to be true
+      end
+    end
+
+    it "renders <picture> with all config formats for a default width when no format is specified" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse("{% imgflow #{test_image_name} width:400 %}")
+
+      html = template.render(liquid_context)
+      paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
+
+      expect(html).to include("<picture")
+      expect(paths.map { |path| File.extname(path) }).to match_array(config.formats.map { |f| ".#{f}" })
+      paths.each do |path|
+        expect(File.file?(File.join(site.source, path.delete_prefix("/")))).to be true
+      end
     end
   end
 
@@ -219,6 +335,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       rendered = template.render(liquid_context)
       expect(rendered).to be_a(String)
       expect(rendered).not_to be_empty
+      expect(rendered).not_to include("<!-- ImgFlow Error:")
     end
 
     it "handles multiple tags in template" do
@@ -299,6 +416,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
 
       # Test 9: End-to-End Validation
       expect(result).to be_a(String) # Tag should render without errors
+      expect(result).not_to include("<!-- ImgFlow Error:")
 
       # NOTE: The tag may not call process_batch_operations directly due to internal logic
       # The important thing is that the tag renders without errors and components are available
@@ -342,6 +460,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       # Test 5: Complete Tag Rendering
       result = template.render(liquid_context)
       expect(result).to be_a(String)
+      expect(result).not_to include("<!-- ImgFlow Error:")
     end
   end
 

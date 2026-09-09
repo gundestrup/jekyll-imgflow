@@ -91,11 +91,12 @@ module JekyllImgFlow
     def process_task(task)
       # Check if processing is needed
       # Check if output is up-to-date
-      if task[:skip_if_exists] && File.exist?(task[:output_path]) && !@operation_processor.needs_processing?(
-        task[:input_path],
-        task[:output_path],
-        task[:params]
-      )
+      if !task[:force_processing] && task[:skip_if_exists] && File.exist?(task[:output_path]) &&
+         !@operation_processor.needs_processing?(
+           task[:input_path],
+           task[:output_path],
+           task[:params]
+         )
         Jekyll.logger.debug "⏭️  Skipping #{task[:original_name]} - already up-to-date"
         mark_completed(task, :skipped)
         return
@@ -104,7 +105,8 @@ module JekyllImgFlow
       # Process the operation
       operation = {
         type: task[:operation_type],
-        params: task[:params]
+        params: task[:params],
+        file_digest: task[:file_digest]
       }
 
       Jekyll.logger.debug "🔍 BatchManager: Processing task - input: #{task[:input_path]}, original: #{task[:original_name]}"
@@ -201,7 +203,7 @@ module JekyllImgFlow
     # @param config [Config] ImgFlow configuration
     # @param site [Jekyll::Site] Jekyll site object
     # @return [Array<Hash>] Array of tasks
-    def self.build_default_tasks(original_name, input_path, config, _site)
+    def self.build_default_tasks(original_name, input_path, config, _site, file_digest: nil)
       tasks = []
 
       # Use FilenameGenerator for consistent naming
@@ -233,6 +235,7 @@ module JekyllImgFlow
             },
             version_type: :default,
             page_path: nil, # Default versions not tied to specific page
+            file_digest: file_digest,
             skip_if_exists: true
           }
         end

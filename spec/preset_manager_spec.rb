@@ -238,4 +238,100 @@ RSpec.describe JekyllImgFlow::PresetManager, :unit do
       expect(markup).to include("filters:blur,sharpen")
     end
   end
+
+  describe "Built-in presets" do
+    context "without any user presets" do
+      let(:empty_site) { double("site", source: test_dir) }
+      let(:empty_presets_dir) { File.join(test_dir, "_data", "imgflow", "presets") }
+      let(:manager) { described_class.new(empty_site, config) }
+
+      before do
+        # Ensure site presets dir is empty (but exists)
+        FileUtils.mkdir_p(empty_presets_dir)
+        Dir.glob(File.join(empty_presets_dir, "*.yml")).each { |f| File.delete(f) }
+      end
+
+      it "loads built-in presets from the gem" do
+        expect(manager.preset_exists?("thumbnail")).to be true
+        expect(manager.preset_exists?("hero")).to be true
+        expect(manager.preset_exists?("gallery")).to be true
+      end
+
+      it "lists built-in presets in available_presets" do
+        presets = manager.available_presets
+        expect(presets).to include("thumbnail")
+        expect(presets).to include("hero")
+        expect(presets).to include("gallery")
+      end
+
+      it "returns built-in preset names via builtin_preset_names" do
+        names = manager.builtin_preset_names
+        expect(names).to include("thumbnail")
+        expect(names).to include("hero")
+        expect(names).to include("gallery")
+      end
+
+      it "identifies built-in presets with builtin_preset?" do
+        expect(manager.builtin_preset?("thumbnail")).to be true
+        expect(manager.builtin_preset?("hero")).to be true
+        expect(manager.builtin_preset?("nonexistent")).to be false
+      end
+
+      it "builds markup from built-in thumbnail preset" do
+        markup = manager.build_markup_from_preset("thumbnail")
+        expect(markup).to include("width:150")
+        expect(markup).to include("formats:webp,jpg")
+        expect(markup).to include("quality:75")
+      end
+
+      it "builds markup from built-in hero preset" do
+        markup = manager.build_markup_from_preset("hero")
+        expect(markup).to include("width:800")
+        expect(markup).to include("formats:avif,webp,jpg")
+        expect(markup).to include("quality:85")
+      end
+
+      it "builds markup from built-in gallery preset" do
+        markup = manager.build_markup_from_preset("gallery")
+        expect(markup).to include("width:400")
+        expect(markup).to include("formats:avif,webp,jpg")
+        expect(markup).to include("quality:80")
+      end
+
+      it "allows user options to override built-in preset values" do
+        markup = manager.build_markup_from_preset("thumbnail", { width: 200 })
+        expect(markup).to include("width:200")
+        expect(markup).not_to include("width:150")
+        expect(markup).to include("quality:75") # Not overridden
+      end
+    end
+
+    context "with user preset that overrides a built-in name" do
+      it "user preset takes precedence over built-in" do
+        # Create a user thumbnail preset with different width
+        File.write(File.join(presets_dir, "thumbnail.yml"), <<~YAML)
+          operations:
+            - resize:
+                width: 300
+            - format:
+                formats: ["webp"]
+        YAML
+
+        markup = preset_manager.build_markup_from_preset("thumbnail")
+        expect(markup).to include("width:300")
+        expect(markup).to include("formats:webp")
+        expect(markup).not_to include("width:150")
+        expect(markup).not_to include("formats:webp,jpg")
+      end
+
+      it "user_preset? returns true for user-defined preset" do
+        File.write(File.join(presets_dir, "thumbnail.yml"), "operations: []")
+        expect(preset_manager.user_preset?("thumbnail")).to be true
+      end
+
+      it "user_preset? returns false for built-in-only preset" do
+        expect(preset_manager.user_preset?("hero")).to be false
+      end
+    end
+  end
 end

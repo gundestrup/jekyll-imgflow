@@ -1,48 +1,56 @@
 # ImgFlow Presets Directory
 
-This directory contains user-defined presets that combine multiple ImgFlow tags into reusable templates.
+This documentation describes reusable YAML presets. Built-in presets are shipped
+with the gem and user-defined presets are loaded from `_data/imgflow/presets/`.
+A user preset with the same name overrides the built-in preset.
 
 ## 📁 Preset Structure
 
-Presets are Jekyll partials that follow the naming convention: `_IFpreset_name.html`
-
-The `_IF` prefix identifies these as ImgFlow preset files.
+Presets are YAML files named `<preset_name>.yml` under
+`_data/imgflow/presets/`. Built-in presets are available without copying them.
+To enable the optional preset-management tasks, add
+`require "jekyll-imgflow/tasks"` to the site's `Rakefile`; then run
+`rake imgflow:install_presets` to copy editable versions into that directory.
 
 ## 🎨 Creating Presets
 
 ### Example: Hero Image Preset
-**File:** `_presets/_IFhero.html`
+**File:** `_data/imgflow/presets/hero.yml`
 
-```liquid
-{% imgflow_resize image.jpg width:400 height:300 %}
-{% imgflow_resize image.jpg width:800 height:600 %}
-{% imgflow_resize image.jpg width:1200 height:900 %}
-{% imgflow_resize image.jpg width:1600 height:1200 %}
-{% imgflow_format image.jpg formats:avif,webp,jpg %}
-{% imgflow_quality image.jpg quality:85 %}
+```yaml
+operations:
+  - resize:
+      width: 800
+  - format:
+      formats: ["avif", "webp", "jpg"]
+  - quality:
+      quality: 85
 ```
 
 ### Example: Thumbnail Preset
-**File:** `_presets/_IFthumbnail.html`
+**File:** `_data/imgflow/presets/thumbnail.yml`
 
-```liquid
-{% imgflow_crop image.jpg ratio:1:1 %}
-{% imgflow_resize image.jpg width:100 height:100 %}
-{% imgflow_resize image.jpg width:200 height:200 %}
-{% imgflow_format image.jpg formats:webp,jpg %}
-{% imgflow_quality image.jpg quality:75 %}
+```yaml
+operations:
+  - resize:
+      width: 150
+  - format:
+      formats: ["webp", "jpg"]
+  - quality:
+      quality: 75
 ```
 
 ### Example: Gallery Preset
-**File:** `_presets/_IFgallery.html`
+**File:** `_data/imgflow/presets/gallery.yml`
 
-```liquid
-{% imgflow_resize image.jpg width:300 height:200 %}
-{% imgflow_resize image.jpg width:600 height:400 %}
-{% imgflow_resize image.jpg width:900 height:600 %}
-{% imgflow_format image.jpg formats:avif,webp,jpg %}
-{% imgflow_quality image.jpg quality:80 %}
-{% imgflow_optimize image.jpg level:high %}
+```yaml
+operations:
+  - resize:
+      width: 400
+  - format:
+      formats: ["avif", "webp", "jpg"]
+  - quality:
+      quality: 80
 ```
 
 ## 🚀 Using Presets
@@ -70,10 +78,16 @@ The `_IF` prefix identifies these as ImgFlow preset files.
 </footer>
 ```
 
-### Direct Include
-```liquid
-{% include _IFhero.html image="banner.jpg" %}
+### User overrides
+
+Copy the built-in presets into the site and edit the YAML as needed:
+
+```bash
+bundle exec rake imgflow:install_presets
 ```
+
+A user-defined preset with the same name takes precedence over the built-in
+preset. User options supplied on the tag override values from the preset.
 
 ## 🏷️ Available Tags
 
@@ -107,32 +121,27 @@ The `_IF` prefix identifies these as ImgFlow preset files.
 
 When a preset is called, ImgFlow:
 
-1. **Parses the preset file** for tag calls
-2. **Executes each tag** in sequence
-3. **Applies provider fallbacks** if needed
-4. **Generates final HTML** with all variants
-5. **Caches results** for future use
+1. Loads a user preset from `_data/imgflow/presets/` when present
+2. Otherwise loads the matching built-in YAML preset
+3. Converts its operations to ImgFlow options
+4. Applies options supplied on the tag as overrides
+5. Generates and caches the requested image variants
 
-## 📁 Directory Options
+## 📁 Directory Layout
 
-Presets can be stored in multiple locations:
-
-```
+```text
 _project/
-├── _presets/               # Primary location
-│   ├── _IFhero.html
-│   ├── _IFthumbnail.html
-│   └── _IFgallery.html
-├── _includes/              # Alternative location
-│   ├── _IFhero.html
-│   └── _IFthumbnail.html
-└── _IFhero.html            # Root level (not recommended)
+├── _data/imgflow/presets/  # Optional user presets (override built-ins)
+│   ├── hero.yml
+│   ├── thumbnail.yml
+│   └── gallery.yml
+└── assets/images/          # Site images
 ```
 
 ## 🎯 Best Practices
 
 1. **Use descriptive names** - `hero`, `thumbnail`, `gallery`
-2. **Include multiple sizes** - At least 3 breakpoints
+2. **Choose dimensions for the intended placement** - Override them on individual tags when needed
 3. **Use modern formats** - AVIF, WebP, JPG fallback
 4. **Set appropriate quality** - 75-85 for most use cases
 5. **Test with different providers** - Ensure compatibility

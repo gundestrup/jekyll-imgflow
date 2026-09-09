@@ -23,9 +23,10 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
     # Setup site with imgflow_components methods that BuildTimeProcessor expects
     allow(site).to receive(:respond_to?).with(:imgflow_components).and_return(true)
     allow(site).to receive(:respond_to?).with(:imgflow_components=).and_return(true)
+    allow(site).to receive(:respond_to?).with(:config).and_return(true)
 
     # Mock manifest for post_write hook
-    mock_manifest = double("manifest", save: nil)
+    mock_manifest = double("manifest", save: nil, cleanup_orphans: [])
     allow(site).to receive(:imgflow_components).and_return({ manifest: mock_manifest })
     allow(site).to receive(:imgflow_components=)
 
@@ -73,6 +74,13 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
         site.define_singleton_method(:imgflow_components) { @imgflow_components }
         site.define_singleton_method(:imgflow_components=) { |value| @imgflow_components = value }
       end
+    end
+
+    it "excludes the configured cache directory from watch processing" do
+      Jekyll::Hooks.trigger :site, :after_init, site
+
+      cache_dir = JekyllImgFlow::Config.new(site).cache_dir
+      expect(site.config["exclude"]).to include(cache_dir)
     end
   end
 
@@ -123,7 +131,9 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
     it "logs cleanup results" do
       # Mock ManifestManager to return orphaned files
       mock_manifest = double("manifest_manager")
-      allow(mock_manifest).to receive(:cleanup_orphans).and_return(["file1.jpg", "file2.jpg"])
+      allow(mock_manifest).to receive_messages(
+        cleanup_orphans: ["file1.jpg", "file2.jpg"], save: nil
+      )
       allow(JekyllImgFlow::ManifestManager).to receive(:new).with(site).and_return(mock_manifest)
 
       JekyllImgFlow.cleanup_orphaned_images(site)
@@ -136,7 +146,7 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
     it "logs when no orphans found" do
       # Mock ManifestManager to return no orphaned files
       mock_manifest = double("manifest_manager")
-      allow(mock_manifest).to receive(:cleanup_orphans).and_return([])
+      allow(mock_manifest).to receive_messages(cleanup_orphans: [], save: nil)
       allow(JekyllImgFlow::ManifestManager).to receive(:new).with(site).and_return(mock_manifest)
 
       JekyllImgFlow.cleanup_orphaned_images(site)
@@ -209,8 +219,9 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
     it "handles cleanup errors gracefully" do
       # Mock cleanup to raise error (only in production)
       allow(Jekyll).to receive(:env).and_return("production")
-      allow(JekyllImgFlow::ManifestManager).to receive(:new).and_raise(StandardError,
-                                                                       "Cleanup failed")
+      manifest = double("manifest", save: nil)
+      allow(manifest).to receive(:cleanup_orphans).and_raise(StandardError, "Cleanup failed")
+      allow(site).to receive(:imgflow_components).and_return({ manifest: manifest })
 
       # Should raise error - hooks don't swallow errors by default
       expect do
@@ -353,7 +364,7 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
       # Mock cleanup to return many files
       orphaned_files = (1..100).map { |i| "orphaned#{i}.jpg" }
       mock_manifest = double("manifest_manager")
-      allow(mock_manifest).to receive(:cleanup_orphans).and_return(orphaned_files)
+      allow(mock_manifest).to receive_messages(cleanup_orphans: orphaned_files, save: nil)
       allow(JekyllImgFlow::ManifestManager).to receive(:new).with(site).and_return(mock_manifest)
 
       # Should log correct count
@@ -425,7 +436,7 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
 
   describe "post_write cleanup_orphaned_images" do
     let(:site) { create_mock_site }
-    let(:mock_manifest) { double("manifest", save: nil) }
+    let(:mock_manifest) { double("manifest", save: nil, cleanup_orphans: []) }
 
     before do
       allow(site).to receive(:imgflow_components).and_return({ manifest: mock_manifest })
@@ -437,23 +448,21 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
     it "calls cleanup_orphaned_images through post_write hook in production" do
       allow(Jekyll).to receive(:env).and_return("production")
 
-      mock_mm = double("manifest_manager")
-      allow(mock_mm).to receive(:cleanup_orphans).and_return(["file1.webp", "file2.avif"])
-      allow(JekyllImgFlow::ManifestManager).to receive(:new).with(site).and_return(mock_mm)
+      allow(mock_manifest).to receive(:cleanup_orphans)
+        .and_return(["file1.webp", "file2.avif"])
 
       Jekyll::Hooks.trigger :site, :post_write, site
 
       expect(Jekyll.logger).to have_received(:info).with(
         "✅ ImgFlow: Removed 2 orphaned specialized images"
       ).at_least(:once)
+      expect(mock_manifest).to have_received(:save).at_least(:once)
     end
 
     it "logs no orphans found when cleanup returns empty" do
       allow(Jekyll).to receive(:env).and_return("production")
 
-      mock_mm = double("manifest_manager")
-      allow(mock_mm).to receive(:cleanup_orphans).and_return([])
-      allow(JekyllImgFlow::ManifestManager).to receive(:new).with(site).and_return(mock_mm)
+      allow(mock_manifest).to receive(:cleanup_orphans).and_return([])
 
       Jekyll::Hooks.trigger :site, :post_write, site
 

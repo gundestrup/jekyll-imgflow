@@ -11,24 +11,28 @@ lib/jekyll-imgflow/
 ├── batch_manager.rb             # Batch job queue management
 ├── build_time_processor.rb      # Build-time image processing
 ├── config.rb                    # Configuration management
+├── generated_file_cleaner.rb    # Path-safe generated output cleanup
 ├── hooks.rb                     # Jekyll build hooks
 ├── imgflow_tag.rb               # {% imgflow %} tag handler
 ├── manifest_manager.rb          # Track image versions and page usage
 ├── operation_processor.rb       # Process image operations
 ├── parser.rb                    # Parse liquid tag markup
 ├── path_resolver.rb             # Centralized path resolution
-├── picture_tag_adapter.rb       # {% picture %} compatibility
+├── picture_tag_adaptor.rb       # {% picture %} compatibility
 ├── preset_manager.rb            # Manage and process presets
+├── processing_stats.rb          # Cache hit/miss and per-operation metrics
 ├── provider_registry.rb         # Manage available providers
 ├── tag_scanner.rb               # [OPTIONAL] Scan content for validation/reporting
+├── tasks.rb                     # Rake tasks for preset listing/installing
 ├── version.rb                   # Gem version information
 │
 ├── helpers/                     # Utility helpers
 │   └── http_downloader.rb       # Download HTTP/file:// URLs
 │
-├── presets/                     # User presets documentation
-│   ├── README.md                # Preset system documentation
-│   └── examples.md              # Preset examples
+├── presets/                     # Built-in YAML presets (shipped with gem)
+│   ├── gallery.yml              # Gallery preset (400px, avif/webp/jpg, Q80)
+│   ├── hero.yml                 # Hero preset (800px, avif/webp/jpg, Q85)
+│   └── thumbnail.yml            # Thumbnail preset (150px, webp/jpg, Q75)
 │
 ├── providers/                   # Provider implementations
 │   ├── base_provider.rb         # Base provider interface
@@ -55,12 +59,15 @@ _data/imgflow/presets/           # User-defined presets (YAML)
   └── thumbnail.yml
 
 assets/images/                   # Source directory
-  └── originals/                 # Original images
+  ├── originals/                 # Original images
+  └── optimized/                 # Generated images copied by Jekyll
+
+.cache/imgflow/                   # Persistent cache (configurable)
+  └── imgflow-manifest.json      # Manifest tracking all versions
 
 _site/assets/images/             # Built site (ephemeral, rebuilt each time)
   ├── originals/                 # Original images (copied by Jekyll)
-  ├── optimized/                 # Generated images (created during build)
-  └── imgflow-manifest.json      # Manifest tracking all versions
+  └── optimized/                 # Generated images (copied by Jekyll)
 ```
 
 ## 🔄 Operations Flow
@@ -72,7 +79,7 @@ _site/assets/images/             # Built site (ephemeral, rebuilt each time)
 │ ManifestManager (Single Source of Truth)                   │
 │ - Tracks all image versions (default + specialized)        │
 │ - Stores operations, paths, and page usage                 │
-│ - Persists to _site/assets/images/imgflow-manifest.json    │
+│ - Persists to <source>/<cache_dir>/imgflow-manifest.json   │
 └─────────────────────────────────────────────────────────────┘
          ↑                                    ↑
          │                                    │
@@ -97,8 +104,8 @@ BuildTimeProcessor.process_changed_images()
 3. BatchManager.process_all()
     ↓
 4. For each task in queue:
-   a. PathResolver.resolve_output_path()
-      - Generates path: _site/assets/images/optimized/{name}-{size}-{hash}.{format}
+   a. PathResolver.resolve_source_output_path()
+      - Generates path: assets/images/optimized/{name}-{size}-{hash}.{format}
    b. OperationProcessor.process_operation()
       - Calls appropriate tag (ResizeTag, etc.)
       - Tag validates parameters
@@ -108,9 +115,9 @@ BuildTimeProcessor.process_changed_images()
       - Stores: operations, output path, provider
     ↓
 5. ManifestManager.save()
-   - Saves to _site/assets/images/imgflow-manifest.json
+   - Saves atomically under the configured cache_dir
     ↓
-6. Jekyll build continues with all default images ready in _site/
+6. Jekyll copies generated source images into _site/
 ```
 
 ### **Runtime Processing Flow (ImgflowTag)**
@@ -222,11 +229,12 @@ PictureTagAdaptor.to_imgflow_tag()
 
 ```text
 ✓ Process if:
-  - No versions exist in manifest
-  - Original file mtime > latest version time
+  - A configured default version is missing
+  - A generated output file is missing
+  - The SHA-256 source digest changed
   - Provider changed since last processing
 ✗ Skip if:
-  - Versions exist and are up-to-date
+  - Every configured version exists for the current source digest
   - Same provider as last processing
 ```
 
@@ -270,7 +278,7 @@ PictureTagAdaptor.to_imgflow_tag()
   - `register_version(original, path, operations, type, page_path)` - Add new version
   - `update_page_usage(original, operations, page_path)` - Track page usage
   - `get_versions(original, type)` - Retrieve versions
-  - `save()` - Persist to _site/assets/images/imgflow-manifest.json
+  - `save()` - Persist atomically to `<source>/<cache_dir>/imgflow-manifest.json`
 
 ### **BuildTimeProcessor**
 
@@ -278,7 +286,7 @@ PictureTagAdaptor.to_imgflow_tag()
 
 - **When:** `:pre_render` hook (after Jekyll copies assets, before rendering)
 - **Creates:** Default versions (all sizes × all formats)
-- **Output:** `_site/assets/images/optimized/`
+- **Output:** `<source>/assets/images/optimized/` (copied to `_site/` by Jekyll)
 - **Registers:** All versions in ManifestManager as `:default` type
 - **Does NOT:** Track page usage (defaults aren't page-specific)
 
@@ -289,7 +297,7 @@ PictureTagAdaptor.to_imgflow_tag()
 - **When:** During Liquid template rendering
 - **Checks:** ManifestManager for existing versions
 - **Creates:** Specialized versions if not found
-- **Output:** `_site/assets/images/optimized/`
+- **Output:** `<source>/assets/images/optimized/` (copied to `_site/` by Jekyll)
 - **Registers:** New versions in ManifestManager as `:specialized` type
 - **Tracks:** Page usage via `update_page_usage()`
 - **Returns:** HTML with relative image paths
@@ -484,8 +492,9 @@ Opacity 0.5 → Flyimg: a_50
 - Track default vs specialized versions
 - Track which pages use which versions
 - Detect orphaned images
-- Cleanup unused images
-- Store manifest in `_site/` (auto-reset on rebuild)
+- Cleanup unused and obsolete generated files
+- Store source digests per generated version
+- Persist the manifest under configured `cache_dir`
 
 **Does NOT:**
 
@@ -774,30 +783,38 @@ Generates: `image-750w-q90.webp` (specialized)
 
 ## 📊 Manifest Structure
 
-Located at: `_site/assets/images/imgflow-manifest.json`
+Located at: `<source>/<cache_dir>/imgflow-manifest.json`
 
 ```json
 {
-  "image.jpg": {
-    "versions": {
-      "default": [
-        {
-          "output": "optimized/image-400w.webp",
-          "operations": {"width": 400, "format": "webp"},
-          "type": "default",
-          "used_on": ["index.html", "about.html"],
-          "created_at": 1234567890
-        }
-      ],
-      "specialized": [
-        {
-          "output": "optimized/image-750w-q90.webp",
-          "operations": {"width": 750, "quality": 90, "format": "webp"},
-          "type": "specialized",
-          "used_on": ["blog/post1.html"],
-          "created_at": 1234567900
-        }
-      ]
+  "provider": "sharp",
+  "images": {
+    "image.jpg": {
+      "file_digest": "9f86d081...",
+      "versions": {
+        "default": [
+          {
+            "output": "/assets/images/optimized/image-400-hash.webp",
+            "operations": {"width": 400, "format": "webp", "quality": 85},
+            "type": "default",
+            "used_on": [],
+            "created_at": 1234567890,
+            "file_digest": "9f86d081...",
+            "provider": "sharp"
+          }
+        ],
+        "specialized": [
+          {
+            "output": "/assets/images/optimized/image-750-hash.webp",
+            "operations": {"width": 750, "quality": 90, "format": "webp"},
+            "type": "specialized",
+            "used_on": ["blog/post1.html"],
+            "created_at": 1234567900,
+            "file_digest": "9f86d081...",
+            "provider": "sharp"
+          }
+        ]
+      }
     }
   }
 }
@@ -876,15 +893,15 @@ Located at: `_site/assets/images/imgflow-manifest.json`
 
 **Detection:**
 
-- ManifestManager tracks `used_on` array for each version
-- When page is deleted, remove from `used_on`
-- If `used_on` is empty, image is orphaned
+- ManifestManager resets specialized `used_on` arrays before rendering
+- Rendered tags rebuild current page usage
+- If `used_on` remains empty, the specialized version is orphaned
 
 **Cleanup:**
 
-- Default versions: Never cleaned (always needed)
-- Specialized versions: Cleaned if orphaned
-- Run cleanup on build or manually
+- Default versions: Cleaned when no longer present in configured sizes/formats
+- Specialized versions: Cleaned if orphaned in non-development builds
+- Deleted originals: All tracked generated versions are cleaned
 
 ## 🎨 Presets
 
@@ -949,30 +966,9 @@ end
 
 ## 📝 Configuration
 
-**Default values:** `lib/jekyll-imgflow/config.rb`
-
-**User overrides:** `_config.yml`
-
-```yaml
-# _config.yml
-imgflow:
-  originals: "assets/images/originals"
-  output: "assets/images/optimized"
-  quality: 85
-  sizes:
-    sm: 400
-    md: 800
-    lg: 1200
-  formats:
-    - avif
-    - webp
-    - png
-    - jpg
-  backend_priority:
-    - sharp
-    - libvips
-    - imagemagick
-```
+**See:** [installation.md](installation.md) for the full configuration reference
+with defaults and examples. Key config keys: `originals`, `output`, `quality`,
+`sizes`, `formats`, `backend_priority`, `cache_dir`.
 
 ## ✅ Best Practices
 
@@ -989,13 +985,13 @@ imgflow:
    - All defaults in config.rb
    - User overrides in _config.yml
 
-4. **Manifest in _site/**
-   - Auto-reset on rebuild
-   - Tracks all versions
+4. **Persistent manifest cache**
+   - Stored under configured `cache_dir`
+   - Tracks versions and source digests across rebuilds
    - Enables smart cleanup
 
 5. **Default vs Specialized**
-   - Default: Always generated, never cleaned
+   - Default: Generated from configured sizes/formats; obsolete outputs are cleaned
    - Specialized: On-demand, cleaned if orphaned
 
 ## 💡 Usage Examples

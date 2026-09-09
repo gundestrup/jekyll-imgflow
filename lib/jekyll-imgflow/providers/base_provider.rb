@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "English"
 require "open3"
 require "pathname"
 
@@ -158,6 +157,13 @@ module JekyllImgFlow
       # Helper methods
       protected
 
+      # Check if the input file is an SVG (vector format).
+      # SVGs require special handling: they have no fixed pixel dimensions,
+      # so providers must choose a rasterization size.
+      def svg?(input_path)
+        File.extname(input_path).downcase == ".svg"
+      end
+
       def execute_command(command)
         stdout, stderr, status = Open3.capture3(command)
         raise "Command failed: #{command}\nError: #{stderr.strip}" unless status.success?
@@ -185,11 +191,16 @@ module JekyllImgFlow
         end
 
         # Provider capability methods
+        KNOWN_OPERATIONS = %i[crop format opacity optimize quality resize
+                              watermark alpha_opacity].freeze
+
         def unsupported_operations
           [] # Default: no unsupported operations
         end
 
         def supports_operation?(operation)
+          return false unless KNOWN_OPERATIONS.include?(operation)
+
           !unsupported_operations.include?(operation)
         end
       end

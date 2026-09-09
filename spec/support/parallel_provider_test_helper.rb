@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require_relative "test_environment"
+
 # Provider constants for filtering
-CLI_PROVIDERS = %w[sharp imagemagick libvips].freeze
-HTTP_PROVIDERS = %w[imgproxy weserv flyimg].freeze
+CLI_PROVIDERS = TestEnvironment::CLI_PROVIDERS
+HTTP_PROVIDERS = TestEnvironment::HTTP_PROVIDERS
 
 begin
   require "parallel"
@@ -30,17 +32,18 @@ module ParallelProviderTestHelper
 
   # Check if provider filtering is enabled via environment variable
   def provider_filter_enabled?
-    ENV.fetch("TEST_PROVIDER", nil) && !ENV["TEST_PROVIDER"].empty?
+    provider_filter && !provider_filter.empty?
+  end
+
+  def provider_filter
+    ENV["IMGFLOW_TEST_PROVIDER"] || ENV.fetch("TEST_PROVIDER", nil)
   end
 
   # Get filtered provider list
   def filtered_providers(all_providers)
-    if provider_filter_enabled?
-      filter = ENV.fetch("TEST_PROVIDER", nil)
-      all_providers.select { |p| p == filter }
-    else
-      all_providers
-    end
+    return all_providers unless provider_filter_enabled?
+
+    all_providers.select { |provider| provider.to_s.downcase == provider_filter.downcase }
   end
 
   # Run tests across providers in parallel
@@ -101,7 +104,7 @@ module ParallelProviderTestHelper
       system("which magick > /dev/null 2>&1") || system("which convert > /dev/null 2>&1")
     when "libvips"
       system("which vips > /dev/null 2>&1")
-    when "imgproxy", "weserv", "flyimg", "image_compressor"
+    when "imgproxy", "weserv", "flyimg"
       # HTTP providers - check if service is running
       check_http_service(provider_name)
     else
@@ -184,24 +187,10 @@ module ParallelProviderTestHelper
   end
 
   def check_http_service(provider_name)
-    providers
-    url = case provider_name
-          when "imgproxy"
-            TEST_CONFIG.dig("imgflow", "imgproxy_url")
-          when "weserv"
-            TEST_CONFIG.dig("imgflow", "weserv_url")
-          when "flyimg"
-            TEST_CONFIG.dig("imgflow", "flyimg_url")
-          when "image_compressor"
-            TEST_CONFIG.dig("imgflow", "image_compressor_url")
-          end
-
-    return false unless url
-
     require "net/http"
-    uri = URI(url)
-    response = Net::HTTP.get_response(uri)
-    response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
+
+    response = Net::HTTP.get_response(URI(TestEnvironment.docker_url(provider_name)))
+    response.is_a?(Net::HTTPResponse)
   rescue StandardError
     false
   end

@@ -40,7 +40,7 @@ bundle exec rspec --parallel   # Run in parallel (faster)
 
 ## Parallel Testing
 
-**See:** [PARALLEL_TESTING.md](PARALLEL_TESTING.md) for detailed parallel testing setup
+**See:** [parallel_testing.md](parallel_testing.md) for detailed parallel testing setup
 
 ### Quick Commands
 
@@ -103,7 +103,7 @@ bundle exec rspec spec/provider_interface_spec.rb # Provider tests
 
 **Related Documents:**
 
-- [PARALLEL_TESTING.md](PARALLEL_TESTING.md) - Parallel testing details
+- [parallel_testing.md](parallel_testing.md) - Parallel testing details
 - [development.md](development.md) - Development workflow
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Component architecture
 - [picture_tag_migration.md](picture_tag_migration.md) - Picture Tag migration

@@ -37,7 +37,7 @@ TEST_PROVIDER=sharp bundle exec rspec spec/provider_interface_spec.rb
 ## Port Assignment
 
 | Process | Port | TEST_ENV_NUMBER |
-|---------|------|-----------------|
+| --- | ---: | --- |
 | Process 0 | 4010 | "" |
 | Process 1 | 4011 | "1" |
 | Process 2 | 4012 | "2" |

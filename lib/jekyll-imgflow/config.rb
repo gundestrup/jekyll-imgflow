@@ -23,7 +23,7 @@ module JekyllImgFlow
 
     attr_reader :site, :originals, :output, :input_formats, :sizes, :formats,
                 :quality, :backend_priority, :imgproxy_url,
-                :image_compressor_url, :weserv_url, :flyimg_url,
+                :weserv_url, :flyimg_url,
                 :optimize_qualities, :fallback_format
 
     def initialize(site)
@@ -42,7 +42,6 @@ module JekyllImgFlow
       @fallback_format  = cfg["fallback_format"] || DEFAULT_FALLBACK_FORMAT
 
       @imgproxy_url = cfg["imgproxy_url"]
-      @image_compressor_url = cfg["image_compressor_url"]
       @weserv_url       = cfg["weserv_url"]
       @flyimg_url       = cfg["flyimg_url"]
       @optimize_qualities = cfg["optimize_qualities"] || {
@@ -64,12 +63,10 @@ module JekyllImgFlow
       {
         enabled: merged_config.key?("imgproxy_url") ||
           merged_config.key?("weserv_url") ||
-          merged_config.key?("flyimg_url") ||
-          merged_config.key?("image_compressor_url"),
+          merged_config.key?("flyimg_url"),
         imgproxy_url: @imgproxy_url,
         weserv_url: @weserv_url,
-        flyimg_url: @flyimg_url,
-        image_compressor_url: @image_compressor_url
+        flyimg_url: @flyimg_url
       }
     end
 

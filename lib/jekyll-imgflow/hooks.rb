@@ -11,6 +11,12 @@ module JekyllImgFlow
       site.define_singleton_method(:imgflow_components=) { |value| @imgflow_components = value }
     end
 
+    if site.respond_to?(:config)
+      cache_dir = Config.new(site).cache_dir
+      site.config["exclude"] = Array(site.config["exclude"])
+      site.config["exclude"] << cache_dir unless site.config["exclude"].include?(cache_dir)
+    end
+
     # Components will be initialized on first use (lazy loading)
     Jekyll.logger.info "✅ ImgFlow: Components ready for initialization"
   end
@@ -31,22 +37,23 @@ module JekyllImgFlow
     Jekyll.logger.info "🔌 ImgFlow post_write hook - saving final manifest with page usage"
 
     if site.imgflow_components && site.imgflow_components[:manifest]
-      site.imgflow_components[:manifest].save
+      manifest = site.imgflow_components[:manifest]
+      cleanup_orphaned_images(site, manifest) if Jekyll.env != "development" &&
+                                                 !(site.is_a?(Jekyll::Site) && site.incremental?)
+      manifest.save
       Jekyll.logger.info "✅ ImgFlow: Final manifest saved with all page usage data"
     else
       Jekyll.logger.warn "⚠️  ImgFlow: No manifest found to save"
     end
-
-    # Clean up orphaned specialized images in production
-    cleanup_orphaned_images(site) if Jekyll.env != "development"
   end
 
-  def self.cleanup_orphaned_images(site)
+  def self.cleanup_orphaned_images(site, manifest = nil)
     Jekyll.logger.info "🧹 ImgFlow: Checking for orphaned specialized images..."
 
     # Use ManifestManager to find and cleanup orphans
-    manifest = ManifestManager.new(site)
+    manifest ||= ManifestManager.new(site)
     cleaned = manifest.cleanup_orphans
+    manifest.save
 
     if cleaned.any?
       Jekyll.logger.info "✅ ImgFlow: Removed #{cleaned.length} orphaned specialized images"

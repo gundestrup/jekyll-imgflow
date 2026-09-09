@@ -8,6 +8,10 @@ module JekyllImgFlow
   module Providers
     # ImageMagick provider implementation using the standardized tag interface
     class Imagemagick < BaseProvider
+      # Cache rsvg delegate check across all instances (checked once per build)
+      @rsvg_available = nil
+      @svg_warning_shown = false
+
       def available?
         # Check if magick or convert CLI is available
         _, _, status1 = Open3.capture3("which", "magick")
@@ -18,17 +22,30 @@ module JekyllImgFlow
       def execute(input_path, output_path)
         return if @operations.empty?
 
+        # Warn once per build about SVG performance with ImageMagick
+        warn_svg_performance if svg?(input_path) && !self.class.instance_variable_get(:@svg_warning_shown)
+
         # Build single ImageMagick command with all operations combined
         command = build_combined_imagemagick_command(input_path, output_path)
         execute_command(command)
 
-        reset_operations
         output_path
+      ensure
+        reset_operations
       end
 
       def build_combined_imagemagick_command(input_path, output_path)
-        # Start with base command
-        command_parts = ["magick", input_path.shellescape]
+        # Start with base command.
+        # For SVGs, set -density before the input so ImageMagick rasterizes
+        # at a reasonable resolution instead of the full viewBox (which can
+        # be 10000x8500 = 85M pixels, making each conversion take 10+ seconds).
+        # With the rsvg delegate installed, -density controls the render DPI.
+        # Without rsvg, ImageMagick uses its slow internal MSVG parser.
+        command_parts = if svg?(input_path)
+                          ["magick", "-density", svg_density.to_s, input_path.shellescape]
+                        else
+                          ["magick", input_path.shellescape]
+                        end
 
         # Add all operations
         @operations.each do |operation|
@@ -132,6 +149,58 @@ module JekyllImgFlow
       def translate_quality_to_imagemagick(quality)
         # ImageMagick uses 1-100 directly, no translation needed
         quality
+      end
+
+      # Choose a rasterization density (DPI) for SVG input.
+      # ImageMagick's internal SVG parser renders at the full viewBox size
+      # (e.g. 10000x8500 = 85M pixels) before applying -resize, which is
+      # extremely slow. Setting -density before the input tells the rsvg
+      # delegate to render at a lower resolution.
+      # We target ~2x the largest resize dimension for good quality,
+      # assuming a ~10 inch viewBox (common for SVGs). This avoids the
+      # massive internal canvas while preserving output quality.
+      # For a 400px output: density = 80px/in / 10in = 8 DPI → renders at
+      # ~800px instead of 10000px, giving ~10x speedup.
+      def svg_density
+        max_width = @operations.filter_map { |op| op[:type] == :resize && op[:width] }.max
+        # Default to 36 DPI if no resize (e.g. format-only conversion)
+        return 36 unless max_width
+
+        # Target 2x output width for quality. Assume ~10 inch viewBox.
+        # No upper cap — even 2000px output only needs 40 DPI.
+        (max_width * 2 / 10).to_i
+      end
+
+      # Check if ImageMagick has the rsvg delegate installed.
+      # Without it, ImageMagick uses its slow internal MSVG parser.
+      # Install with: macOS: `brew install librsvg`, Ubuntu: `apt install librsvg2-bin`
+      def rsvg_available?
+        return self.class.instance_variable_get(:@rsvg_available) unless self.class.instance_variable_get(:@rsvg_available).nil?
+
+        stdout, _, status = Open3.capture3("magick", "-list", "delegate")
+        result = status.success? && stdout.include?("rsvg-convert")
+        self.class.instance_variable_set(:@rsvg_available, result)
+        result
+      end
+
+      # Warn once per build about SVG performance with ImageMagick.
+      # Suggests installing rsvg-convert or using a different provider.
+      def warn_svg_performance
+        return if self.class.instance_variable_get(:@svg_warning_shown)
+
+        self.class.instance_variable_set(:@svg_warning_shown, true)
+        if rsvg_available?
+          Jekyll.logger.info "ImgFlow:",
+                             "ImageMagick processing SVG with rsvg delegate " \
+                             "(density=#{svg_density})."
+        else
+          Jekyll.logger.warn "ImgFlow:",
+                             "ImageMagick is processing SVGs without the rsvg " \
+                             "delegate — this is VERY slow. Install librsvg " \
+                             "(macOS: `brew install librsvg`, " \
+                             "Ubuntu: `apt install librsvg2-bin`) or use a " \
+                             "different provider (sharp/libvips) for SVGs."
+        end
       end
     end
   end

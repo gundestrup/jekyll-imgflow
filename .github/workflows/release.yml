@@ -32,6 +32,9 @@ jobs:
       - name: Verify CHANGELOG has an entry for this version
         run: bundle exec rake version:check_changelog
 
+      - name: Verify Docker image pins are current
+        run: STRICT=true bundle exec rake check_docker_images
+
       - name: Build gem
         run: gem build jekyll-imgflow.gemspec
 

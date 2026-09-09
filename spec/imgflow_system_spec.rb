@@ -6,7 +6,7 @@ require "fileutils"
 
 # Methods to exclude from interface compliance check
 EXCLUDED_METHODS = %i[initialize execute reset_operations operations execute_command
-                      get_image_dimensions check_http_service].freeze
+                      get_image_dimensions check_http_service svg?].freeze
 
 RSpec.describe "JekyllImgFlow System Integration", :integration, :system do
   # Use TestPictures for realistic image scenarios
@@ -78,14 +78,6 @@ RSpec.describe "JekyllImgFlow System Integration", :integration, :system do
           required_provider_methods.each do |method|
             # Methods can have negative arity (accept parameters) - that's normal
             expect(provider.method(method).arity).to be_a(Integer)
-          end
-
-          # Test 4: Can process basic operations (if available)
-          TEST_CONFIG["imgflow"]
-          begin
-            # Simple availability check - just verify provider responds to optimize
-          rescue StandardError => e
-            warn "Provider availability check failed: #{e.message}"
           end
         end
       end

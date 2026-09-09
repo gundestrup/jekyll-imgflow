@@ -4,9 +4,6 @@ module JekyllImgFlow
   # Unified HTML Generator for all markup formats
   # Supports Picture Tag compatibility with multiple markup formats and attributes
   class HtmlGenerator
-    MARKUP_FORMATS = %w[auto picture img data_auto data_picture data_img direct_url
-                        naked_srcset].freeze
-
     # Generate HTML based on markup format and attributes
     # @param results [Array<String>] Processed image paths
     # @param attributes [Hash] HTML attributes by element
@@ -332,11 +329,20 @@ module JekyllImgFlow
            .gsub(">", "&gt;")
     end
 
-    # Get correct path for HTML generation (relative paths for Jekyll sites)
+    # Get correct path for HTML generation.
     def html_path(relative_path)
-      # For HTML generation, we want relative paths within the site
-      # Remove leading slash to make it relative to site root
-      relative_path.start_with?("/") ? relative_path[1..] : relative_path
+      path = "/#{relative_path.delete_prefix('/')}"
+      baseurl = html_baseurl
+      return path if baseurl.empty? || path == baseurl || path.start_with?("#{baseurl}/")
+
+      "#{baseurl}#{path}"
+    end
+
+    def html_baseurl
+      site = @context&.registers&.dig(:site) || @config&.site
+      baseurl = site&.config&.fetch("baseurl", "").to_s
+      normalized = baseurl.gsub(%r{\A/+|/+$}, "")
+      normalized.empty? ? "" : "/#{normalized}"
     end
 
     # Get absolute URL when needed (for direct_url format)
@@ -345,18 +351,7 @@ module JekyllImgFlow
 
       site = @context.registers[:site]
       base_url = site.config["url"] || "http://localhost:4000"
-      baseurl = site.config["baseurl"] || ""
-
-      # Ensure base_url ends without trailing slash and baseurl starts without slash
-      base_url = base_url.chomp("/")
-      baseurl = baseurl[1..] if baseurl.start_with?("/")
-
-      # Build URL parts carefully to avoid double slashes
-      url_parts = [base_url]
-      url_parts << baseurl unless baseurl.empty?
-      url_parts << html_path(relative_path)
-
-      url_parts.join("/")
+      "#{base_url.chomp('/')}#{html_path(relative_path)}"
     end
   end
 end

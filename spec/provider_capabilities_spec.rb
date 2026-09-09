@@ -89,18 +89,12 @@ RSpec.describe "Provider Capability Flags - Meta Testing", :external, :provider 
       all_providers.each do |provider_info|
         provider_instance = provider_info[:instance]
         provider_class = provider_info[:class]
-        provider_name = provider_info[:name]
 
         tag_operation_mapping.each do |tag_class, operation|
           next unless provider_class.supports_operation?(operation)
 
           # Provider claims to support operation - tag should work
-          begin
-            tag_class.new(provider_instance)
-          rescue StandardError => e
-            expect(e).to be_nil,
-                         "Provider #{provider_name} claims to support #{operation} but #{tag_class.name} failed: #{e.message}"
-          end
+          expect { tag_class.new(provider_instance) }.not_to raise_error
         end
       end
     end
@@ -131,13 +125,12 @@ RSpec.describe "Provider Capability Flags - Meta Testing", :external, :provider 
         provider_name = provider_info[:name]
 
         # Unknown operation should return false
-        begin
+        result = nil
+        expect do
           result = provider_class.supports_operation?(:unknown_operation_xyz)
-          expect(result).to be false,
-                               "Provider #{provider_name} should return false for unknown operations"
-        rescue ArgumentError
-          # If provider has strict validation, that's also acceptable
-        end
+        end.not_to raise_error
+        expect(result).to be(false),
+                          "Provider #{provider_name} should return false for unknown operations"
       end
     end
 

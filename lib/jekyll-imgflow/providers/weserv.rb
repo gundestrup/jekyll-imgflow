@@ -9,7 +9,7 @@ module JekyllImgFlow
   module Providers
     # Weserv provider implementation using the standardized tag interface
     class Weserv < BaseProvider
-      TIMEOUT = 10
+      TIMEOUT = 30
 
       def available?
         # Check if weserv service is running
@@ -26,8 +26,9 @@ module JekyllImgFlow
 
         # Fetch the result in one request
         fetch_and_save(url, output_path)
-        reset_operations
         output_path
+      ensure
+        reset_operations
       end
 
       def build_combined_weserv_url(input_path)

@@ -29,10 +29,9 @@ imgflow:
 {% imgflow photo.jpg resize width:800 %}
 ```
 
-> **Full configuration options:** `quality`, `backend_priority`, `formats`,
-> `fallback_format`, `sizes`, provider URLs, and more — see the
-> [Installation Guide](docs/installation.md#4-add-to-_configyml)
-> and [Configuration Reference](docs/ARCHITECTURE.md).
+> **Configuration:** Only `originals` and `output` are required in `_config.yml`
+> — everything else has sensible defaults. See the
+> [Installation Guide](docs/installation.md#4-add-to-_configyml) for full options.
 
 > **Note:** Image references require exact filenames (or paths relative to
 > `originals`). There is no fuzzy matching during the build yet — if you type
@@ -86,12 +85,12 @@ ImgFlow has two processing flows: **Build-Time** (pre-generation) and **Runtime*
 ## 🎯 Provider Support
 
 ### HTTP API Services (Recommended)
-- **[Imgproxy](https://github.com/imgproxy/imgproxy)** - Fast, reliable (Port 33001)
-- **[Weserv](https://github.com/weserv/images)** - Battle-tested (Port 33007)  
-- **[Flyimg](https://github.com/flyimg/flyimg)** - On-the-fly processing (Port 33008)
+- **[Imgproxy](https://github.com/imgproxy/imgproxy)** - Fast, reliable (Port 4022)
+- **[Weserv](https://github.com/weserv/images)** - Battle-tested (Port 4026)
+- **[Flyimg](https://github.com/flyimg/flyimg)** - On-the-fly processing (Port 4030)
 
 ### CLI Tools (Local)
-- **[Sharp](https://github.com/lovell/sharp)** - Fastest (Node.js/libvips)
+- **[Sharp](https://github.com/lovell/sharp)** - Node.js/libvips processing
 - **[ImageMagick](https://github.com/ImageMagick/ImageMagick)** - Feature-rich
 - **[LibVips](https://github.com/libvips/libvips)** - Memory efficient
 
@@ -110,7 +109,7 @@ rake test                            # All tests
 rake parallel:test                   # Parallel testing (faster)
 
 # Docker Services
-docker-compose -f docker-compose.test.yml up -d  # Start services
+rake start_services                  # Start services (pulls latest pinned images)
 rake check_services                  # Verify services
 ```
 
@@ -130,25 +129,35 @@ bundle install
 imgflow:
   originals: "assets/images/originals"
   output: "assets/images/optimized"
+  # cache_dir defaults to ".cache/imgflow" (stores manifest, survives _site wipes)
 
 # Use in templates
 {% imgflow photo.jpg resize width:800 %}
+
+# Or use built-in presets:
+{% imgflow photo.jpg preset:gallery %}
 ```
 
+**Built-in presets:** `gallery` (400px, avif/webp/jpg, Q80), `hero` (800px, avif/webp/jpg, Q85), `thumbnail` (150px, webp/jpg, Q75). They work without installation. To copy editable versions, add `require "jekyll-imgflow/tasks"` to the site's `Rakefile`, then run `rake imgflow:install_presets`.
+
 **See:** [installation.md](docs/installation.md) for detailed installation and
-[all configuration options](docs/installation.md#4-add-to-_configyml)
+[all configuration options](docs/installation.md#4-add-to-_configyml),
+[presets.md](docs/usage/presets.md) for the preset system
 
 ## 🐳 Docker Setup (Recommended)
 
 ```bash
-# Start all services
-docker-compose -f docker-compose.test.yml --env-file .env.test up -d
+# Start all services (pulls latest pinned images first)
+rake start_services
 
 # Check services
 rake check_services
 
+# Check if pinned images are outdated (run before releases)
+rake check_docker_images
+
 # Stop services
-docker-compose -f docker-compose.test.yml down
+rake stop_services
 ```
 
 **See:** [docker.md](docs/docker.md) for detailed Docker configuration and services

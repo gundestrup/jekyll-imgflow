@@ -1,0 +1,7 @@
+operations:
+  - resize:
+      width: 150
+  - format:
+      formats: ["webp", "jpg"]
+  - quality:
+      quality: 75

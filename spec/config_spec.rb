@@ -136,7 +136,7 @@ RSpec.describe JekyllImgFlow::Config, :unit do
     it "returns Docker configuration" do
       expect(config.docker_enabled).to be true
       expect(config.sharp_url).to eq(TEST_CONFIG["imgflow"]["sharp_url"])
-      expect(config.imgproxy_url).to eq("http://localhost:33001")
+      expect(config.imgproxy_url).to eq(TestEnvironment.docker_url("imgproxy"))
     end
   end
 end
