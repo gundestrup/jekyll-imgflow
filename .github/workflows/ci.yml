@@ -22,7 +22,8 @@ jobs:
       - name: Install image processing libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y libvips-dev imagemagick
+          sudo apt-get install -y libvips-dev imagemagick \
+            libheif-plugin-aomenc libheif-plugin-aomdec libheif-plugin-libde265
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
