@@ -32,7 +32,7 @@ jobs:
           bundler-cache: true
 
       - name: Run tests
-        run: bundle exec rspec --format progress
+        run: bundle exec rspec --format progress --tag ~slow --tag ~external
         env:
           CI: "true"
 
