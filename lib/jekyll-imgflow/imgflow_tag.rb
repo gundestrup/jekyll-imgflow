@@ -60,7 +60,8 @@ module Jekyll
       # Combine image path with preset markup. Keep the path quoted because
       # filenames may contain spaces.
       image_markup = if image_path.include?(" ")
-                       "\"#{image_path.gsub('"', '\\"')}\""
+                       escaped_path = image_path.gsub("\\") { "\\\\" }.gsub('"', '\\"')
+                       "\"#{escaped_path}\""
                      else
                        image_path
                      end

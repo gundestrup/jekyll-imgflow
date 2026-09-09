@@ -197,6 +197,17 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
 
       expect(result).to eq("image.jpg width:800")
     end
+
+    it "escapes backslashes and quotes in paths with spaces" do
+      allow(preset_manager).to receive(:build_markup_from_preset)
+        .with("hero", {})
+        .and_return("width:800")
+
+      markup = '"dir\\\\name with \\"quote\\".jpg" preset:hero'
+      result = tag.send(:expand_preset_markup, markup, preset_manager)
+
+      expect(result).to start_with(%q("dir\\\\name with \"quote\".jpg"))
+    end
   end
 
   describe "#process_operations with nil page" do

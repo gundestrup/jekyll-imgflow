@@ -256,6 +256,14 @@ RSpec.describe JekyllImgFlow::PictureTagAdaptor, :unit do
     end
   end
 
+  describe "#translate_to_imgflow" do
+    it "handles repeated whitespace without ambiguous regex backtracking" do
+      result = adaptor.translate_to_imgflow("{%    picture    example.jpg    %}")
+
+      expect(result[:markup]).to include("example.jpg")
+    end
+  end
+
   describe "#parse_arguments" do
     it "handles single-quoted paths with spaces" do
       args = adaptor.send(:parse_arguments, "'some image.jpg' --alt Text")
