@@ -24,7 +24,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
-          ruby-version: "3.4"
+          ruby-version: .ruby-version
 
       - name: Verify tag matches gem version
         run: test "v$(bundle exec rake version:show)" = "${GITHUB_REF_NAME}"

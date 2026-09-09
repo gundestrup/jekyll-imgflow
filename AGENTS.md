@@ -7,7 +7,7 @@
 
 Jekyll ImgFlow is a Jekyll plugin for automatic image optimization with multiple providers (Sharp, ImageMagick, LibVips, Imgproxy, Weserv, Flyimg) and formats (WebP, AVIF, JPG, PNG). It generates responsive images during Jekyll build and render time.
 
-- **Language:** Ruby 3.4+
+- **Language:** Ruby 3.4+ (exact development/CI version is declared in `.ruby-version`)
 - **Framework:** Jekyll 4.x plugin (Liquid tags + build hooks)
 - **Gem:** `jekyll-imgflow` (version is defined in `lib/jekyll-imgflow/version.rb`)
 - **License:** AGPL-3.0-or-later
@@ -89,6 +89,15 @@ rake check_docker_images  # Check if pinned Docker images are outdated (run befo
 ```
 
 See [docs/parallel_testing.md](docs/parallel_testing.md) for parallel test setup and [docs/scripts.md](docs/scripts.md) for utility scripts.
+
+Git hooks are installed with `bin/install-hooks.sh`:
+
+- `pre-commit` runs RuboCop.
+- `pre-push` runs `rake ci`, which mirrors the GitHub Actions test and style
+  checks, then verifies Docker image pins for release tags.
+
+CI and local development read the exact Ruby version from the committed
+`.ruby-version` file. The Sharp CLI version is declared in `package.json`.
 
 ## Code Quality Tools
 

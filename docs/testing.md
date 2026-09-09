@@ -16,8 +16,9 @@ pre-push Git hook runs it automatically. Install the hook with:
 bin/install-hooks.sh
 ```
 
-The CI environment is pinned to Ubuntu 26.04, Ruby 3.4.10, and the Sharp CLI
-version declared in `package.json`. Install that CLI locally with:
+The CI environment is pinned to Ubuntu 26.04, uses the Ruby version declared
+in `.ruby-version`, and uses the Sharp CLI version declared in `package.json`.
+Install that CLI locally with:
 
 ```bash
 SHARP_CLI_VERSION="$(node -p 'require("./package.json").devDependencies["sharp-cli"]')"

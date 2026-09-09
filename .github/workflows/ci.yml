@@ -12,9 +12,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-26.04
-    strategy:
-      matrix:
-        ruby: ["3.4.10"]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -33,7 +30,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby }}
+          ruby-version: .ruby-version
           bundler-cache: true
 
       - name: Run tests

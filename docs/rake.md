@@ -117,9 +117,10 @@ by GitHub Actions is checked before a push. Install or refresh the hooks with:
 bin/install-hooks.sh
 ```
 
-GitHub Actions uses Ubuntu 26.04, Ruby 3.4.10, libvips/ImageMagick, and the
-pinned Sharp CLI version from `package.json`. Local native tools still depend
-on the host OS, but `rake ci` uses the same RSpec tags and Ruby version target.
+GitHub Actions uses Ubuntu 26.04, the Ruby version from `.ruby-version`,
+libvips/ImageMagick, and the pinned Sharp CLI version from `package.json`.
+Local native tools still depend on the host OS, but `rake ci` uses the same
+RSpec tags and Ruby version target.
 
 ### Full Testing
 
