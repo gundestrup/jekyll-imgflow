@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.1] - 2026-09-09
 
 ### Fixed
 
@@ -12,6 +12,17 @@
 
 - Development and CI tooling now pins Sharp CLI to `6.1.0`, with Dependabot
   coverage for the npm development dependency tree.
+- CI and local development now share the committed Ruby version from
+  `.ruby-version`; `rake ci` mirrors the GitHub Actions checks and runs
+  automatically from the pre-push hook.
+- CI uses Ubuntu 26.04 with the required libvips/ImageMagick and AVIF codec
+  packages, while Docker-backed HTTP provider tests remain local-only.
+
+### Security
+
+- Fixed incomplete escaping of backslashes in preset image paths.
+- Replaced the Picture Tag adaptor's backtracking regex with indexed parsing to
+  remove the CodeQL polynomial-ReDoS finding.
 
 ## [0.3.0] - 2026-09-09
 
