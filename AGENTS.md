@@ -72,7 +72,8 @@ The full file tree with descriptions is in [docs/ARCHITECTURE.md](docs/ARCHITECT
 See [docs/rake.md](docs/rake.md) for the full list of Rake tasks and [docs/development.md](docs/development.md) for the development workflow. Quick reference:
 
 ```bash
-rake quick          # Style + tests (fastest)
+rake quick          # Style + fast tests (excludes slow/external)
+rake ci             # CI-equivalent RuboCop + RSpec gate (includes external)
 rake test           # All tests
 rake quality        # Full quality checks
 rake rubocop        # Check code style

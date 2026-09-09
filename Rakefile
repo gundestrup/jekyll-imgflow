@@ -7,6 +7,7 @@ require "yard"
 require "jekyll"
 require "net/http"
 require "fileutils"
+require "json"
 require "parallel"
 require_relative "lib/jekyll-imgflow/tasks"
 require_relative "spec/support/test_environment"
@@ -692,6 +693,13 @@ desc "Run CI checks locally (mirrors .github/workflows/ci.yml)"
 task :ci do
   Jekyll.logger.info "🤖 Running CI checks (mirrors GitHub Actions)..."
   Jekyll.logger.info "📝 Excluding slow tests only (includes external tests)"
+
+  package_json = JSON.parse(File.read("package.json"))
+  expected_sharp = package_json.fetch("devDependencies").fetch("sharp-cli")
+  actual_sharp = `sharp --version 2>/dev/null`.strip
+  abort "Sharp CLI mismatch: expected #{expected_sharp}, got #{actual_sharp}" unless
+    actual_sharp == expected_sharp
+
   sh "bundle exec rubocop"
   Jekyll.logger.info "✅ Style checks passed"
   sh "bundle exec rspec --format progress --tag ~slow"

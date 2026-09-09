@@ -36,7 +36,8 @@ rake docs                 # Show docs structure
 - `rake spec` - Run tests with coverage
 - `rake spec_slow` - Run slow tests sequentially (tagged `:slow`)
 - `rake spec_fast` - Run fast tests only (excludes `:slow`, `:external`, `:provider`)
-- `rake quick` - Style + tests (fast)
+- `rake quick` - Style + fast tests (excludes `:slow` and `:external`)
+- `rake ci` - Run the same RuboCop and RSpec checks as GitHub Actions locally
 - `rake quality` - All quality checks (slow)
 
 ### ⚡ Parallel Testing
@@ -102,11 +103,23 @@ rake check_services
 rake test
 ```
 
-### Before Committing
+### Before Committing or Pushing
 
 ```bash
-rake quick
+rake quick  # Fast local feedback; excludes slow and external tests
+rake ci     # CI-equivalent gate; includes external tests that can run locally
 ```
+
+The pre-push hook runs `rake ci` automatically, so the same test command used
+by GitHub Actions is checked before a push. Install or refresh the hooks with:
+
+```bash
+bin/install-hooks.sh
+```
+
+GitHub Actions uses Ubuntu 26.04, Ruby 3.4.10, libvips/ImageMagick, and the
+pinned Sharp CLI version from `package.json`. Local native tools still depend
+on the host OS, but `rake ci` uses the same RSpec tags and Ruby version target.
 
 ### Full Testing
 

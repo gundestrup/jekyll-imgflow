@@ -20,8 +20,19 @@ architecture, and data flow. Key points:
 ## Development Workflow
 
 1. Edit code in `lib/` directory
-2. Test changes: `rake quick`
-3. Full check before commit: `rake`
+2. Test changes quickly: `rake quick`
+3. Run the CI-equivalent checks before pushing: `rake ci`
+4. Commit and push; the pre-push hook runs `rake ci` automatically
+5. Run the full quality suite when needed: `rake`
+
+`rake ci` runs RuboCop and `bundle exec rspec --tag ~slow`, matching the
+GitHub Actions workflow. It includes external tests that can run with local
+CLI providers. Docker-backed HTTP provider tests remain local-only and should
+be run with the test services started.
+
+Install or refresh the Git hooks with `bin/install-hooks.sh`. The pre-commit
+hook runs RuboCop; the pre-push hook runs the CI-equivalent checks and, for
+release tags, verifies Docker image pins.
 
 **Commands:** See [rake.md](rake.md) for the full Rake task reference.
 

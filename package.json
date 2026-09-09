@@ -1,0 +1,8 @@
+{
+  "name": "jekyll-imgflow-development",
+  "private": true,
+  "description": "Pinned development tools for Jekyll ImgFlow",
+  "devDependencies": {
+    "sharp-cli": "5.2.0"
+  }
+}

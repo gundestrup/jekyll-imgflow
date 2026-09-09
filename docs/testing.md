@@ -3,9 +3,29 @@
 ## Quick Start
 
 ```bash
+rake ci                        # CI-equivalent local gate
 bundle exec rspec              # Run all tests
 bundle exec rspec --parallel   # Run in parallel (faster)
 ```
+
+`rake ci` is the recommended pre-push check. It runs RuboCop and
+`bundle exec rspec --tag ~slow`, matching `.github/workflows/ci.yml`. The
+pre-push Git hook runs it automatically. Install the hook with:
+
+```bash
+bin/install-hooks.sh
+```
+
+The CI environment is pinned to Ubuntu 26.04, Ruby 3.4.10, and the Sharp CLI
+version declared in `package.json`. Install that CLI locally with:
+
+```bash
+SHARP_CLI_VERSION="$(node -p 'require("./package.json").devDependencies["sharp-cli"]')"
+npm install -g "sharp-cli@${SHARP_CLI_VERSION}"
+```
+
+Docker-backed HTTP provider tests are intentionally run locally rather than in
+CI. Start them with `rake start_services` when running those provider tests.
 
 ## Test Structure
 
