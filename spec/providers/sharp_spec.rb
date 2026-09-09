@@ -30,4 +30,14 @@ RSpec.describe JekyllImgFlow::Providers::Sharp, :unit do
       expect(provider.translate_position("custom")).to eq("custom")
     end
   end
+
+  describe "#sharp_format" do
+    it "maps jpg to the jpeg format accepted by Sharp CLI" do
+      expect(provider.sharp_format("jpg")).to eq("jpeg")
+    end
+
+    it "preserves other formats" do
+      expect(provider.sharp_format("webp")).to eq("webp")
+    end
+  end
 end

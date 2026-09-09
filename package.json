@@ -3,6 +3,6 @@
   "private": true,
   "description": "Pinned development tools for Jekyll ImgFlow",
   "devDependencies": {
-    "sharp-cli": "5.2.0"
+    "sharp-cli": "6.1.0"
   }
 }

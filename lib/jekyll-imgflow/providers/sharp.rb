@@ -79,7 +79,7 @@ module JekyllImgFlow
 
         format_op = @operations.find { |op| op[:type] == :format }
         quality_op = @operations.find { |op| op[:type] == :quality }
-        command_parts += ["-f", format_op[:format]] if format_op
+        command_parts += ["-f", sharp_format(format_op[:format])] if format_op
         command_parts += ["-q#{quality_op[:quality]}"] if quality_op
 
         if opacity && opacity < 1.0
@@ -142,7 +142,7 @@ module JekyllImgFlow
         quality_op = @operations.find { |op| op[:type] == :quality }
         alpha_op = @operations.find { |op| op[:type] == :alpha_opacity }
 
-        command_parts += ["-f", format_op[:format]] if format_op
+        command_parts += ["-f", sharp_format(format_op[:format])] if format_op
         command_parts += ["-q#{quality_op[:quality]}"] if quality_op
         if alpha_op
           alpha_value = (alpha_op[:opacity] * 255).round
@@ -200,7 +200,7 @@ module JekyllImgFlow
         quality_op = @operations.find { |op| op[:type] == :quality }
         alpha_op = @operations.find { |op| op[:type] == :alpha_opacity }
 
-        command_parts += ["-f", format_op[:format]] if format_op
+        command_parts += ["-f", sharp_format(format_op[:format])] if format_op
         command_parts += ["-q#{quality_op[:quality]}"] if quality_op
         if alpha_op
           alpha_value = (alpha_op[:opacity] * 255).round
@@ -208,6 +208,12 @@ module JekyllImgFlow
         end
 
         command_parts.join(" ")
+      end
+
+      # Sharp CLI calls JPEG "jpeg", while ImgFlow uses the standard "jpg"
+      # extension in generated filenames and public configuration.
+      def sharp_format(format)
+        format.to_s == "jpg" ? "jpeg" : format
       end
     end
   end

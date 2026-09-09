@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Sharp CLI format compatibility** — the Sharp provider now translates
+  ImgFlow's public `jpg` format name to Sharp CLI's required `jpeg` argument,
+  preserving `.jpg` output filenames while supporting Sharp CLI 6.x.
+
+### Changed
+
+- Development and CI tooling now pins Sharp CLI to `6.1.0`, with Dependabot
+  coverage for the npm development dependency tree.
+
 ## [0.3.0] - 2026-09-09
 
 ### Added
