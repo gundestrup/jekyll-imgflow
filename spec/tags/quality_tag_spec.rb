@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require "vips"
+begin
+  require "vips"
+rescue LoadError
+  # libvips native library not installed — helper methods fall back to rescue
+end
 
 RSpec.describe JekyllImgFlow::Tags::QualityTag, :unit do
   let(:site) do
