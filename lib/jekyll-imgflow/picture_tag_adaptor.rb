@@ -42,11 +42,11 @@ module JekyllImgFlow
     # @param picture_markup [String] Picture Tag markup like "{% picture hero image.jpg 16:9 --alt Text %}"
     # @return [Hash] Translation result with markup and attributes
     def translate_to_imgflow(picture_markup)
-      # Extract content between {% picture ... %}
-      match = picture_markup.match(/\{%[ \t]*picture[ \t]+([^%]*)%\}/)
-      return { markup: "", attributes: {} } unless match
+      # Extract content between {% picture ... %} without a backtracking regex
+      content = extract_picture_content(picture_markup)
+      return { markup: "", attributes: {} } unless content
 
-      content = match[1].strip
+      content = content.strip
       return { markup: "", attributes: {} } if content.empty?
 
       # Parse arguments
@@ -74,6 +74,32 @@ module JekyllImgFlow
     end
 
     private
+
+    def extract_picture_content(markup)
+      offset = 0
+      while (opening = markup.index("{%", offset))
+        cursor = skip_whitespace(markup, opening + 2)
+        if markup[cursor, 7] == "picture"
+          cursor += 7
+          if cursor < markup.length && whitespace?(markup[cursor])
+            cursor = skip_whitespace(markup, cursor)
+            closing = markup.index("%}", cursor)
+            return markup[cursor...closing] if closing
+          end
+        end
+        offset = opening + 2
+      end
+      nil
+    end
+
+    def skip_whitespace(markup, cursor)
+      cursor += 1 while cursor < markup.length && whitespace?(markup[cursor])
+      cursor
+    end
+
+    def whitespace?(character)
+      [" ", "\t", "\r", "\n"].include?(character)
+    end
 
     # Parse arguments handling quoted paths and attributes
     # @param content [String] Raw content
