@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.2] - 2026-09-09
+
+### Fixed
+
+- **Modal full-size variants** — modal links now generate optimized variants at
+  the smaller of the original image width and configured maximum size, avoiding
+  upscaled 2000px outputs for originals such as 1680px images.
+- **Modal format negotiation** — the modal now opens a `<picture>` element with
+  AVIF/WebP/PNG sources and the configured fallback format, instead of always
+  loading the fallback file directly.
+
+### Added
+
+- Regression coverage for original-width modal generation and optimized modal
+  format selection.
+
 ## [0.3.1] - 2026-09-09
 
 ### Fixed

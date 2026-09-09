@@ -20,15 +20,24 @@ module JekyllImgFlow
 
     JS = <<~JS
       (function(){
-      function openModal(src,alt){
+      function openModal(trigger,alt){
       var o=document.createElement('div');
       o.className='imgflow-modal-overlay';
+      var p=document.createElement('picture');
+      var href=trigger.getAttribute('href');
+      var types={avif:'image/avif',webp:'image/webp',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg'};
+      var formats=(trigger.getAttribute('data-imgflow-modal-formats')||'').split(',');
+      formats.forEach(function(format){
+      if(!format)return;
+      var s=document.createElement('source');
+      s.srcset=href.replace(/.[^.]+$/,'.'+format);s.type=types[format];p.appendChild(s);});
       var i=document.createElement('img');
-      i.src=src;i.alt=alt||'';i.className='imgflow-modal-image';
+      i.src=href;
+      i.alt=alt||'';i.className='imgflow-modal-image';p.appendChild(i);
       var b=document.createElement('button');
       b.className='imgflow-modal-close';b.setAttribute('aria-label','Close');
       b.innerHTML='&times;';
-      o.appendChild(b);o.appendChild(i);document.body.appendChild(o);
+      o.appendChild(b);o.appendChild(p);document.body.appendChild(o);
       function c(){document.body.removeChild(o);
       document.removeEventListener('keydown',k);}
       function k(e){if(e.key==='Escape')c();}
@@ -38,7 +47,7 @@ module JekyllImgFlow
       document.addEventListener('click',function(e){
       var t=e.target.closest('[data-imgflow-modal]');
       if(!t)return;e.preventDefault();
-      openModal(t.getAttribute('href'),t.getAttribute('data-imgflow-alt'));});
+      openModal(t,t.getAttribute('data-imgflow-alt'));});
       })();
     JS
 
@@ -84,20 +93,72 @@ module JekyllImgFlow
       @config&.image_modal ? true : false
     end
 
-    # Pick the best image path for the modal — prefer the fallback format
-    # (e.g. jpg) for maximum browser compatibility
+    # Pick the largest existing fallback-format variant for the modal.
     def modal_image_path
-      fallback_ext = @config&.fallback_format ? ".#{@config.fallback_format}" : ".jpg"
-      fallback = @results.find { |r| File.extname(r).downcase == fallback_ext }
-      fallback || @results.last
+      variants = modal_variants
+      variants[modal_fallback_format] || @results.last
+    end
+
+    def modal_variants
+      candidates = @attributes[:modal_results] + @results + generated_modal_results
+      max_width = modal_max_width
+
+      candidates.each_with_object({}) do |result, variants|
+        parsed = JekyllImgFlow::FilenameGenerator.new.parse_filename(File.basename(result))
+        next if parsed.empty? || (max_width && parsed[:width] > max_width)
+        next if variants[parsed[:format]] && modal_width(variants[parsed[:format]]) >= parsed[:width]
+
+        variants[parsed[:format]] = result
+      end
+    end
+
+    def modal_fallback_format
+      @config&.fallback_format.to_s
+    end
+
+    def modal_max_width
+      return unless @config.respond_to?(:sizes)
+
+      @config.sizes.values.max
+    end
+
+    def generated_modal_results
+      return [] unless @config && @context&.registers&.key?(:site)
+
+      result = @results.first
+      parsed = JekyllImgFlow::FilenameGenerator.new.parse_filename(File.basename(result))
+      return [] if parsed.empty?
+
+      site = @context.registers[:site]
+      directory = File.join(site.source, File.dirname(result.delete_prefix("/")))
+      return [] unless File.directory?(directory)
+
+      max_width = @config.sizes.values.max
+      Dir.children(directory).filter_map do |filename|
+        candidate = JekyllImgFlow::FilenameGenerator.new.parse_filename(filename)
+        next unless candidate[:base_name] == parsed[:base_name]
+        next unless candidate[:hash] == parsed[:hash]
+        next if max_width && candidate[:width] > max_width
+
+        File.join(File.dirname(result), filename)
+      end
+    rescue Errno::ENOENT
+      []
+    end
+
+    def modal_width(result)
+      JekyllImgFlow::FilenameGenerator.new.parse_filename(File.basename(result))[:width] || 0
     end
 
     # Wrap HTML in modal trigger anchor
     def wrap_with_modal(html)
-      modal_href = html_path(modal_image_path)
+      variants = modal_variants
+      modal_href = html_path(variants[modal_fallback_format] || @results.last)
       return html unless modal_href
 
+      source_formats = variants.keys.reject { |format| format == modal_fallback_format }
       data_attrs = " data-imgflow-modal"
+      data_attrs += " data-imgflow-modal-formats=\"#{source_formats.join(',')}\"" unless source_formats.empty?
       alt = @attributes[:alt]
       data_attrs += " data-imgflow-alt=\"#{escape_attr_value(alt)}\"" if alt
 

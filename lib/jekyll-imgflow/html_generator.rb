@@ -83,7 +83,8 @@ module JekyllImgFlow
         parent: attributes[:parent] || {},
         alt: attributes[:alt],
         link: attributes[:link],
-        modal: attributes[:modal]
+        modal: attributes[:modal],
+        modal_results: attributes[:modal_results] || []
       }
     end
 
@@ -96,7 +97,8 @@ module JekyllImgFlow
         parent: {},
         alt: nil,
         link: nil,
-        modal: nil
+        modal: nil,
+        modal_results: []
       }
     end
 

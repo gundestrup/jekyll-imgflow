@@ -347,7 +347,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
                         { image_path: "test.jpg",
                           operations: [{ type: :resize, params: { width: 800 } }] },
                         context)
-      expect(manifest).to have_received(:update_page_usage)
+      expect(manifest).to have_received(:update_page_usage).at_least(:once)
       expect(result).to eq("<img>")
     end
 
@@ -368,7 +368,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
                  operations: [{ type: :resize, params: { width: 800 } }] },
                context)
 
-      expect(operation_processor).to have_received(:process_operation)
+      expect(operation_processor).to have_received(:process_operation).at_least(:once)
     end
   end
 
@@ -565,6 +565,36 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
         expect(results).to include("/tmp/output-avif.img", "/tmp/output-webp.img",
                                    "/tmp/output-jpg.img")
       end
+    end
+  end
+
+  describe "#process_modal_variants" do
+    let(:config) do
+      double(
+        "config",
+        formats: %w[avif webp jpg],
+        image_modal: true,
+        sizes: { "sm" => 400, "md" => 800, "lg" => 1200, "xl" => 2000 }
+      )
+    end
+    let(:components) { { config: config } }
+
+    it "generates optimized variants at the original width without upscaling" do
+      allow(FastImage).to receive(:size).and_return([1680, 1050])
+      allow(tag).to receive(:process_variant) do |_, _, params, _, _, _|
+        "/tmp/output-#{params[:width]}-#{params[:format]}.img"
+      end
+
+      operation = { type: :resize, params: { width: 200 } }
+      parsed = { html_attributes: {} }
+      results = tag.send(:process_modal_variants, components, operation, parsed,
+                         "test.jpg", "/tmp/test.jpg", "/page")
+
+      expect(results).to contain_exactly(
+        "/tmp/output-1680-avif.img",
+        "/tmp/output-1680-webp.img",
+        "/tmp/output-1680-jpg.img"
+      )
     end
   end
 

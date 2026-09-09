@@ -617,13 +617,39 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
 
     it "uses fallback format image for modal href" do
       results = [
-        "/assets/images/optimized/test-800-hash.avif",
-        "/assets/images/optimized/test-800-hash.webp",
-        "/assets/images/optimized/test-800-hash.png",
-        "/assets/images/optimized/test-800-hash.jpg"
+        "/assets/images/optimized/test-800-a1b2c3d4e.avif",
+        "/assets/images/optimized/test-800-a1b2c3d4e.webp",
+        "/assets/images/optimized/test-800-a1b2c3d4e.png",
+        "/assets/images/optimized/test-800-a1b2c3d4e.jpg"
       ]
       html = JekyllImgFlow::HtmlGenerator.generate(results, {}, "picture", context, modal_config)
-      expect(html).to include('href="/assets/images/optimized/test-800-hash.jpg"')
+      expect(html).to include('href="/assets/images/optimized/test-800-a1b2c3d4e.jpg"')
+      expect(html).to include('data-imgflow-modal-formats="avif,webp,png"')
+    end
+
+    it "uses the largest existing configured variant for modal href" do
+      Dir.mktmpdir do |source|
+        output_dir = File.join(source, "assets/images/optimized")
+        FileUtils.mkdir_p(output_dir)
+        FileUtils.touch(File.join(output_dir, "test-2000-a1b2c3d4e.jpg"))
+        FileUtils.touch(File.join(output_dir, "test-200-a1b2c3d4e.jpg"))
+
+        modal_site = double("site", source: source, config: { "baseurl" => "" })
+        modal_context = double("context", registers: { site: modal_site })
+        sized_config = double(
+          "config",
+          formats: %w[avif webp png jpg],
+          fallback_format: "jpg",
+          image_modal: true,
+          sizes: { "sm" => 400, "md" => 800, "lg" => 1200, "xl" => 2000 }
+        )
+        results = ["assets/images/optimized/test-200-a1b2c3d4e.jpg"]
+
+        html = JekyllImgFlow::HtmlGenerator.generate(results, {}, "img", modal_context,
+                                                     sized_config)
+
+        expect(html).to include('href="/assets/images/optimized/test-2000-a1b2c3d4e.jpg"')
+      end
     end
 
     it "wraps picture element in modal trigger" do

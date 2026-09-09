@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "shellwords"
+require "fastimage"
 
 module Jekyll
   class ImgflowTag < Liquid::Tag
@@ -99,9 +100,49 @@ module Jekyll
                                    page_path)
                 end
 
+      modal_results = if operations.empty?
+                        []
+                      else
+                        process_modal_variants(components, operations.first, parsed, original_name,
+                                               input_path, page_path)
+                      end
       relative_results = results.uniq.map { |result| relative_result_path(result, site) }
+      relative_modal_results = modal_results.uniq.map do |result|
+        relative_result_path(result, site)
+      end
       parsed = parsed.merge(markup_format: "picture") if relative_results.length > 1
+      parsed = parsed.merge(modal_results: relative_modal_results)
       generate_html(relative_results, parsed, context)
+    end
+
+    def process_modal_variants(components, operation, parsed, original_name, input_path, page_path)
+      config = components[:config]
+      return [] unless modal_requested?(parsed, config)
+
+      original_width = FastImage.size(input_path)&.first
+      return [] unless original_width
+
+      params = operation[:params].dup
+      formats = Array(params.delete(:formats) || params[:format])
+      formats = config.formats if formats.empty?
+      modal_width = [original_width, config.sizes.values.max].min
+
+      formats.map do |format|
+        modal_params = params.merge(width: modal_width, format: format)
+        process_variant(components, operation, modal_params, original_name, input_path, page_path)
+      end
+    rescue FastImage::ImageFetchError, FastImage::UnknownImageType
+      []
+    end
+
+    def modal_requested?(parsed, config)
+      return false if %w[direct_url naked_srcset].include?(parsed[:markup_format])
+
+      attrs = parsed[:html_attributes] || {}
+      return false if attrs[:link]
+
+      modal = attrs[:modal]
+      modal.nil? ? (config.respond_to?(:image_modal) && config.image_modal) : modal.to_s == "true"
     end
 
     def process_variants(components, operation, original_name, input_path, page_path)
@@ -195,7 +236,8 @@ module Jekyll
         parent: extract_prefixed_attrs(base_attrs, "parent-"),
         alt: base_attrs[:alt],
         link: base_attrs[:link],
-        modal: base_attrs[:modal]
+        modal: base_attrs[:modal],
+        modal_results: parsed[:modal_results] || []
       }
     end
 
