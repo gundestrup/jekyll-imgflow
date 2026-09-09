@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0] - 2026-09-09
+
+### Added
+
+- **Image modal/lightbox by default** — clicking an `{% imgflow %}` image now opens a full-size modal popup showing the largest generated version. The modal is enabled by default (`image_modal: true` in config) and requires no user setup — CSS and JS are automatically injected into pages that contain modal-enabled images via a `post_render` hook. Disable globally in `_config.yml` with `image_modal: false`. Per-image overrides: `modal:true` forces the modal on (even when config is `false`), `modal:false` forces it off. Images with an explicit `link:` attribute use that link instead (modal is skipped). The modal supports keyboard navigation (Escape to close) and click-outside-to-close.
+
 ## [0.2.0] - 2026-09-08
 
 ### Fixed

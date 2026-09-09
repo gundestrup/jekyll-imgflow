@@ -193,7 +193,8 @@ module Jekyll
         a: extract_prefixed_attrs(base_attrs, "a-"),
         parent: extract_prefixed_attrs(base_attrs, "parent-"),
         alt: base_attrs[:alt],
-        link: base_attrs[:link]
+        link: base_attrs[:link],
+        modal: base_attrs[:modal]
       }
     end
 

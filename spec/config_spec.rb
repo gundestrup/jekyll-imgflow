@@ -30,6 +30,7 @@ RSpec.describe JekyllImgFlow::Config, :unit do
       expect(cfg.quality).to eq(85)
       expect(cfg.backend_priority).to eq(%w[sharp libvips imagemagick imgproxy weserv flyimg])
       expect(cfg.fallback_format).to eq("jpg")
+      expect(cfg.image_modal).to be true
     end
 
     it "allows minimal config with only originals and output" do
@@ -66,6 +67,15 @@ RSpec.describe JekyllImgFlow::Config, :unit do
       expect(cfg.originals).to eq("shared/originals") # from shared
       expect(cfg.output).to eq("custom/output") # overridden by imgflow
     end
+
+    it "allows disabling image_modal via config" do
+      modal_site = double("site", config: {
+                            "imgflow" => { "image_modal" => false }
+                          })
+      cfg = described_class.new(modal_site)
+
+      expect(cfg.image_modal).to be false
+    end
   end
 
   describe "default constants" do
@@ -91,6 +101,10 @@ RSpec.describe JekyllImgFlow::Config, :unit do
 
     it "has default fallback_format" do
       expect(described_class::DEFAULT_FALLBACK_FORMAT).to eq("jpg")
+    end
+
+    it "has default image_modal" do
+      expect(described_class::DEFAULT_IMAGE_MODAL).to be true
     end
   end
 

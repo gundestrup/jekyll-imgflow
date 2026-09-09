@@ -9,7 +9,7 @@ module JekyllImgFlow
     # Define valid operation parameters and attribute types
     OPERATION_PARAMS = %i[width height ratio aspect_ratio quality format formats
                           optimize level watermark opacity position keep preset].freeze
-    HTML_ATTRIBUTES = %i[alt class title loading].freeze
+    HTML_ATTRIBUTES = %i[alt class title loading link modal].freeze
 
     # Simple operation mappings for single-parameter operations
     SIMPLE_OPERATIONS = {

@@ -20,11 +20,12 @@ module JekyllImgFlow
     # Format used for the <img> fallback in <picture> elements.
     # All other formats in `formats` get <source> tags for browsers that support them.
     DEFAULT_FALLBACK_FORMAT = "jpg"
+    DEFAULT_IMAGE_MODAL = true
 
     attr_reader :site, :originals, :output, :input_formats, :sizes, :formats,
                 :quality, :backend_priority, :imgproxy_url,
                 :weserv_url, :flyimg_url,
-                :optimize_qualities, :fallback_format
+                :optimize_qualities, :fallback_format, :image_modal
 
     def initialize(site)
       shared = site.config["shared_images_configs"] || {}
@@ -40,6 +41,7 @@ module JekyllImgFlow
       @quality          = cfg["quality"] || DEFAULT_QUALITY
       @backend_priority = cfg["backend_priority"] || DEFAULT_BACKEND_PRIORITY
       @fallback_format  = cfg["fallback_format"] || DEFAULT_FALLBACK_FORMAT
+      @image_modal      = cfg.fetch("image_modal", DEFAULT_IMAGE_MODAL)
 
       @imgproxy_url = cfg["imgproxy_url"]
       @weserv_url       = cfg["weserv_url"]

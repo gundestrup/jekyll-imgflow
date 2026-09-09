@@ -47,6 +47,13 @@ module JekyllImgFlow
     end
   end
 
+  # Inject modal CSS/JS into pages that contain data-imgflow-modal triggers
+  %i[pages documents].each do |type|
+    Jekyll::Hooks.register type, :post_render do |doc|
+      doc.output = ModalAssets.inject(doc.output) if doc.output
+    end
+  end
+
   def self.cleanup_orphaned_images(site, manifest = nil)
     Jekyll.logger.info "🧹 ImgFlow: Checking for orphaned specialized images..."
 

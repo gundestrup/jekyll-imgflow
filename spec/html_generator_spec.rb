@@ -28,7 +28,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
 
   # Use proper config with TestPictures formats
   let(:config) do
-    double("config", formats: %w[avif webp png jpg], fallback_format: "jpg")
+    double("config", formats: %w[avif webp png jpg], fallback_format: "jpg", image_modal: true)
   end
 
   let(:attributes) do
@@ -116,7 +116,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
   describe "config integration" do
     context "with custom formats" do
       let(:custom_config) do
-        double("config", formats: %w[avif webp png], fallback_format: "jpg")
+        double("config", formats: %w[avif webp png], fallback_format: "jpg", image_modal: false)
       end
 
       it "uses fallback_format for <img> and other formats for <source>" do
@@ -135,7 +135,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
 
     context "with png as fallback_format" do
       let(:png_fallback_config) do
-        double("config", formats: %w[avif webp jpg png], fallback_format: "png")
+        double("config", formats: %w[avif webp jpg png], fallback_format: "png", image_modal: false)
       end
 
       it "uses png for <img> fallback and serves webp/avif/jpg via <source>" do
@@ -415,7 +415,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
     it "handles uppercase file extensions" do
       # Test with uppercase extensions - use config that allows webp as source
       uppercase_config = double("config", formats: %w[avif webp png jpg],
-                                          fallback_format: "jpg")
+                                          fallback_format: "jpg", image_modal: false)
       uppercase_results = [
         "/assets/images/optimized/test-image.WEBP",
         "/assets/images/optimized/test-image.AVIF",
@@ -555,6 +555,133 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
       html = JekyllImgFlow::HtmlGenerator.generate(test_results, attrs, "img", context, config)
       expect(html).not_to include("hidden")
       expect(html).not_to include("data-nil")
+    end
+  end
+
+  describe "modal behavior" do
+    let(:modal_config) do
+      double("config", formats: %w[avif webp png jpg], fallback_format: "jpg", image_modal: true)
+    end
+
+    let(:no_modal_config) do
+      double("config", formats: %w[avif webp png jpg], fallback_format: "jpg", image_modal: false)
+    end
+
+    let(:single_result) do
+      ["/assets/images/optimized/#{TestPictures.expected_filename(test_image_name, :md, :jpg)}"]
+    end
+
+    it "wraps image in modal trigger when config image_modal is true" do
+      html = JekyllImgFlow::HtmlGenerator.generate(single_result, {}, "img", context,
+                                                   modal_config)
+      expect(html).to include("data-imgflow-modal")
+      expect(html).to include("<a href=\"")
+      expect(html).to include(single_result.first)
+    end
+
+    it "does not wrap in modal when config image_modal is false" do
+      html = JekyllImgFlow::HtmlGenerator.generate(single_result, {}, "img", context,
+                                                   no_modal_config)
+      expect(html).not_to include("data-imgflow-modal")
+      expect(html).not_to include("<a href=\"")
+    end
+
+    it "does not wrap in modal when link attribute is set" do
+      attrs = { link: "https://example.com/page" }
+      html = JekyllImgFlow::HtmlGenerator.generate(single_result, attrs, "img", context,
+                                                   modal_config)
+      expect(html).not_to include("data-imgflow-modal")
+      expect(html).to include("<a href=\"https://example.com/page\"")
+    end
+
+    it "forces modal on with modal:true even when config image_modal is false" do
+      attrs = { modal: "true" }
+      html = JekyllImgFlow::HtmlGenerator.generate(single_result, attrs, "img", context,
+                                                   no_modal_config)
+      expect(html).to include("data-imgflow-modal")
+    end
+
+    it "forces modal off with modal:false even when config image_modal is true" do
+      attrs = { modal: "false" }
+      html = JekyllImgFlow::HtmlGenerator.generate(single_result, attrs, "img", context,
+                                                   modal_config)
+      expect(html).not_to include("data-imgflow-modal")
+    end
+
+    it "includes data-imgflow-alt when alt attribute is set" do
+      attrs = { alt: "Test description" }
+      html = JekyllImgFlow::HtmlGenerator.generate(single_result, attrs, "img", context,
+                                                   modal_config)
+      expect(html).to include("data-imgflow-alt=\"Test description\"")
+    end
+
+    it "uses fallback format image for modal href" do
+      results = [
+        "/assets/images/optimized/test-800-hash.avif",
+        "/assets/images/optimized/test-800-hash.webp",
+        "/assets/images/optimized/test-800-hash.png",
+        "/assets/images/optimized/test-800-hash.jpg"
+      ]
+      html = JekyllImgFlow::HtmlGenerator.generate(results, {}, "picture", context, modal_config)
+      expect(html).to include('href="/assets/images/optimized/test-800-hash.jpg"')
+    end
+
+    it "wraps picture element in modal trigger" do
+      html = JekyllImgFlow::HtmlGenerator.generate(test_results, {}, "picture", context,
+                                                   modal_config)
+      expect(html).to include("data-imgflow-modal")
+      expect(html).to match(/<a\s+href=.*<picture/)
+    end
+
+    it "does not wrap in modal when config is nil" do
+      nil_config = double("config", formats: %w[avif webp png jpg], fallback_format: "jpg",
+                                    image_modal: nil)
+      html = JekyllImgFlow::HtmlGenerator.generate(single_result, {}, "img", context,
+                                                   nil_config)
+      expect(html).not_to include("data-imgflow-modal")
+    end
+  end
+
+  describe "JekyllImgFlow::ModalAssets" do
+    it "injects style and script tags when data-imgflow-modal is present" do
+      html = "<html><head><title>Test</title></head><body>" \
+             "<a href=\"/img.jpg\" data-imgflow-modal>img</a></body></html>"
+      result = JekyllImgFlow::ModalAssets.inject(html)
+
+      expect(result).to include("<style>")
+      expect(result).to include("imgflow-modal-overlay")
+      expect(result).to include("<script>")
+      expect(result).to include("data-imgflow-modal")
+    end
+
+    it "does not inject when data-imgflow-modal is absent" do
+      html = "<html><head><title>Test</title></head><body><p>hello</p></body></html>"
+      result = JekyllImgFlow::ModalAssets.inject(html)
+
+      expect(result).not_to include("<style>")
+      expect(result).not_to include("<script>")
+    end
+
+    it "injects into head when head tag exists" do
+      html = "<html><head><title>Test</title></head><body>content</body></html>"
+      result = JekyllImgFlow::ModalAssets.inject(
+        html.sub("content", "<a data-imgflow-modal>img</a>")
+      )
+
+      expect(result).to include("<style>\n.imgflow-modal-overlay")
+      expect(result.index("<style>")).to be < result.index("</head>")
+    end
+
+    it "appends assets when no head or body tags exist" do
+      html = "<a data-imgflow-modal>img</a>"
+      result = JekyllImgFlow::ModalAssets.inject(html)
+
+      expect(result).to include("<style>")
+      expect(result).to include("<script>")
+    end
+
+    it "returns nil input unchanged" do
+      expect(JekyllImgFlow::ModalAssets.inject(nil)).to be_nil
     end
   end
 end

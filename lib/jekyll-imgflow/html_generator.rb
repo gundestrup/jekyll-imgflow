@@ -4,6 +4,8 @@ module JekyllImgFlow
   # Unified HTML Generator for all markup formats
   # Supports Picture Tag compatibility with multiple markup formats and attributes
   class HtmlGenerator
+    include ModalWrapper
+
     # Generate HTML based on markup format and attributes
     # @param results [Array<String>] Processed image paths
     # @param attributes [Hash] HTML attributes by element
@@ -47,6 +49,9 @@ module JekyllImgFlow
       # Wrap in link if specified
       html = wrap_with_link(html) if @attributes[:link]
 
+      # Wrap in modal trigger if enabled (only for HTML elements, not raw URLs)
+      html = wrap_with_modal(html) if modal_enabled? && html_element?
+
       # Wrap in parent container if specified
       html = wrap_with_parent(html) if @attributes[:parent]&.any?
 
@@ -77,7 +82,8 @@ module JekyllImgFlow
         a: attributes[:a] || {},
         parent: attributes[:parent] || {},
         alt: attributes[:alt],
-        link: attributes[:link]
+        link: attributes[:link],
+        modal: attributes[:modal]
       }
     end
 
@@ -89,7 +95,8 @@ module JekyllImgFlow
         a: {},
         parent: {},
         alt: nil,
-        link: nil
+        link: nil,
+        modal: nil
       }
     end
 
