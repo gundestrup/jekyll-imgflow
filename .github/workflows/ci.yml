@@ -40,3 +40,11 @@ jobs:
 
       - name: Run RuboCop
         run: bundle exec rubocop
+
+      - name: Install Semgrep
+        run: pip3 install semgrep
+
+      - name: Run Semgrep security scan
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: semgrep ci
