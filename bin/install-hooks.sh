@@ -29,7 +29,7 @@ if ! bundle exec rubocop --force-exclusion; then
 fi
 
 echo "🔍 Running Semgrep security scan..."
-if ! semgrep scan --config .semgrep.yml --error lib/ 2>&1; then
+if ! semgrep scan --pro --config .semgrep.yml --error lib/ 2>&1; then
     echo "❌ Semgrep scan failed"
     echo "Fix the issues or use 'git commit --no-verify' to skip"
     exit 1

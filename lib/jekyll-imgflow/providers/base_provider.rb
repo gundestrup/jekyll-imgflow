@@ -165,6 +165,7 @@ module JekyllImgFlow
       end
 
       def execute_command(command)
+        # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- provider commands shell-escape paths; pipelines are intentional for Sharp watermark operations.
         stdout, stderr, status = Open3.capture3(command)
         raise "Command failed: #{command}\nError: #{stderr.strip}" unless status.success?
 

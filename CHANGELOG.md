@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added Semgrep and CodeFactor status badges to the README.
+- Documented local Semgrep Pro scans and `semgrep ci` dashboard
+  synchronization. GitHub Actions continues to publish CI findings through
+  `SEMGREP_APP_TOKEN`, while CodeFactor analyzes the repository through its
+  GitHub integration.
+
+### Fixed
+
+- Replaced shell-interpolated cleanup and test-helper commands with argument
+  arrays and process APIs where possible.
+- Added explicit Semgrep suppressions for intentional Jekyll Picture Tag MD5
+  compatibility hashes and provider commands that use safe argument arrays or
+  shell-escaped paths.
+
+### Security
+
+- Pinned all GitHub Actions used by CI and release workflows to immutable
+  commit SHAs to prevent mutable-tag supply-chain changes.
+
 ## [0.3.2] - 2026-09-09
 
 ### Fixed

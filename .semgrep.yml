@@ -1,7 +1,7 @@
 # Semgrep configuration for jekyll-imgflow
 # https://semgrep.dev/docs/
 #
-# Run: semgrep scan --config .semgrep.yml --error lib/
+# Run: semgrep scan --pro --config .semgrep.yml --error lib/
 
 rules:
   # Detect String#scan with unanchored polynomial regex (ReDoS).

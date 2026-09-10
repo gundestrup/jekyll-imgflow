@@ -83,6 +83,7 @@ module JekyllImgFlow
     def generate_jpt_hash(original_path, operations)
       # Get filename digest (MD5 of filename) - exactly like JPT
       filename = File.basename(original_path)
+      # nosemgrep: ruby.lang.security.weak-hashes-md5.weak-hashes-md5 -- Jekyll Picture Tag filename compatibility, not security.
       file_digest = Digest::MD5.hexdigest(filename)
 
       # Build settings array (like Jekyll Picture Tag)
@@ -94,6 +95,7 @@ module JekyllImgFlow
       ]
 
       # Generate MD5 hash of settings (9 chars like JPT)
+      # nosemgrep: ruby.lang.security.weak-hashes-md5.weak-hashes-md5 -- Jekyll Picture Tag filename compatibility, not security.
       Digest::MD5.hexdigest(settings.join)[0..8]
     end
   end

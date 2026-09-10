@@ -26,6 +26,9 @@ module DockerServiceStatus
   end
 
   def container_status(name, compose_file:, env_file:)
+    return { state: "unavailable", detail: "unknown service" } unless SERVICE_PATHS.key?(name)
+
+    # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- Open3 receives an argument array; no shell is invoked.
     stdout, stderr, status = Open3.capture3(
       "docker-compose", "-f", compose_file, "--env-file", env_file,
       "ps", "--all", "--format", "json", name

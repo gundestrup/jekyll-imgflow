@@ -6,6 +6,8 @@ A [Jekyll](https://jekyllrb.com/) plugin for automatic image optimization with m
 
 [![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundestrup/jekyll-imgflow)
 [![Status](https://img.shields.io/badge/status-active-success)](https://github.com/gundestrup/jekyll-imgflow)
+[![Semgrep](https://img.shields.io/badge/Semgrep-scanned-1B2B34?logo=semgrep&logoColor=white)](https://semgrep.dev/)
+[![CodeFactor](https://www.codefactor.io/repository/github/gundestrup/jekyll-imgflow/badge)](https://www.codefactor.io/repository/github/gundestrup/jekyll-imgflow)
 [![codecov](https://codecov.io/gh/gundestrup/jekyll-imgflow/branch/main/graph/badge.svg)](https://codecov.io/gh/gundestrup/jekyll-imgflow)
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code%20Companion-jekyll--imgflow-blue?logo=visual-studio-code)](https://github.com/gundestrup/jekyll-imgflow-vscode)
 [![License](https://img.shields.io/github/license/gundestrup/jekyll-imgflow)](LICENSE)
@@ -202,8 +204,15 @@ bundle install
 # Download test images
 rake download_test_images
 
-# Run tests
-rake quick
+# Run the CI-equivalent checks locally
+rake ci
+
+# Run the local Semgrep Pro rules directly
+semgrep scan --pro --config .semgrep.yml --error lib/
+
+# Sync the repository scan and findings with the Semgrep dashboard
+# (requires semgrep login or SEMGREP_APP_TOKEN)
+semgrep ci
 ```
 
 ### Key Files

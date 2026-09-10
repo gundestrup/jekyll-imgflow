@@ -169,6 +169,9 @@ module JekyllImgFlow
       # Get an image dimension (width or height) using vips header.
       # Returns integer or 0 if vips is unavailable.
       def vips_image_dimension(image_path, field)
+        return 0 unless %w[width height].include?(field)
+
+        # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- Open3 receives an argument array and field is allowlisted.
         stdout, _, status = Open3.capture3("vips", "header", image_path, field)
         return 0 unless status.success?
 
@@ -323,6 +326,7 @@ module JekyllImgFlow
         Jekyll.logger.debug "LibVips command: #{command.join(' ')}"
 
         # Execute command array directly (no shell)
+        # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- command is an argument array; no shell is invoked.
         stdout, stderr, status = Open3.capture3(*command)
         output = "#{stdout}#{stderr}"
         success = status.success?

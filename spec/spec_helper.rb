@@ -3,6 +3,7 @@
 require "simplecov"
 require "ostruct"
 require "fastimage"
+require "open3"
 require_relative "../scripts/test_logger"
 require_relative "support/test_directory_helper"
 require_relative "support/test_pictures"
@@ -236,7 +237,8 @@ module ProviderTestHelpers
 
   # Helper to check if CLI tool is available
   def cli_tool_available?(command)
-    system("which #{command} >/dev/null 2>&1")
+    # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- system receives separate arguments; no shell interpolation.
+    system("which", command, out: File::NULL, err: File::NULL)
   end
 
   # Get all providers from registry without availability filtering
@@ -524,7 +526,8 @@ module ProviderTestHelpers
       cleanup_server(port)
 
       Dir.chdir(site_dir) do
-        pid = spawn("bundle exec jekyll serve --host 0.0.0.0 --port #{port} --detach")
+        pid = spawn("bundle", "exec", "jekyll", "serve", "--host", "0.0.0.0",
+                    "--port", port.to_s, "--detach")
         sleep 2 # Give server time to start
 
         # Track the server for cleanup
@@ -545,7 +548,10 @@ module ProviderTestHelpers
   # Clean up a specific server
   def cleanup_server(port)
     # Kill any process using this port (more reliable than PID tracking)
-    system("lsof -ti:#{port} | xargs kill -9 2>/dev/null")
+    # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- Open3 receives an argument array; no shell is invoked.
+    output, = Open3.capture3("lsof", "-ti:#{Integer(port)}")
+    output.split.filter_map { |pid| Integer(pid, exception: false) }
+          .each { |pid| Process.kill("KILL", pid) }
 
     # Also try to kill the tracked PID if we have one
     server_info = active_servers[port]

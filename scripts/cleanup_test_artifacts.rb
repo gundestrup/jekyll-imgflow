@@ -5,6 +5,7 @@
 # Run this to clean up orphaned test files and servers
 
 require "fileutils"
+require "open3"
 require "tmpdir"
 require_relative "../spec/support/test_environment"
 
@@ -17,12 +18,13 @@ ports_to_check = TestEnvironment.all_test_ports
 
 killed_count = 0
 ports_to_check.each do |port|
-  output = `lsof -ti:#{port} 2>/dev/null`.strip
-  next if output.empty?
+  output, = Open3.capture3("lsof", "-ti:#{Integer(port)}")
+  pids = output.split.filter_map { |pid| Integer(pid, exception: false) }
+  next if pids.empty?
 
   puts "  🔍 Found process on port #{port}, killing..."
-  system("lsof -ti:#{port} | xargs kill -9 2>/dev/null")
-  killed_count += 1
+  pids.each { |pid| Process.kill("KILL", pid) }
+  killed_count += pids.length
 end
 
 if killed_count.positive?
@@ -37,7 +39,8 @@ project_root = File.expand_path("..", __dir__)
 local_tmp_dir = File.join(project_root, "tmp")
 
 if File.exist?(local_tmp_dir)
-  size = `du -sh "#{local_tmp_dir}" 2>/dev/null`.split.first
+  size_output, = Open3.capture3("du", "-sh", local_tmp_dir)
+  size = size_output.split.first
   FileUtils.rm_rf(local_tmp_dir)
   puts "  ✅ Removed tmp/ directory (#{size})"
 else
@@ -62,8 +65,8 @@ patterns.each do |pattern|
     next unless File.directory?(dir)
 
     # Get size before removing
-    size_output = `du -sk "#{dir}" 2>/dev/null`.split.first.to_i
-    total_size += size_output
+    size_output, = Open3.capture3("du", "-sk", dir)
+    total_size += size_output.split.first.to_i
 
     begin
       FileUtils.rm_rf(dir)
