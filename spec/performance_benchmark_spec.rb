@@ -182,78 +182,94 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
     def collect_metrics(test_site, test_site_dir, build_time)
       output_dir = File.join(test_site_dir, "_site", "assets", "images", "optimized")
       originals_dir = File.join(test_site_dir, "assets", "images", "originals")
-
-      metrics = {
-        build_time: build_time.round(2),
-        images_generated: 0,
-        total_output_size: 0,
-        total_input_size: 0
-      }
-
-      if Dir.exist?(originals_dir)
-        originals = Dir.glob(File.join(originals_dir, "*")).select { |f| File.file?(f) }
-        metrics[:total_input_size] = originals.sum { |f| File.size(f) }
-      end
-
-      if Dir.exist?(output_dir)
-        images = Dir.glob(File.join(output_dir, "**", "*")).select { |f| File.file?(f) }
-        metrics[:images_generated] = images.length
-        metrics[:total_output_size] = images.sum { |f| File.size(f) }
-      end
-
-      # Collect processing stats from the OperationProcessor
-      if test_site.respond_to?(:imgflow_components) && test_site.imgflow_components[:stats]
-        stats = test_site.imgflow_components[:stats]
-        metrics[:cache_hits] = stats.cache_hits
-        metrics[:cache_misses] = stats.cache_misses
-        metrics[:cache_hit_rate] = stats.cache_hit_rate
-        metrics[:operation_timings] = stats.operation_timings.transform_values { |v| v.round(3) }
-        metrics[:compression_ratios] = stats.average_compression_ratios
-      end
-
-      metrics[:status] = metrics[:images_generated] == 0 ? "failed" : "success"
+      metrics = { build_time: build_time.round(2) }
+      metrics.merge!(input_metrics(originals_dir), output_metrics(output_dir))
+      metrics.merge!(stats_metrics(test_site))
+      metrics[:status] = metrics[:images_generated].zero? ? "failed" : "success"
       metrics
+    end
+
+    def input_metrics(originals_dir)
+      return { total_input_size: 0 } unless Dir.exist?(originals_dir)
+
+      files = Dir.glob(File.join(originals_dir, "*")).select { |file| File.file?(file) }
+      { total_input_size: files.sum { |file| File.size(file) } }
+    end
+
+    def output_metrics(output_dir)
+      return { images_generated: 0, total_output_size: 0 } unless Dir.exist?(output_dir)
+
+      files = Dir.glob(File.join(output_dir, "**", "*")).select { |file| File.file?(file) }
+      { images_generated: files.length, total_output_size: files.sum { |file| File.size(file) } }
+    end
+
+    def stats_metrics(test_site)
+      stats = test_site.imgflow_components[:stats] if test_site.respond_to?(:imgflow_components)
+      return {} unless stats
+
+      {
+        cache_hits: stats.cache_hits,
+        cache_misses: stats.cache_misses,
+        cache_hit_rate: stats.cache_hit_rate,
+        operation_timings: stats.operation_timings.transform_values { |value| value.round(3) },
+        compression_ratios: stats.average_compression_ratios
+      }
     end
 
     def generate_performance_report(picture_library, test_images, results, test_sizes,
                                     output_formats)
-      # Get system info
-      cpu = cpu_info
-      os = os_info
-      mem = memory_info
-
       total_input_size = results.values.first&.dig(:total_input_size) || 0
+      report = performance_header(picture_library, test_images)
+      report += summary_table(results)
+      report += cache_performance_section(results)
+      report += operation_timing_section(results)
+      report += compression_ratio_section(results)
+      report += performance_footer(test_images, test_sizes, output_formats, results, total_input_size)
+      report
+    end
 
-      report = <<~MARKDOWN
+    def performance_header(picture_library, test_images)
+      cpu = cpu_info
+      <<~MARKDOWN
         # Enhanced ImgFlow Performance Benchmark Report (#{picture_library.to_s.upcase} SET)
 
         **Generated:** #{Time.now.strftime('%Y-%m-%dT%H:%M:%S%z')}
         **Ruby Version:** #{RUBY_VERSION}
-        **Operating System:** #{os}
+        **Operating System:** #{os_info}
         **CPU:** #{cpu[:type]}
-        **Memory:** #{mem}
+        **Memory:** #{memory_info}
         **CPU Cores:** #{cpu[:total]} total, #{cpu[:used]} used for testing
         **Test Set:** #{picture_library.to_s.upcase} SET (#{test_images.length} #{test_images.one? ? 'image' : 'images'})
 
+      MARKDOWN
+    end
+
+    def summary_table(results)
+      table = <<~MARKDOWN
         ## Summary Table
 
         | Provider | Cold (s) | Warm (s) | Images Generated | Total Size (MB) | Avg Size (KB) |
         | --- | ---: | ---: | ---: | ---: | ---: |
       MARKDOWN
+      results.each { |provider_name, metrics| table += summary_row(provider_name, metrics) }
+      table
+    end
 
-      results.each do |provider_name, metrics|
-        avg_size = metrics[:images_generated] > 0 ? (metrics[:total_output_size] / metrics[:images_generated] / 1024.0).round(2) : 0
-        total_mb = (metrics[:total_output_size] / 1024.0 / 1024.0).round(2)
-        report += "| #{provider_name.upcase} | #{metrics[:build_time]} | " \
-                  "#{metrics[:warm_build_time]} | #{metrics[:images_generated]} | " \
-                  "#{total_mb} | #{avg_size} |\n"
-      end
+    def summary_row(provider_name, metrics)
+      total_mb = (metrics[:total_output_size] / 1024.0 / 1024.0).round(2)
+      "| #{provider_name.upcase} | #{metrics[:build_time]} | " \
+        "#{metrics[:warm_build_time]} | #{metrics[:images_generated]} | " \
+        "#{total_mb} | #{average_output_size(metrics)} |\n"
+    end
 
-      report += cache_performance_section(results)
-      report += operation_timing_section(results)
-      report += compression_ratio_section(results)
+    def average_output_size(metrics)
+      return 0 unless metrics[:images_generated].positive?
 
-      report += <<~MARKDOWN
+      (metrics[:total_output_size] / metrics[:images_generated] / 1024.0).round(2)
+    end
+
+    def performance_footer(test_images, test_sizes, output_formats, results, total_input_size)
+      <<~MARKDOWN
 
         ## Test Library Information
 
@@ -264,15 +280,13 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
 
         ## Key Findings
 
-        - **Fastest Provider:** #{results.min_by { |_, r| r[:build_time] }&.first}
-        - **Total Processing Time:** #{results.values.sum { |r| r[:build_time] }.round(2)}s
+        - **Fastest Provider:** #{results.min_by { |_, metrics| metrics[:build_time] }&.first}
+        - **Total Processing Time:** #{results.values.sum { |metrics| metrics[:build_time] }.round(2)}s
 
         ---
 
         *This report was generated automatically by the ImgFlow performance benchmark test.*
       MARKDOWN
-
-      report
     end
 
     def cache_performance_section(results)
@@ -290,30 +304,30 @@ RSpec.describe "ImgFlow Performance Benchmark", :performance, :slow do
     end
 
     def operation_timing_section(results)
-      all_ops = results.values.flat_map { |m| m[:operation_timings]&.keys || [] }.uniq.sort
-      return "" if all_ops.empty?
+      columns = results.values.flat_map { |metrics| metrics[:operation_timings]&.keys || [] }.uniq.sort
+      return "" if columns.empty?
 
-      section = "\n## Processing Time by Primary Operation (s)\n\n"
-      section += "| Provider | #{all_ops.join(' | ')} |\n"
-      section += "| --- #{'| ---: ' * all_ops.length}|\n"
-      results.each do |provider_name, metrics|
-        timings = metrics[:operation_timings] || {}
-        values = all_ops.map { |op| timings[op]&.round(3) || "-" }
-        section += "| #{provider_name.upcase} | #{values.join(' | ')} |\n"
+      metric_section(results, "Processing Time by Primary Operation (s)", columns) do |metrics, column|
+        (metrics[:operation_timings] || {})[column]&.round(3) || "-"
       end
-      section
     end
 
     def compression_ratio_section(results)
-      all_formats = results.values.flat_map { |m| m[:compression_ratios]&.keys || [] }.uniq.sort
-      return "" if all_formats.empty?
+      columns = results.values.flat_map { |metrics| metrics[:compression_ratios]&.keys || [] }.uniq.sort
+      return "" if columns.empty?
 
-      section = "\n## Compression Ratio by Format (% saved)\n\n"
-      section += "| Provider | #{all_formats.join(' | ')} |\n"
-      section += "| --- #{'| ---: ' * all_formats.length}|\n"
+      metric_section(results, "Compression Ratio by Format (% saved)", columns) do |metrics, column|
+        value = (metrics[:compression_ratios] || {})[column]
+        value ? "#{value}%" : "-"
+      end
+    end
+
+    def metric_section(results, title, columns)
+      section = "\n## #{title}\n\n"
+      section += "| Provider | #{columns.join(' | ')} |\n"
+      section += "| --- #{'| ---: ' * columns.length}|\n"
       results.each do |provider_name, metrics|
-        ratios = metrics[:compression_ratios] || {}
-        values = all_formats.map { |f| ratios[f] ? "#{ratios[f]}%" : "-" }
+        values = columns.map { |column| yield(metrics, column) }
         section += "| #{provider_name.upcase} | #{values.join(' | ')} |\n"
       end
       section

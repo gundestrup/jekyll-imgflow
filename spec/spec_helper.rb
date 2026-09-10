@@ -70,40 +70,8 @@ end
 def cleanup_all_servers
   return if active_servers.empty?
 
-  # Create a copy to avoid modification during iteration
-  servers_to_cleanup = active_servers.dup
-
-  servers_to_cleanup.each do |port, server_info|
-    # Kill by port first (most reliable)
-    system("lsof -ti:#{port} | xargs kill -9 2>/dev/null")
-
-    # Also try to kill the tracked PID
-    if server_info[:pid]
-      begin
-        Process.kill("TERM", server_info[:pid])
-      rescue StandardError
-        nil
-      end
-      begin
-        Process.wait(server_info[:pid])
-      rescue StandardError
-        nil
-      end
-    end
-
-    # Remove from tracking immediately
-    active_servers.delete(port)
-  rescue Errno::ESRCH, Errno::ECHILD
-    # Process already gone - still remove from tracking
-    active_servers.delete(port)
-    nil
-  rescue StandardError
-    # Still try to remove from tracking to prevent accumulation
-    active_servers.delete(port) if ENV["DEBUG"]
-  end
-
-  # Final safety clear
-  active_servers.clear if active_servers.any?
+  active_servers.each_key { |port| cleanup_server(port) }
+  active_servers.clear
 end
 
 # Manual cleanup for orphaned servers (can be called from command line)
@@ -550,7 +518,8 @@ module ProviderTestHelpers
     # Kill any process using this port (more reliable than PID tracking)
     # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- Open3 receives an argument array; no shell is invoked.
     output, = Open3.capture3("lsof", "-ti:#{Integer(port)}")
-    output.split.filter_map { |pid| Integer(pid, exception: false) }
+    output.split
+          .filter_map { |pid| Integer(pid, exception: false) }
           .each { |pid| Process.kill("KILL", pid) }
 
     # Also try to kill the tracked PID if we have one
@@ -814,33 +783,31 @@ module ProviderTestHelpers
 
   # Check file format using FastImage with fallback for reliability
   def expect_file_signature(file_path, expected_format)
-    # Use FastImage to detect the actual image type
     detected_type = FastImage.type(file_path)
+    return validate_detected_type(file_path, expected_format, detected_type) if detected_type
 
-    if detected_type
-      # FastImage worked - validate the format
-      raise "Expected #{expected_format} format, got #{detected_type} for #{file_path}" unless detected_type.to_s.downcase == expected_format.downcase
-    else
-      # FastImage failed - fall back to basic validation for AVIF and newer formats
-      # Check file extension and basic file properties
-      actual_extension = File.extname(file_path).downcase.sub(".", "")
+    validate_file_fallback(file_path, expected_format)
+  end
 
-      # Handle jpg/jpeg mapping
-      normalized_expected = expected_format.downcase
-      normalized_actual = actual_extension.downcase
+  def validate_detected_type(file_path, expected_format, detected_type)
+    return if detected_type.to_s.casecmp?(expected_format.to_s)
 
-      # jpg and jpeg are equivalent
-      if normalized_expected == "jpeg" && normalized_actual == "jpg"
-        normalized_actual = "jpeg"
-      elsif normalized_actual == "jpeg" && normalized_expected == "jpg"
-        normalized_actual = "jpg"
-      end
+    raise "Expected #{expected_format} format, got #{detected_type} for #{file_path}"
+  end
 
-      raise "Expected #{expected_format} format (extension #{actual_extension}) for #{file_path}" unless normalized_actual == normalized_expected
+  def validate_file_fallback(file_path, expected_format)
+    actual_extension = File.extname(file_path).delete_prefix(".")
+    expected = normalize_image_format(expected_format)
+    actual = normalize_image_format(actual_extension)
+    return if actual == expected && File.size(file_path) > 50
 
-      # For FastImage failures, just check that it's a reasonable file size
-      raise "File too small to be valid image: #{file_path}" if File.size(file_path) <= 50
-    end
+    raise "Expected #{expected_format} format (extension #{actual_extension}) for #{file_path}" unless actual == expected
+
+    raise "File too small to be valid image: #{file_path}"
+  end
+
+  def normalize_image_format(format)
+    format.to_s.downcase.sub("jpeg", "jpg")
   end
 end
 
@@ -904,37 +871,27 @@ module TestImageHelpers
                                 maintain_aspect: true)
     return false unless File.exist?(resized_path)
 
-    # Get original dimensions
-    orig_width, orig_height = get_image_dimensions(original_path)
-    return false unless orig_width && orig_height
+    original_dimensions = get_image_dimensions(original_path)
+    resized_dimensions = get_image_dimensions(resized_path)
+    return false unless original_dimensions.all? && resized_dimensions.all?
 
-    # Get resized dimensions
-    new_width, new_height = get_image_dimensions(resized_path)
-    return false unless new_width && new_height
+    expected_dimensions = expected_resize_dimensions(
+      original_dimensions, target_width, target_height, maintain_aspect
+    )
+    validate_image_dimensions(resized_path, *expected_dimensions, tolerance: 2)
+  end
 
-    if maintain_aspect
-      # For aspect-ratio maintained resize, calculate expected dimensions
-      if target_width && !target_height
-        # Width specified, height calculated
-        expected_height = (target_width * orig_height.to_f / orig_width).round
-        expected_width = target_width
-      elsif target_height && !target_width
-        # Height specified, width calculated
-        expected_width = (target_height * orig_width.to_f / orig_height).round
-        expected_height = target_height
-      else
-        # Both specified (shouldn't happen with maintain_aspect=true)
-        expected_width = target_width
-        expected_height = target_height
-      end
+  def expected_resize_dimensions(original_dimensions, target_width, target_height, maintain_aspect)
+    return [target_width, target_height] unless maintain_aspect
+
+    original_width, original_height = original_dimensions
+    if target_width && !target_height
+      [target_width, (target_width * original_height.to_f / original_width).round]
+    elsif target_height && !target_width
+      [(target_height * original_width.to_f / original_height).round, target_height]
     else
-      # For exact resize, use specified dimensions
-      expected_width = target_width
-      expected_height = target_height
+      [target_width, target_height]
     end
-
-    # Validate with small tolerance for rounding
-    validate_image_dimensions(resized_path, expected_width, expected_height, tolerance: 2)
   end
 
   # Validate that a crop operation produced correct dimensions

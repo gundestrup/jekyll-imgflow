@@ -17,6 +17,9 @@
 - Added explicit Semgrep suppressions for intentional Jekyll Picture Tag MD5
   compatibility hashes and provider commands that use safe argument arrays or
   shell-escaped paths.
+- Refactored complex test helpers, performance-report helpers, HTML attribute
+  normalization, and ImgFlow operation processing without changing behavior.
+- Corrected chained collection-method alignment in the test helper suite.
 
 ### Security
 

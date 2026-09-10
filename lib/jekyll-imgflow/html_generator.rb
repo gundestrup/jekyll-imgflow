@@ -76,15 +76,15 @@ module JekyllImgFlow
       return default_attributes if attributes.nil? || attributes.empty?
 
       {
-        img: attributes[:img] || {},
-        picture: attributes[:picture] || {},
-        source: attributes[:source] || {},
-        a: attributes[:a] || {},
-        parent: attributes[:parent] || {},
+        img: attributes.fetch(:img, {}),
+        picture: attributes.fetch(:picture, {}),
+        source: attributes.fetch(:source, {}),
+        a: attributes.fetch(:a, {}),
+        parent: attributes.fetch(:parent, {}),
         alt: attributes[:alt],
         link: attributes[:link],
         modal: attributes[:modal],
-        modal_results: attributes[:modal_results] || []
+        modal_results: attributes.fetch(:modal_results, [])
       }
     end
 

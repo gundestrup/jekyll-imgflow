@@ -73,46 +73,48 @@ module Jekyll
       return "" unless parsed[:image_path]
 
       site = context.registers[:site]
-      page = context.registers[:page]
+      input_path = resolve_input_path(parsed[:image_path], site, components[:config])
+      original_name = original_image_name(input_path, site, components[:config])
+      page_path = page_identifier(context.registers[:page])
+      results, modal_results = process_image_variants(components, parsed, original_name, input_path,
+                                                      page_path)
+      render_processed_results(results, modal_results, parsed, site, context)
+    end
 
-      # Resolve input path
-      input_path = resolve_image_path(parsed[:image_path], site, components[:config])
+    def resolve_input_path(image_path, site, config)
+      input_path = resolve_image_path(image_path, site, config)
       raise ArgumentError, "Input image file not found: #{input_path}" unless File.file?(input_path)
 
-      # Store original name relative to the configured originals directory
-      # so output can mirror the original directory structure
-      originals_dir = File.join(site.source, components[:config].originals)
-      original_name = input_path.sub("#{originals_dir}/", "")
+      input_path
+    end
 
-      # Get page path for manifest tracking
-      # Try multiple attributes to get the page identifier
-      page_path = if page
-                    page["path"] || page["url"] || page["name"] || "unknown"
-                  else
-                    "unknown"
-                  end
+    def original_image_name(input_path, site, config)
+      originals_dir = File.join(site.source, config.originals)
+      input_path.sub("#{originals_dir}/", "")
+    end
 
+    def page_identifier(page)
+      (page && (page["path"] || page["url"] || page["name"])) || "unknown"
+    end
+
+    def process_image_variants(components, parsed, original_name, input_path, page_path)
       operations = parsed[:operations]
-      results = if operations.empty?
-                  [input_path]
-                else
-                  process_variants(components, operations.first, original_name, input_path,
-                                   page_path)
-                end
+      return [[input_path], []] if operations.empty?
 
-      modal_results = if operations.empty?
-                        []
-                      else
-                        process_modal_variants(components, operations.first, parsed, original_name,
-                                               input_path, page_path)
-                      end
+      operation = operations.first
+      results = process_variants(components, operation, original_name, input_path, page_path)
+      modal_results = process_modal_variants(components, operation, parsed, original_name,
+                                             input_path, page_path)
+      [results, modal_results]
+    end
+
+    def render_processed_results(results, modal_results, parsed, site, context)
       relative_results = results.uniq.map { |result| relative_result_path(result, site) }
       relative_modal_results = modal_results.uniq.map do |result|
         relative_result_path(result, site)
       end
       parsed = parsed.merge(markup_format: "picture") if relative_results.length > 1
-      parsed = parsed.merge(modal_results: relative_modal_results)
-      generate_html(relative_results, parsed, context)
+      generate_html(relative_results, parsed.merge(modal_results: relative_modal_results), context)
     end
 
     def process_modal_variants(components, operation, parsed, original_name, input_path, page_path)
@@ -123,16 +125,20 @@ module Jekyll
       return [] unless original_width
 
       params = operation[:params].dup
-      formats = Array(params.delete(:formats) || params[:format])
-      formats = config.formats if formats.empty?
+      formats = modal_formats(params, config)
+      params.delete(:formats)
       modal_width = [original_width, config.sizes.values.max].min
-
       formats.map do |format|
-        modal_params = params.merge(width: modal_width, format: format)
-        process_variant(components, operation, modal_params, original_name, input_path, page_path)
+        process_variant(components, operation, params.merge(width: modal_width, format: format),
+                        original_name, input_path, page_path)
       end
     rescue FastImage::ImageFetchError, FastImage::UnknownImageType
       []
+    end
+
+    def modal_formats(params, config)
+      formats = Array(params[:formats] || params[:format])
+      formats.empty? ? config.formats : formats
     end
 
     def modal_requested?(parsed, config)
