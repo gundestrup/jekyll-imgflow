@@ -13,30 +13,11 @@ module JekyllImgFlow
         opacity = options[:opacity]
         raise ArgumentError, "Opacity parameter is required" if opacity.nil?
 
-        validated_opacity = validate_opacity(opacity)
+        validated_opacity = validate_opacity(opacity, min: 0.01, max: 0.99)
 
         @provider.alpha_opacity = validated_opacity
         @provider.execute(input_path, output_path)
         output_path
-      end
-
-      private
-
-      def validate_opacity(value)
-        # Check if value is numeric before converting
-        raise ArgumentError, "Invalid opacity: '#{value}'. Must be between 0.01 and 0.99." unless valid_numeric?(value)
-
-        opacity = value.to_f
-        raise ArgumentError, "Invalid opacity: '#{value}'. Must be between 0.01 and 0.99." unless opacity.between?(0.01, 0.99)
-
-        opacity
-      end
-
-      def valid_numeric?(value)
-        Float(value)
-        true
-      rescue ArgumentError, TypeError
-        false
       end
     end
   end

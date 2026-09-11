@@ -7,23 +7,13 @@ require_relative "base_provider"
 module JekyllImgFlow
   module Providers
     # Sharp provider implementation using the standardized tag interface
-    class Sharp < BaseProvider
+    class Sharp < CliBase
       def available?
-        # Check if sharp CLI is available
-        _, _, status = Open3.capture3("which", "sharp")
-        status.success?
+        cli_available?("sharp")
       end
 
-      def execute(input_path, output_path)
-        return if @operations.empty?
-
-        # Build Sharp command
-        command = build_sharp_command(input_path, output_path)
-        execute_command(command)
-
-        output_path
-      ensure
-        reset_operations
+      def build_commands(input_path, output_path)
+        build_sharp_command(input_path, output_path)
       end
 
       def build_sharp_command(input_path, output_path)
@@ -41,24 +31,24 @@ module JekyllImgFlow
       end
 
       def build_watermark_pipeline(input_path, output_path, has_crop, has_resize)
-        temp_path = input_path.gsub(/\.[^.]+$/, ".tmp_base.jpg")
+        temp = temp_path(input_path, "tmp_base.jpg")
         commands = []
 
         if has_crop && has_resize
-          commands << build_sequential_crop_resize(input_path, temp_path)
-          base_path = temp_path
+          commands << build_sequential_crop_resize(input_path, temp)
+          base_path = temp
         elsif has_resize
-          commands << build_resize_command(input_path, temp_path)
-          base_path = temp_path
+          commands << build_resize_command(input_path, temp)
+          base_path = temp
         elsif has_crop
-          commands << build_crop_command(input_path, temp_path)
-          base_path = temp_path
+          commands << build_crop_command(input_path, temp)
+          base_path = temp
         else
           base_path = input_path
         end
 
         commands << build_composite_command(base_path, output_path)
-        commands << "rm -f #{temp_path.shellescape}" unless base_path == input_path
+        commands << "rm -f #{temp.shellescape}" unless base_path == input_path
         commands.join(" && ")
       end
 
@@ -73,8 +63,8 @@ module JekyllImgFlow
         add_format_quality(command_parts)
 
         if parts[:opacity] && parts[:opacity] < 1.0
-          wm_temp = parts[:watermark_path].gsub(/\.[^.]+$/, ".tmp_wm.png")
-          alpha_value = (parts[:opacity] * 255).round
+          wm_temp = temp_path(parts[:watermark_path], "tmp_wm.png")
+          alpha_value = alpha_byte_value(parts[:opacity])
           temp_cmd = ["sharp", "-i", parts[:watermark_path].shellescape,
                       "-o", wm_temp.shellescape,
                       "ensureAlpha", alpha_value.to_s].join(" ")
@@ -102,16 +92,16 @@ module JekyllImgFlow
 
       def build_sequential_crop_resize(input_path, output_path)
         # Build temp file path for intermediate crop result
-        temp_path = input_path.gsub(/\.[^.]+$/, ".tmp_crop.jpg")
+        temp = temp_path(input_path, "tmp_crop.jpg")
 
         # First command: crop only
-        crop_cmd = build_crop_command(input_path, temp_path)
+        crop_cmd = build_crop_command(input_path, temp)
 
         # Second command: resize + format + quality + alpha (all together)
-        resize_cmd = build_resize_command(temp_path, output_path)
+        resize_cmd = build_resize_command(temp, output_path)
 
         # Combine with && and cleanup temp file
-        "#{crop_cmd} && #{resize_cmd} && rm -f #{temp_path.shellescape}"
+        "#{crop_cmd} && #{resize_cmd} && rm -f #{temp.shellescape}"
       end
 
       def build_resize_command(input_path, output_path)
@@ -137,12 +127,7 @@ module JekyllImgFlow
 
         if geo[:smartcrop]
           # Use smartcrop for intelligent cropping (Sharp uses libvips backend)
-          # Map keep parameter to libvips interestingness
-          interestingness = case geo[:keep].to_s
-                            when "entropy" then "entropy"
-                            when "center", "centre" then "centre"
-                            else "attention" # default
-                            end
+          interestingness = smartcrop_interestingness(geo[:keep])
 
           # sharp -i input.jpg -o output.jpg smartcrop width height --interesting=attention
           ["sharp", "-i", input_path.shellescape, "-o", output_path.shellescape,
@@ -185,8 +170,7 @@ module JekyllImgFlow
         alpha_op = find_op(:alpha_opacity)
         return unless alpha_op
 
-        alpha_value = (alpha_op[:opacity] * 255).round
-        command_parts.push("alpha", "{alpha:#{alpha_value}}")
+        command_parts.push("alpha", "{alpha:#{alpha_byte_value(alpha_op[:opacity])}}")
       end
     end
   end

@@ -48,7 +48,7 @@ module JekyllImgFlow
         when :watermark
           append_weserv_watermark(operation, params)
         when :alpha_opacity
-          params << "alpha=#{(operation[:opacity] * 255).round}"
+          params << "alpha=#{alpha_byte_value(operation[:opacity])}"
         end
       end
 

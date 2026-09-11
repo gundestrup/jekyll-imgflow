@@ -36,23 +36,6 @@ module JekyllImgFlow
         else position.to_s
         end
       end
-
-      def validate_opacity(value)
-        # Check if value is numeric before converting
-        raise ArgumentError, "Invalid opacity: '#{value}'. Must be between 0.0 and 1.0." unless valid_numeric?(value)
-
-        opacity = value.to_f
-        raise ArgumentError, "Invalid opacity: '#{value}'. Must be between 0.0 and 1.0." unless opacity.between?(0.0, 1.0)
-
-        opacity
-      end
-
-      def valid_numeric?(value)
-        Float(value)
-        true
-      rescue ArgumentError, TypeError
-        false
-      end
     end
   end
 end

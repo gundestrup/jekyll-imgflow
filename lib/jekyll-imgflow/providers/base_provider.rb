@@ -75,6 +75,38 @@ module JekyllImgFlow
         File.extname(input_path).delete(".").downcase
       end
 
+      # Convert a 0..1 opacity float to a 0..255 integer (used by all
+      # providers that encode alpha as an 8-bit value).
+      def alpha_byte_value(opacity)
+        (opacity * 255).round
+      end
+
+      # Generate a temporary file path by replacing the extension of
+      # +input_path+ with +suffix+ (e.g. temp_path("a.jpg", "tmp_base.jpg")
+      # → "a.tmp_base.jpg").
+      def temp_path(input_path, suffix)
+        input_path.gsub(/\.[^.]+$/, ".#{suffix}")
+      end
+
+      # Map a smartcrop +keep+ value to the libvips interestingness string
+      # used by Sharp and LibVips smartcrop/thumbnail --crop operations.
+      def smartcrop_interestingness(keep)
+        case keep.to_s
+        when "entropy" then "entropy"
+        when "center", "centre" then "centre"
+        else "attention"
+        end
+      end
+
+      # Check whether any of the given CLI commands is available on PATH.
+      # Used by CLI providers (sharp, libvips, imagemagick).
+      def cli_available?(*commands)
+        commands.any? do |cmd|
+          _, _, status = Open3.capture3("which", cmd)
+          status.success?
+        end
+      end
+
       # Check if this provider is available (must be implemented by subclasses)
       def available?
         # Default: not available unless subclass implements actual check
@@ -331,6 +363,45 @@ module JekyllImgFlow
         end
       rescue StandardError => e
         raise "#{provider_label} request failed: #{e.message}"
+      end
+    end
+
+    # Shared base for CLI-based providers (sharp, imagemagick, libvips).
+    # Subclasses implement `build_commands(input_path, output_path)` to
+    # return an array of command entries (strings or arrays), and
+    # `run_command(cmd)` to execute a single entry.
+    class CliBase < BaseProvider
+      def execute(input_path, output_path)
+        return if @operations.empty?
+
+        before_execute(input_path)
+        commands = build_commands(input_path, output_path)
+        Array(commands).each { |cmd| run_command(cmd) }
+        output_path
+      ensure
+        reset_operations
+      end
+
+      protected
+
+      # Hook for subclasses to perform pre-execution work (e.g. SVG warnings).
+      def before_execute(_input_path); end
+
+      # Subclasses override to return command(s) to execute.
+      # May return a single command or an array of commands.
+      def build_commands(_input_path, _output_path)
+        raise NotImplementedError
+      end
+
+      # Execute a single command. Default uses the shell-based
+      # `execute_command` from BaseProvider. Subclasses that use
+      # argument arrays (no shell) should override this.
+      def run_command(cmd)
+        if cmd.is_a?(Array) && cmd.first == :cleanup
+          FileUtils.rm_f(cmd[1])
+          return
+        end
+        execute_command(cmd)
       end
     end
   end

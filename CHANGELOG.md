@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.5] - 2026-09-12
+
+### Changed
+
+- Moved duplicated `validate_quality`, `valid_numeric?`, and
+  `validate_opacity` methods from individual tag classes into `BaseTag`.
+  `validate_opacity` is now parameterized by `min:`/`max:` so both
+  `OpacityTag` (0.01–0.99) and `WatermarkTag` (0.0–1.0) share one
+  implementation.
+- Introduced `Providers::CliBase < BaseProvider` to centralize the shared
+  CLI-provider `execute` skeleton (empty-operations guard, build, run,
+  reset). `sharp`, `imagemagick`, and `libvips` now inherit it and only
+  provide `build_commands` and optional `before_execute`/`run_command`
+  overrides.
+- Added `cli_available?(*commands)`, `temp_path(input_path, suffix)`,
+  `alpha_byte_value(opacity)`, and `smartcrop_interestingness(keep)`
+  helpers to `BaseProvider`, eliminating repeated `Open3.capture3("which",
+  …)` calls, temp-file path `gsub` patterns, `* 255).round` calculations,
+  and smartcrop interestingness mappings across all six providers.
+- Consolidated `CropTag#get_original_dimensions` into `BaseTag` as a
+  raising variant of the existing `get_image_dimensions` helper.
+
 ## [0.3.4] - 2026-09-12
 
 ### Changed

@@ -7,24 +7,17 @@ require_relative "base_provider"
 module JekyllImgFlow
   module Providers
     # Libvips provider implementation using the standardized tag interface
-    class Libvips < BaseProvider
+    class Libvips < CliBase
       def available?
-        # Check if vips CLI is available
-        _, _, status = Open3.capture3("which", "vips")
-        status.success?
+        cli_available?("vips")
       end
 
-      def execute(input_path, output_path)
-        return if @operations.empty?
+      def build_commands(input_path, output_path)
+        build_vips_commands(input_path, output_path)
+      end
 
-        # Build and execute vips commands (array form, no shell).
-        # Cleanup markers ([:cleanup, path]) are handled by execute_command.
-        commands = build_vips_commands(input_path, output_path)
-        commands.each { |cmd_array| execute_command(cmd_array) }
-
-        output_path
-      ensure
-        reset_operations
+      def run_command(cmd)
+        execute_command(cmd)
       end
 
       # Build all vips commands as an array of command arrays.
@@ -72,19 +65,19 @@ module JekyllImgFlow
       end
 
       def build_alpha_pipeline(input_path, output_path, has_crop, has_resize)
-        temp_path = input_path.gsub(/\.[^.]+$/, ".tmp_base.jpg")
-        commands, base_path = build_base_pipeline(input_path, temp_path, has_crop, has_resize)
+        temp = temp_path(input_path, "tmp_base.jpg")
+        commands, base_path = build_base_pipeline(input_path, temp, has_crop, has_resize)
         commands << build_alpha_command(base_path, output_path)
-        commands << [:cleanup, temp_path] unless base_path == input_path
+        commands << [:cleanup, temp] unless base_path == input_path
         commands
       end
 
       def build_watermark_pipeline(input_path, output_path, has_crop, has_resize)
-        temp_path = input_path.gsub(/\.[^.]+$/, ".tmp_base.jpg")
-        commands, base_path = build_base_pipeline(input_path, temp_path, has_crop, has_resize)
+        temp = temp_path(input_path, "tmp_base.jpg")
+        commands, base_path = build_base_pipeline(input_path, temp, has_crop, has_resize)
         base_path, commands = apply_watermark_alpha(base_path, input_path, commands)
         commands.concat(build_composite_commands(base_path, output_path))
-        cleanup_paths(commands, input_path, temp_path, base_path)
+        cleanup_paths(commands, input_path, temp, base_path)
         commands
       end
 
@@ -100,7 +93,7 @@ module JekyllImgFlow
         alpha_op = find_op(:alpha_opacity)
         return [base_path, commands] unless alpha_op
 
-        alpha_temp = input_path.gsub(/\.[^.]+$/, ".tmp_alpha.jpg")
+        alpha_temp = temp_path(input_path, "tmp_alpha.jpg")
         [alpha_temp, commands << build_alpha_command(base_path, alpha_temp)]
       end
 
@@ -114,7 +107,7 @@ module JekyllImgFlow
         parts = watermark_parts(wm_op)
 
         if parts[:opacity] && parts[:opacity] < 1.0
-          wm_temp = parts[:watermark_path].gsub(/\.[^.]+$/, ".tmp_wm.png")
+          wm_temp = temp_path(parts[:watermark_path], "tmp_wm.png")
           alpha_value = parts[:opacity]
           # Step 1: Apply alpha to watermark
           alpha_cmd = ["vips", "linear", parts[:watermark_path],
@@ -184,10 +177,10 @@ module JekyllImgFlow
           [["vips", "thumbnail", input_path, format_spec,
             width.to_s, "--height=#{height}", "--crop=attention"]]
         else
-          temp_path = input_path.gsub(/\.[^.]+$/, ".tmp_crop.jpg")
-          [build_crop_command(input_path, temp_path),
-           build_resize_command(temp_path, output_path),
-           [:cleanup, temp_path]]
+          temp = temp_path(input_path, "tmp_crop.jpg")
+          [build_crop_command(input_path, temp),
+           build_resize_command(temp, output_path),
+           [:cleanup, temp]]
         end
       end
 
@@ -221,8 +214,7 @@ module JekyllImgFlow
       end
 
       def build_smartcrop_command(geo, input_path, output_path)
-        interestingness = %w[center centre].include?(geo[:keep].to_s) ? "centre" : geo[:keep].to_s
-        interestingness = "attention" unless %w[entropy centre].include?(interestingness)
+        interestingness = smartcrop_interestingness(geo[:keep])
         ["vips", "smartcrop", input_path, output_path,
          geo[:width].to_s, geo[:height].to_s,
          "--interesting=#{interestingness}"]
@@ -245,19 +237,11 @@ module JekyllImgFlow
         crop_width = geo[:width] || 1000
         crop_height = geo[:height] || 1000
         format_spec = build_format_spec(output_path)
-        interestingness = svg_crop_interestingness(geo[:keep])
+        interestingness = smartcrop_interestingness(geo[:keep])
 
         [["vips", "thumbnail", input_path, format_spec,
           crop_width.to_s, "--height=#{crop_height}",
           "--crop=#{interestingness}"]]
-      end
-
-      def svg_crop_interestingness(keep)
-        case keep.to_s
-        when "entropy" then "entropy"
-        when "center", "centre" then "centre"
-        else "attention"
-        end
       end
 
       def build_copy_command(input_path, output_path)

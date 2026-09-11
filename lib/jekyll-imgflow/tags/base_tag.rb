@@ -33,6 +33,14 @@ module JekyllImgFlow
         end
       end
 
+      # Like get_image_dimensions but raises if dimensions cannot be read.
+      def get_original_dimensions(image_path)
+        width, height = get_image_dimensions(image_path)
+        raise ArgumentError, "Unable to determine original image dimensions" unless width && height
+
+        [width, height]
+      end
+
       def validate_positive_integer(value, name)
         return if value.nil?
 
@@ -46,6 +54,31 @@ module JekyllImgFlow
         # Get default quality from provider's config
         # Config class already handles the fallback (cfg["quality"] || 85)
         @provider.config&.quality
+      end
+
+      def validate_quality(value)
+        return @default_quality if value.nil?
+
+        quality = value.to_i
+        raise ArgumentError, "Invalid quality: '#{value}'. Must be between 1 and 100." unless quality.between?(1, 100)
+
+        quality
+      end
+
+      def validate_opacity(value, min: 0.0, max: 1.0)
+        raise ArgumentError, "Invalid opacity: '#{value}'. Must be between #{min} and #{max}." unless valid_numeric?(value)
+
+        opacity = value.to_f
+        raise ArgumentError, "Invalid opacity: '#{value}'. Must be between #{min} and #{max}." unless opacity.between?(min, max)
+
+        opacity
+      end
+
+      def valid_numeric?(value)
+        Float(value)
+        true
+      rescue ArgumentError, TypeError
+        false
       end
     end
   end

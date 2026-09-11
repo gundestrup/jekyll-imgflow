@@ -83,16 +83,6 @@ module JekyllImgFlow
         crop_options[:keep] = keep
       end
 
-      # Get original image dimensions using FastImage
-      def get_original_dimensions(input_path)
-        require "fastimage"
-        original_width, original_height = FastImage.size(input_path)
-
-        raise ArgumentError, "Unable to determine original image dimensions" unless original_width && original_height
-
-        [original_width, original_height]
-      end
-
       # Parse dimension (supports pixels and percentages)
       def parse_dimension(value, original_size)
         return if value.nil?

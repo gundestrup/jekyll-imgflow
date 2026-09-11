@@ -7,31 +7,22 @@ require_relative "base_provider"
 module JekyllImgFlow
   module Providers
     # ImageMagick provider implementation using the standardized tag interface
-    class Imagemagick < BaseProvider
+    class Imagemagick < CliBase
       # Cache rsvg delegate check across all instances (checked once per build)
       @rsvg_available = nil
       @svg_warning_shown = false
 
       def available?
-        # Check if magick or convert CLI is available
-        _, _, status1 = Open3.capture3("which", "magick")
-        _, _, status2 = Open3.capture3("which", "convert")
-        status1.success? || status2.success?
+        cli_available?("magick", "convert")
       end
 
-      def execute(input_path, output_path)
-        return if @operations.empty?
-
+      def before_execute(input_path)
         # Warn once per build about SVG performance with ImageMagick
         warn_svg_performance if svg?(input_path) && !self.class.instance_variable_get(:@svg_warning_shown)
+      end
 
-        # Build single ImageMagick command with all operations combined
-        command = build_combined_imagemagick_command(input_path, output_path)
-        execute_command(command)
-
-        output_path
-      ensure
-        reset_operations
+      def build_commands(input_path, output_path)
+        build_combined_imagemagick_command(input_path, output_path)
       end
 
       def build_combined_imagemagick_command(input_path, output_path)

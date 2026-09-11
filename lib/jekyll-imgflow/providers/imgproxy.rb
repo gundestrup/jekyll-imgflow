@@ -50,7 +50,7 @@ module JekyllImgFlow
         when :watermark
           append_imgproxy_watermark(operation, operations)
         when :alpha_opacity
-          operations << "a:#{(operation[:opacity] * 255).round}"
+          operations << "a:#{alpha_byte_value(operation[:opacity])}"
         end
       end
 

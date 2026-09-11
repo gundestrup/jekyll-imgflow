@@ -95,30 +95,30 @@ RSpec.describe JekyllImgFlow::Tags::OpacityTag, :unit do
 
   describe "opacity validation" do
     it "accepts valid opacity values" do
-      expect(tag.send(:validate_opacity, 0.5)).to eq(0.5)
-      expect(tag.send(:validate_opacity, 0.01)).to eq(0.01)
-      expect(tag.send(:validate_opacity, 0.99)).to eq(0.99)
+      expect(tag.send(:validate_opacity, 0.5, min: 0.01, max: 0.99)).to eq(0.5)
+      expect(tag.send(:validate_opacity, 0.01, min: 0.01, max: 0.99)).to eq(0.01)
+      expect(tag.send(:validate_opacity, 0.99, min: 0.01, max: 0.99)).to eq(0.99)
     end
 
     it "converts string to float" do
-      expect(tag.send(:validate_opacity, "0.7")).to eq(0.7)
+      expect(tag.send(:validate_opacity, "0.7", min: 0.01, max: 0.99)).to eq(0.7)
     end
 
     context "with invalid opacity" do
       it "raises error for opacity below 0.01" do
-        expect { tag.send(:validate_opacity, 0.0) }.to raise_error(
+        expect { tag.send(:validate_opacity, 0.0, min: 0.01, max: 0.99) }.to raise_error(
           ArgumentError, "Invalid opacity: '0.0'. Must be between 0.01 and 0.99."
         )
       end
 
       it "raises error for opacity above 0.99" do
-        expect { tag.send(:validate_opacity, 1.0) }.to raise_error(
+        expect { tag.send(:validate_opacity, 1.0, min: 0.01, max: 0.99) }.to raise_error(
           ArgumentError, "Invalid opacity: '1.0'. Must be between 0.01 and 0.99."
         )
       end
 
       it "raises error for non-numeric opacity" do
-        expect { tag.send(:validate_opacity, "invalid") }.to raise_error(
+        expect { tag.send(:validate_opacity, "invalid", min: 0.01, max: 0.99) }.to raise_error(
           ArgumentError, "Invalid opacity: 'invalid'. Must be between 0.01 and 0.99."
         )
       end

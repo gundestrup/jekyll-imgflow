@@ -45,7 +45,7 @@ module JekyllImgFlow
         when :watermark
           append_flyimg_watermark(operation, options)
         when :alpha_opacity
-          options << "a_#{(operation[:opacity] * 255).round}"
+          options << "a_#{alpha_byte_value(operation[:opacity])}"
         end
       end
 
