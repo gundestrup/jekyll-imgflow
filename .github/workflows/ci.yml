@@ -42,7 +42,7 @@ jobs:
         run: bundle exec rubocop
 
       - name: Install Semgrep
-        run: pip3 install semgrep
+        run: pip3 install --only-binary :all: "semgrep==1.177.0"
 
       - name: Run Semgrep security scan
         env:

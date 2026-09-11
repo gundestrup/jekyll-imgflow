@@ -241,7 +241,7 @@ module TestPictures
   # Get test mode from environment variable
   # @return [Symbol] Test mode (:quick, :full, or custom set name)
   def self.test_mode
-    mode = ENV["TEST_PICTURES"] || ENV["TEST_MODE"] || "default"
+    mode = ENV.fetch("TEST_PICTURES") { ENV.fetch("TEST_MODE", "default") }
     mode.to_sym
   end
 

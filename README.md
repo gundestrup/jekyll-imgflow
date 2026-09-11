@@ -8,6 +8,7 @@ A [Jekyll](https://jekyllrb.com/) plugin for automatic image optimization with m
 [![Status](https://img.shields.io/badge/status-active-success)](https://github.com/gundestrup/jekyll-imgflow)
 [![Semgrep](https://img.shields.io/badge/Semgrep-scanned-1B2B34?logo=semgrep&logoColor=white)](https://semgrep.dev/)
 [![CodeFactor](https://www.codefactor.io/repository/github/gundestrup/jekyll-imgflow/badge)](https://www.codefactor.io/repository/github/gundestrup/jekyll-imgflow)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=gundestrup_jekyll-imgflow&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=gundestrup_jekyll-imgflow)
 [![codecov](https://codecov.io/gh/gundestrup/jekyll-imgflow/branch/main/graph/badge.svg)](https://codecov.io/gh/gundestrup/jekyll-imgflow)
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code%20Companion-jekyll--imgflow-blue?logo=visual-studio-code)](https://github.com/gundestrup/jekyll-imgflow-vscode)
 [![License](https://img.shields.io/github/license/gundestrup/jekyll-imgflow)](LICENSE)

@@ -16,7 +16,7 @@ echo -e "${BLUE}🧪 ImgFlow Test Runner${NC}"
 echo -e "${BLUE}=====================${NC}"
 
 # Check if test logger exists
-if [ ! -f "$TEST_LOGGER" ]; then
+if [[ ! -f "$TEST_LOGGER" ]]; then
     echo -e "${RED}❌ Error: test_logger.rb not found at $TEST_LOGGER${NC}"
     exit 1
 fi

@@ -1059,7 +1059,7 @@ RSpec.configure do |config|
   config.before(:suite) do
     setup_signal_handlers
     TestEnvironment.start_source_server
-    cleanup_temp_output_files if ENV["TEST_ENV_NUMBER"].to_i == 0
+    cleanup_temp_output_files if ENV.fetch("TEST_ENV_NUMBER", "0").to_i == 0
   end
 
   # Per-test cleanup to ensure clean state

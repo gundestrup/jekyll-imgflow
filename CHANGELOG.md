@@ -2,6 +2,10 @@
 
 ## [0.4.0] - 2026-09-12
 
+### Added
+
+- Added SonarCloud quality gate badge to the README.
+
 ### Changed
 
 - Extracted shared provider behavior into `BaseProvider` helpers
@@ -50,6 +54,11 @@
   connection drops).
 - Removed the duplicate `show_status` definition in `scripts/test_logger.rb`
   that shadowed the canonical implementation in `class << self`.
+- Resolved SonarQube analysis findings: pinned `semgrep==1.177.0` with
+  `--only-binary :all:` in CI, replaced `[` with `[[` in
+  `scripts/run_tests.sh`, and replaced raw `ENV[...]` access with
+  `ENV.fetch` defaults in `spec/spec_helper.rb` and
+  `spec/support/test_pictures.rb`.
 
 ## [0.3.3] - 2026-09-11
 
