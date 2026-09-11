@@ -13,23 +13,13 @@ module JekyllImgFlow
         width = validate_positive_integer(options[:width], "width")
         height = validate_positive_integer(options[:height], "height")
 
-        # At least one dimension must be specified
         raise ArgumentError, "Either width or height must be specified for resize operation." if width.nil? && height.nil?
 
         # Get original dimensions
         original_width, original_height = get_image_dimensions(input_path)
 
         # Calculate missing dimension to maintain aspect ratio ONLY when one dimension is missing
-        if width.nil? && height
-          # Only height provided - calculate width to maintain aspect ratio
-          aspect_ratio = original_width.to_f / original_height
-          width = (height * aspect_ratio).round
-        elsif height.nil? && width
-          # Only width provided - calculate height to maintain aspect ratio
-          aspect_ratio = original_height.to_f / original_width
-          height = (width * aspect_ratio).round
-        end
-        # If both width and height are provided, use them as-is (allows aspect ratio changes)
+        width, height = calculate_missing_dimension(width, height, original_width, original_height)
 
         # Calculate scale factors for provider
         scale_x = width && original_width ? width.to_f / original_width : nil
@@ -52,6 +42,23 @@ module JekyllImgFlow
         result = @provider.execute(input_path, output_path)
         Jekyll.logger.debug "🔍 ResizeTag: Provider executed - result: #{result}, output exists: #{File.exist?(output_path)}"
         result
+      end
+
+      private
+
+      def calculate_missing_dimension(width, height, original_width, original_height)
+        if width.nil? && height
+          # Only height provided - calculate width to maintain aspect ratio
+          aspect_ratio = original_width.to_f / original_height
+          [(height * aspect_ratio).round, height]
+        elsif height.nil? && width
+          # Only width provided - calculate height to maintain aspect ratio
+          aspect_ratio = original_height.to_f / original_width
+          [width, (width * aspect_ratio).round]
+        else
+          # If both width and height are provided, use them as-is (allows aspect ratio changes)
+          [width, height]
+        end
       end
 
       # validate_positive_integer inherited from BaseTag

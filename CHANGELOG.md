@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.3.4] - 2026-09-12
+
+### Changed
+
+- Extracted shared provider behavior into `BaseProvider` helpers
+  (`find_op`, `op?`, `crop_geometry`, `watermark_parts`, `compass_to_short`,
+  `input_format_ext`) to eliminate duplicated operation lookups, crop
+  parsing, watermark extraction, and compass-position translation across all
+  six providers.
+- Introduced `Providers::HttpBase < BaseProvider` to centralize HTTP-provider
+  availability checks, request execution, fetching with timeout, and error
+  handling. `imgproxy`, `weserv`, and `flyimg` now inherit this scaffolding
+  and only provide their service URL and URL-building logic.
+- Refactored `sharp`, `imagemagick`, and `libvips` to use the shared
+  `crop_geometry`, `watermark_parts`, and `op?` helpers, removing the
+  repeated crop-parsing block and operation lookups.
+- Removed no-op `translate_quality_to_*` methods from the HTTP providers;
+  they returned the input quality unchanged.
+- Decomposed `Parser.detect_operations`, `PresetManager.yaml_to_tags`,
+  `TagScanner#parse_tag_markup_simple`, `PictureTagPresetMigrator`
+  conversion/description, `CropTag#process`, and `ResizeTag#process` into
+  smaller focused helper methods without changing behavior.
+
+### Fixed
+
+- Removed the duplicate `show_status` definition in `scripts/test_logger.rb`
+  that shadowed the canonical implementation in `class << self`.
+
 ## [0.3.3] - 2026-09-11
 
 ### Added

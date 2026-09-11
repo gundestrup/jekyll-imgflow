@@ -150,40 +150,7 @@ class TestLogger
       puts "=" * 60
 
       if @current_session[:rspec_results]
-        summary = @current_session[:rspec_results]["summary"] || {}
-        total = summary["example_count"] || 0
-        failed = summary["failure_count"] || 0
-        pending = summary["pending_count"] || 0
-        passed = total - failed - pending
-
-        status = if total.zero?
-                   "NO TESTS"
-                 elsif failed.zero?
-                   "PASSED"
-                 else
-                   "FAILED"
-                 end
-        puts "✅ Status: #{status}"
-        puts "⏰  Duration: #{@current_session[:duration_seconds]}s"
-        puts "📅 Timestamp: #{@current_session[:timestamp]}"
-        puts "🌿 Git Branch: #{@current_session[:environment][:git_branch]}"
-        puts "🔢 Git Commit: #{@current_session[:environment][:git_commit][0..7]}"
-
-        puts "\n📊 Test Results:"
-        puts "   Total Tests: #{total}"
-        puts "   ✅ Passed: #{passed}"
-        puts "   ❌ Failed: #{failed}"
-        puts "   ⏸️  Pending: #{pending}" if pending.positive?
-
-        if failed.positive? && @current_session[:rspec_results]["examples"]
-          puts "\n❌ Failed Tests:"
-          @current_session[:rspec_results]["examples"]
-            .select { |example| example["status"] == "failed" }
-            .each do |example|
-            puts "   - #{example['full_description']}"
-            puts "     Location: #{example['file_path']}:#{example['line_number']}"
-          end
-        end
+        display_rspec_summary
       else
         puts "ℹ️  Test completed (no RSpec results available)"
         puts "⏰  Duration: #{@current_session[:duration_seconds]}s"
@@ -192,6 +159,44 @@ class TestLogger
 
       puts "\n📁 Log files saved in: #{@log_dir}"
       puts "=" * 60
+    end
+
+    def display_rspec_summary
+      summary = @current_session[:rspec_results]["summary"] || {}
+      total = summary["example_count"] || 0
+      failed = summary["failure_count"] || 0
+      pending = summary["pending_count"] || 0
+      passed = total - failed - pending
+
+      status = if total.zero?
+                 "NO TESTS"
+               else
+                 (failed.zero? ? "PASSED" : "FAILED")
+               end
+      puts "✅ Status: #{status}"
+      puts "⏰  Duration: #{@current_session[:duration_seconds]}s"
+      puts "📅 Timestamp: #{@current_session[:timestamp]}"
+      puts "🌿 Git Branch: #{@current_session[:environment][:git_branch]}"
+      puts "🔢 Git Commit: #{@current_session[:environment][:git_commit][0..7]}"
+
+      puts "\n📊 Test Results:"
+      puts "   Total Tests: #{total}"
+      puts "   ✅ Passed: #{passed}"
+      puts "   ❌ Failed: #{failed}"
+      puts "   ⏸️  Pending: #{pending}" if pending.positive?
+
+      display_failed_examples if failed.positive?
+    end
+
+    def display_failed_examples
+      examples = @current_session[:rspec_results]["examples"]
+      return unless examples
+
+      puts "\n❌ Failed Tests:"
+      examples.select { |example| example["status"] == "failed" }.each do |example|
+        puts "   - #{example['full_description']}"
+        puts "     Location: #{example['file_path']}:#{example['line_number']}"
+      end
     end
 
     def self.show_status
@@ -204,36 +209,9 @@ class TestLogger
       if File.exist?(latest_file)
         latest = JSON.parse(File.read(latest_file))
         puts "🕐 Latest Run: #{latest['timestamp']}"
-
-        if latest["rspec_results"]
-          summary = latest["rspec_results"]["summary"] || {}
-          failed = summary["failure_count"] || 0
-          total = summary["example_count"] || 0
-          status = if total.zero?
-                     "⚠️ NO TESTS"
-                   elsif failed.zero?
-                     "✅ PASSED"
-                   else
-                     "❌ FAILED"
-                   end
-          puts "📈 Status: #{status}"
-          puts "📊 Results: #{total - failed}/#{total} passed"
-        else
-          puts "📈 Status: ℹ️  Completed"
-        end
-
+        display_latest_status(latest)
         puts "⏱️  Duration: #{latest['duration_seconds']}s"
-
-        # Show recent history
-        history_file = File.join(log_dir, "test_history.json")
-        if File.exist?(history_file)
-          history = JSON.parse(File.read(history_file))
-          puts "\n📜 Recent History (last 10):"
-          history.last(10).each_with_index do |entry, _index|
-            status = entry["success"] ? "✅" : "❌"
-            puts "   #{status} #{entry['timestamp']} - #{entry['total_tests'] - entry['failed_tests']}/#{entry['total_tests']} tests (#{entry['duration_seconds']}s)"
-          end
-        end
+        display_history(log_dir)
       else
         puts "📝 No test logs found. Run tests first to generate logs."
       end
@@ -241,47 +219,37 @@ class TestLogger
       puts "\n📁 Log Directory: #{log_dir}"
       puts "=" * 60
     end
-  end
 
-  def self.show_status
-    log_dir = File.join(Dir.pwd, "test_logs")
-    puts "\n#{'=' * 60}"
-    puts "📊 TEST STATUS DASHBOARD"
-    puts "=" * 60
-
-    latest_file = File.join(log_dir, "latest_test_run.json")
-    if File.exist?(latest_file)
-      latest = JSON.parse(File.read(latest_file))
-      puts "🕐 Latest Run: #{latest['timestamp']}"
-
+    def self.display_latest_status(latest)
       if latest["rspec_results"]
         summary = latest["rspec_results"]["summary"] || {}
         failed = summary["failure_count"] || 0
         total = summary["example_count"] || 0
-        puts "📈 Status: #{failed.zero? ? '✅ PASSED' : '❌ FAILED'}"
+        status = if total.zero?
+                   "⚠️ NO TESTS"
+                 else
+                   (failed.zero? ? "✅ PASSED" : "❌ FAILED")
+                 end
+        puts "📈 Status: #{status}"
         puts "📊 Results: #{total - failed}/#{total} passed"
       else
         puts "📈 Status: ℹ️  Completed"
       end
-
-      puts "⏱️  Duration: #{latest['duration_seconds']}s"
-
-      # Show recent history
-      history_file = File.join(log_dir, "test_history.json")
-      if File.exist?(history_file)
-        history = JSON.parse(File.read(history_file))
-        puts "\n📜 Recent History (last 10):"
-        history.last(10).each_with_index do |entry, _index|
-          status = entry["success"] ? "✅" : "❌"
-          puts "   #{status} #{entry['timestamp']} - #{entry['total_tests'] - entry['failed_tests']}/#{entry['total_tests']} tests (#{entry['duration_seconds']}s)"
-        end
-      end
-    else
-      puts "📝 No test logs found. Run tests first to generate logs."
     end
 
-    puts "\n📁 Log Directory: #{log_dir}"
-    puts "=" * 60
+    def self.display_history(log_dir)
+      history_file = File.join(log_dir, "test_history.json")
+      return unless File.exist?(history_file)
+
+      history = JSON.parse(File.read(history_file))
+      puts "\n📜 Recent History (last 10):"
+      history.last(10).each_with_index do |entry, _index|
+        status = entry["success"] ? "✅" : "❌"
+        passed = entry["total_tests"] - entry["failed_tests"]
+        puts "   #{status} #{entry['timestamp']} - #{passed}/#{entry['total_tests']} " \
+             "tests (#{entry['duration_seconds']}s)"
+      end
+    end
   end
 end
 

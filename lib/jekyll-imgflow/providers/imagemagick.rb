@@ -47,85 +47,7 @@ module JekyllImgFlow
                           ["magick", input_path.shellescape]
                         end
 
-        # Add all operations
-        @operations.each do |operation|
-          case operation[:type]
-          when :resize
-            # Tags now provide complete calculated values
-            command_parts << "-resize" << if operation[:height]
-                                            "#{operation[:width]}x#{operation[:height]}!"
-                                          else
-                                            operation[:width].to_s
-                                          end
-
-          when :crop
-            opts = operation[:options]
-            params = operation[:params] || {}
-
-            # Check for keep parameter (ImageMagick doesn't support smartcrop, but we handle it gracefully)
-            keep = opts[:keep] || params[:keep] || params[:position]
-
-            if operation[:ratio] && keep && SMARTCROP_POSITIONS.include?(keep.to_s)
-              # ImageMagick doesn't support smartcrop, but we handle the keep parameter
-              # Use center gravity as a reasonable fallback for smartcrop requests
-              crop_width = opts[:calculated_width]
-              crop_height = opts[:calculated_height]
-              crop_x = opts[:calculated_x]
-              crop_y = opts[:calculated_y]
-
-              # Use gravity center for smartcrop-like behavior
-              crop_spec = "#{crop_width}x#{crop_height}+#{crop_x}+#{crop_y}"
-              command_parts << "-gravity" << "center"
-            else
-              # Use basic cropping
-              if operation[:ratio]
-                crop_x = opts[:calculated_x]
-                crop_y = opts[:calculated_y]
-                crop_width = opts[:calculated_width]
-                crop_height = opts[:calculated_height]
-              else
-                crop_x = opts[:x]
-                crop_y = opts[:y]
-                crop_width = opts[:width]
-                crop_height = opts[:height]
-              end
-              crop_spec = "#{crop_width}x#{crop_height}+#{crop_x}+#{crop_y}"
-            end
-            command_parts << "-crop" << crop_spec
-
-          when :quality
-            magick_quality = translate_quality_to_imagemagick(operation[:quality])
-            command_parts << "-quality" << magick_quality.to_s
-
-          when :format
-            # Assume validated input from tags
-            # Format is handled by output filename extension
-            # Quality is set separately if needed
-            unless @operations.any? { |op| op[:type] == :quality }
-              default_quality = @config&.quality || raise("No quality configured")
-              command_parts << "-quality" << default_quality.to_s
-            end
-
-          when :watermark
-            watermark_path = operation[:watermark_path]
-            position = operation[:options][:position]
-
-            # Translate compass directions to ImageMagick gravity format
-            gravity = translate_position(position)
-
-            # Add watermark as composite operation
-            command_parts << watermark_path.shellescape
-            command_parts << "-gravity" << gravity
-            command_parts << "-composite"
-
-          when :alpha_opacity
-            opacity = operation[:opacity]
-            alpha_value = (opacity * 100).round
-            command_parts << "-alpha" << "set"
-            command_parts << "-channel" << "A"
-            command_parts << "-evaluate" << "multiply" << "#{alpha_value}%"
-          end
-        end
+        @operations.each { |operation| append_imagemagick_operation(operation, command_parts) }
 
         # Add output filename
         command_parts << output_path.shellescape
@@ -146,9 +68,56 @@ module JekyllImgFlow
 
       private
 
-      def translate_quality_to_imagemagick(quality)
-        # ImageMagick uses 1-100 directly, no translation needed
-        quality
+      def append_imagemagick_operation(operation, command_parts)
+        case operation[:type]
+        when :resize
+          command_parts << "-resize" << if operation[:height]
+                                          "#{operation[:width]}x#{operation[:height]}!"
+                                        else
+                                          operation[:width].to_s
+                                        end
+        when :crop
+          append_imagemagick_crop(operation, command_parts)
+        when :quality
+          command_parts << "-quality" << operation[:quality].to_s
+        when :format
+          # Format is handled by output filename extension.
+          # Quality is set separately if needed.
+          unless op?(:quality)
+            default_quality = @config&.quality || raise("No quality configured")
+            command_parts << "-quality" << default_quality.to_s
+          end
+        when :watermark
+          append_imagemagick_watermark(operation, command_parts)
+        when :alpha_opacity
+          alpha_value = (operation[:opacity] * 100).round
+          command_parts << "-alpha" << "set"
+          command_parts << "-channel" << "A"
+          command_parts << "-evaluate" << "multiply" << "#{alpha_value}%"
+        end
+      end
+
+      def append_imagemagick_crop(operation, command_parts)
+        geo = crop_geometry(operation)
+
+        if geo[:smartcrop]
+          # ImageMagick doesn't support smartcrop, but we handle the keep parameter
+          # Use center gravity as a reasonable fallback for smartcrop requests
+          command_parts << "-gravity" << "center"
+        end
+
+        crop_spec = "#{geo[:width]}x#{geo[:height]}+#{geo[:x]}+#{geo[:y]}"
+        command_parts << "-crop" << crop_spec
+      end
+
+      def append_imagemagick_watermark(operation, command_parts)
+        parts = watermark_parts(operation)
+        gravity = translate_position(parts[:position])
+
+        # Add watermark as composite operation
+        command_parts << parts[:watermark_path].shellescape
+        command_parts << "-gravity" << gravity
+        command_parts << "-composite"
       end
 
       # Choose a rasterization density (DPI) for SVG input.

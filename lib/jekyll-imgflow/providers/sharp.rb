@@ -27,17 +27,13 @@ module JekyllImgFlow
       end
 
       def build_sharp_command(input_path, output_path)
-        has_crop = @operations.any? { |op| op[:type] == :crop }
-        has_resize = @operations.any? { |op| op[:type] == :resize }
-        has_watermark = @operations.any? { |op| op[:type] == :watermark }
-
-        if has_watermark
-          build_watermark_pipeline(input_path, output_path, has_crop, has_resize)
-        elsif has_crop && has_resize
+        if op?(:watermark)
+          build_watermark_pipeline(input_path, output_path, op?(:crop), op?(:resize))
+        elsif op?(:crop) && op?(:resize)
           build_sequential_crop_resize(input_path, output_path)
-        elsif has_resize
+        elsif op?(:resize)
           build_resize_command(input_path, output_path)
-        elsif has_crop
+        elsif op?(:crop)
           build_crop_command(input_path, output_path)
         else
           build_copy_command(input_path, output_path)
@@ -67,25 +63,19 @@ module JekyllImgFlow
       end
 
       def build_composite_command(base_path, output_path)
-        wm_op = @operations.find { |op| op[:type] == :watermark }
-        watermark_path = wm_op[:watermark_path]
-        position = wm_op[:options][:position]
-        opacity = wm_op[:options][:opacity]
-
-        gravity = translate_position(position)
+        wm_op = find_op(:watermark)
+        parts = watermark_parts(wm_op)
+        gravity = translate_position(parts[:position])
 
         command_parts = ["sharp", "-i", base_path.shellescape,
                          "-o", output_path.shellescape]
 
-        format_op = @operations.find { |op| op[:type] == :format }
-        quality_op = @operations.find { |op| op[:type] == :quality }
-        command_parts += ["-f", sharp_format(format_op[:format])] if format_op
-        command_parts += ["-q#{quality_op[:quality]}"] if quality_op
+        add_format_quality(command_parts)
 
-        if opacity && opacity < 1.0
-          wm_temp = watermark_path.gsub(/\.[^.]+$/, ".tmp_wm.png")
-          alpha_value = (opacity * 255).round
-          temp_cmd = ["sharp", "-i", watermark_path.shellescape,
+        if parts[:opacity] && parts[:opacity] < 1.0
+          wm_temp = parts[:watermark_path].gsub(/\.[^.]+$/, ".tmp_wm.png")
+          alpha_value = (parts[:opacity] * 255).round
+          temp_cmd = ["sharp", "-i", parts[:watermark_path].shellescape,
                       "-o", wm_temp.shellescape,
                       "ensureAlpha", alpha_value.to_s].join(" ")
           command_parts += ["composite", wm_temp.shellescape,
@@ -93,7 +83,7 @@ module JekyllImgFlow
           "#{temp_cmd} && #{command_parts.join(' ')} " \
             "&& rm -f #{wm_temp.shellescape}"
         else
-          command_parts += ["composite", watermark_path.shellescape,
+          command_parts += ["composite", parts[:watermark_path].shellescape,
                             "--gravity", gravity, "--blend", "over"]
           command_parts.join(" ")
         end
@@ -125,7 +115,7 @@ module JekyllImgFlow
       end
 
       def build_resize_command(input_path, output_path)
-        resize_op = @operations.find { |op| op[:type] == :resize }
+        resize_op = find_op(:resize)
 
         # sharp -i input.jpg -o output.jpg resize width [height] -f format -q quality
         command_parts = ["sharp", "-i", input_path.shellescape, "-o", output_path.shellescape]
@@ -137,39 +127,18 @@ module JekyllImgFlow
                            ["resize", resize_op[:width].to_s]
                          end
 
-        # Add format, quality, alpha
-        format_op = @operations.find { |op| op[:type] == :format }
-        quality_op = @operations.find { |op| op[:type] == :quality }
-        alpha_op = @operations.find { |op| op[:type] == :alpha_opacity }
-
-        command_parts += ["-f", sharp_format(format_op[:format])] if format_op
-        command_parts += ["-q#{quality_op[:quality]}"] if quality_op
-        if alpha_op
-          alpha_value = (alpha_op[:opacity] * 255).round
-          command_parts += ["alpha", "{alpha:#{alpha_value}}"]
-        end
-
+        add_format_quality_alpha(command_parts)
         command_parts.join(" ")
       end
 
       def build_crop_command(input_path, output_path)
-        crop_op = @operations.find { |op| op[:type] == :crop }
-        opts = crop_op[:options] || {}
-        params = crop_op[:params] || {}
+        crop_op = find_op(:crop)
+        geo = crop_geometry(crop_op)
 
-        # Check if we should use smartcrop (when keep parameter is specified)
-        # JPT keep options: attention (default), entropy, center
-        # Check both options (from CropTag) and params (from OperationProcessor)
-        keep = opts[:keep] || params[:keep] || params[:position]
-
-        if crop_op[:ratio] && keep && %w[attention entropy center
-                                         centre].include?(keep.to_s)
+        if geo[:smartcrop]
           # Use smartcrop for intelligent cropping (Sharp uses libvips backend)
-          crop_width = opts[:calculated_width]
-          crop_height = opts[:calculated_height]
-
           # Map keep parameter to libvips interestingness
-          interestingness = case keep.to_s
+          interestingness = case geo[:keep].to_s
                             when "entropy" then "entropy"
                             when "center", "centre" then "centre"
                             else "attention" # default
@@ -177,18 +146,14 @@ module JekyllImgFlow
 
           # sharp -i input.jpg -o output.jpg smartcrop width height --interesting=attention
           ["sharp", "-i", input_path.shellescape, "-o", output_path.shellescape,
-           "smartcrop", crop_width.to_s, crop_height.to_s,
+           "smartcrop", geo[:width].to_s, geo[:height].to_s,
            "--interesting=#{interestingness}"].join(" ")
         else
           # Use basic extract for manual cropping or when no keep parameter
-          crop_x = crop_op[:ratio] ? opts[:calculated_x] : (opts[:x] || 0)
-          crop_y = crop_op[:ratio] ? opts[:calculated_y] : (opts[:y] || 0)
-          crop_width = crop_op[:ratio] ? opts[:calculated_width] : opts[:width]
-          crop_height = crop_op[:ratio] ? opts[:calculated_height] : opts[:height]
-
           # sharp -i input.jpg -o output.jpg extract top left width height
           ["sharp", "-i", input_path.shellescape, "-o", output_path.shellescape,
-           "extract", crop_y.to_s, crop_x.to_s, crop_width.to_s, crop_height.to_s].join(" ")
+           "extract", geo[:y].to_s, geo[:x].to_s, geo[:width].to_s,
+           geo[:height].to_s].join(" ")
         end
       end
 
@@ -196,17 +161,7 @@ module JekyllImgFlow
         # sharp -i input.jpg -o output.jpg -f format -q quality
         command_parts = ["sharp", "-i", input_path.shellescape, "-o", output_path.shellescape]
 
-        format_op = @operations.find { |op| op[:type] == :format }
-        quality_op = @operations.find { |op| op[:type] == :quality }
-        alpha_op = @operations.find { |op| op[:type] == :alpha_opacity }
-
-        command_parts += ["-f", sharp_format(format_op[:format])] if format_op
-        command_parts += ["-q#{quality_op[:quality]}"] if quality_op
-        if alpha_op
-          alpha_value = (alpha_op[:opacity] * 255).round
-          command_parts += ["alpha", "{alpha:#{alpha_value}}"]
-        end
-
+        add_format_quality_alpha(command_parts)
         command_parts.join(" ")
       end
 
@@ -214,6 +169,24 @@ module JekyllImgFlow
       # extension in generated filenames and public configuration.
       def sharp_format(format)
         format.to_s == "jpg" ? "jpeg" : format
+      end
+
+      private
+
+      def add_format_quality(command_parts)
+        format_op = find_op(:format)
+        quality_op = find_op(:quality)
+        command_parts.push("-f", sharp_format(format_op[:format])) if format_op
+        command_parts.push("-q#{quality_op[:quality]}") if quality_op
+      end
+
+      def add_format_quality_alpha(command_parts)
+        add_format_quality(command_parts)
+        alpha_op = find_op(:alpha_opacity)
+        return unless alpha_op
+
+        alpha_value = (alpha_op[:opacity] * 255).round
+        command_parts.push("alpha", "{alpha:#{alpha_value}}")
       end
     end
   end

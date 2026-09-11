@@ -110,44 +110,51 @@ module JekyllImgFlow
       operations = []
       operation_options = options.slice(*OPERATION_PARAMS)
 
-      # Handle crop+resize combination (needs sequential processing)
-      has_crop = operation_options[:ratio] || operation_options[:aspect_ratio]
-      has_resize = operation_options[:width] || operation_options[:height]
-
-      if has_crop && has_resize
-        crop_params = operation_options.slice(:ratio, :aspect_ratio, :keep, :position)
-        resize_params = operation_options.except(:ratio, :aspect_ratio, :keep, :position)
-        operations << { type: :crop, params: crop_params }
-        operations << { type: :resize, params: resize_params }
-      elsif has_crop
-        crop_params = operation_options.slice(:ratio, :aspect_ratio, :keep, :position)
-        operations << { type: :crop, params: crop_params }
-      elsif has_resize
-        operations << { type: :resize, params: operation_options }
-      end
-
-      # Add simple operations using mappings
-      SIMPLE_OPERATIONS.each do |key, builder|
-        operations << builder.call(operation_options[key]) if operation_options[key]
-      end
-
-      # Handle format operation (can be array or single value)
-      if operation_options[:format] || operation_options[:formats]
-        format_value = operation_options[:format] || operation_options[:formats]
-        operations << if format_value.is_a?(Array)
-                        { type: :format, params: { formats: format_value } }
-                      else
-                        { type: :format, params: { format: format_value } }
-                      end
-      end
-
-      # Handle optimize operation
-      if operation_options[:optimize] || operation_options[:level]
-        operations << { type: :optimize,
-                        params: { level: operation_options[:level] || :medium } }
-      end
+      add_crop_resize_operations(operations, operation_options)
+      add_simple_operations(operations, operation_options)
+      add_format_operation(operations, operation_options)
+      add_optimize_operation(operations, operation_options)
 
       operations
+    end
+
+    def self.add_crop_resize_operations(operations, opts)
+      has_crop = opts[:ratio] || opts[:aspect_ratio]
+      has_resize = opts[:width] || opts[:height]
+      crop_params = opts.slice(:ratio, :aspect_ratio, :keep, :position)
+
+      if has_crop && has_resize
+        operations << { type: :crop, params: crop_params }
+        operations << { type: :resize, params: opts.except(:ratio, :aspect_ratio, :keep, :position) }
+      elsif has_crop
+        operations << { type: :crop, params: crop_params }
+      elsif has_resize
+        operations << { type: :resize, params: opts }
+      end
+    end
+
+    def self.add_simple_operations(operations, opts)
+      SIMPLE_OPERATIONS.each do |key, builder|
+        operations << builder.call(opts[key]) if opts[key]
+      end
+    end
+
+    def self.add_format_operation(operations, opts)
+      return unless opts[:format] || opts[:formats]
+
+      format_value = opts[:format] || opts[:formats]
+      operations << if format_value.is_a?(Array)
+                      { type: :format, params: { formats: format_value } }
+                    else
+                      { type: :format, params: { format: format_value } }
+                    end
+    end
+
+    def self.add_optimize_operation(operations, opts)
+      return unless opts[:optimize] || opts[:level]
+
+      operations << { type: :optimize,
+                      params: { level: opts[:level] || :medium } }
     end
 
     def self.extract_html_attributes(options)

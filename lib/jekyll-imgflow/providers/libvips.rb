@@ -48,10 +48,10 @@ module JekyllImgFlow
 
       def operation_flags
         {
-          crop: @operations.any? { |op| op[:type] == :crop },
-          resize: @operations.any? { |op| op[:type] == :resize },
-          watermark: @operations.any? { |op| op[:type] == :watermark },
-          alpha: @operations.any? { |op| op[:type] == :alpha_opacity }
+          crop: op?(:crop),
+          resize: op?(:resize),
+          watermark: op?(:watermark),
+          alpha: op?(:alpha_opacity)
         }
       end
 
@@ -97,7 +97,7 @@ module JekyllImgFlow
       end
 
       def apply_watermark_alpha(base_path, input_path, commands)
-        alpha_op = @operations.find { |op| op[:type] == :alpha_opacity }
+        alpha_op = find_op(:alpha_opacity)
         return [base_path, commands] unless alpha_op
 
         alpha_temp = input_path.gsub(/\.[^.]+$/, ".tmp_alpha.jpg")
@@ -110,26 +110,24 @@ module JekyllImgFlow
       end
 
       def build_composite_commands(base_path, output_path)
-        wm_op = @operations.find { |op| op[:type] == :watermark }
-        watermark_path = wm_op[:watermark_path]
-        position = wm_op[:options][:position]
-        opacity = wm_op[:options][:opacity]
+        wm_op = find_op(:watermark)
+        parts = watermark_parts(wm_op)
 
-        if opacity && opacity < 1.0
-          wm_temp = watermark_path.gsub(/\.[^.]+$/, ".tmp_wm.png")
-          alpha_value = opacity
+        if parts[:opacity] && parts[:opacity] < 1.0
+          wm_temp = parts[:watermark_path].gsub(/\.[^.]+$/, ".tmp_wm.png")
+          alpha_value = parts[:opacity]
           # Step 1: Apply alpha to watermark
-          alpha_cmd = ["vips", "linear", watermark_path,
+          alpha_cmd = ["vips", "linear", parts[:watermark_path],
                        "#{wm_temp}[alpha]", "1 1 1 #{alpha_value}", "0"]
           # Step 2: Composite
-          xy_args = position_to_vips_xy(position, base_path, watermark_path)
+          xy_args = position_to_vips_xy(parts[:position], base_path, parts[:watermark_path])
           composite_cmd = ["vips", "composite2", base_path, wm_temp,
                            build_format_spec(output_path), "over"] + xy_args
           # Step 3: Cleanup wm_temp
           [alpha_cmd, composite_cmd, [:cleanup, wm_temp]]
         else
-          xy_args = position_to_vips_xy(position, base_path, watermark_path)
-          [["vips", "composite2", base_path, watermark_path,
+          xy_args = position_to_vips_xy(parts[:position], base_path, parts[:watermark_path])
+          [["vips", "composite2", base_path, parts[:watermark_path],
             build_format_spec(output_path), "over"] + xy_args]
         end
       end
@@ -168,9 +166,8 @@ module JekyllImgFlow
       end
 
       def build_alpha_command(input_path, output_path)
-        alpha_op = @operations.find { |op| op[:type] == :alpha_opacity }
-        opacity = alpha_op[:opacity]
-        alpha_value = opacity.round(2)
+        alpha_op = find_op(:alpha_opacity)
+        alpha_value = alpha_op[:opacity].round(2)
 
         # vips linear multiplies alpha band: "1 1 1 alpha" scales alpha
         ["vips", "linear", input_path, output_path,
@@ -180,7 +177,7 @@ module JekyllImgFlow
       def build_sequential_crop_resize(input_path, output_path)
         if svg?(input_path)
           # SVG: use thumbnail with --crop to do crop+resize in one step
-          resize_op = @operations.find { |op| op[:type] == :resize }
+          resize_op = find_op(:resize)
           format_spec = build_format_spec(output_path)
           width = resize_op[:width]
           height = resize_op[:height]
@@ -195,7 +192,7 @@ module JekyllImgFlow
       end
 
       def build_resize_command(input_path, output_path)
-        resize_op = @operations.find { |op| op[:type] == :resize }
+        resize_op = find_op(:resize)
         format_spec = build_format_spec(output_path)
         width = resize_op[:width]
         height = resize_op[:height]
@@ -216,35 +213,24 @@ module JekyllImgFlow
       end
 
       def build_crop_command(input_path, output_path)
-        crop_op = @operations.find { |op| op[:type] == :crop }
-        opts = crop_op[:options] || {}
-        params = crop_op[:params] || {}
-        keep = opts[:keep] || params[:keep] || params[:position]
-        return build_smartcrop_command(crop_op, opts, keep, input_path, output_path) if smartcrop?(crop_op, keep)
+        crop_op = find_op(:crop)
+        geo = crop_geometry(crop_op)
+        return build_smartcrop_command(geo, input_path, output_path) if geo[:smartcrop]
 
-        build_extract_command(crop_op, opts, input_path, output_path)
+        build_extract_command(geo, input_path, output_path)
       end
 
-      def smartcrop?(crop_op, keep)
-        crop_op[:ratio] && keep && %w[attention entropy center centre].include?(keep.to_s)
-      end
-
-      def build_smartcrop_command(_crop_op, opts, keep, input_path, output_path)
-        interestingness = %w[center centre].include?(keep.to_s) ? "centre" : keep.to_s
+      def build_smartcrop_command(geo, input_path, output_path)
+        interestingness = %w[center centre].include?(geo[:keep].to_s) ? "centre" : geo[:keep].to_s
         interestingness = "attention" unless %w[entropy centre].include?(interestingness)
         ["vips", "smartcrop", input_path, output_path,
-         opts[:calculated_width].to_s, opts[:calculated_height].to_s,
+         geo[:width].to_s, geo[:height].to_s,
          "--interesting=#{interestingness}"]
       end
 
-      def build_extract_command(crop_op, opts, input_path, output_path)
-        ratio = crop_op[:ratio]
-        x = ratio ? opts[:calculated_x] : (opts[:x] || 0)
-        y = ratio ? opts[:calculated_y] : (opts[:y] || 0)
-        width = ratio ? opts[:calculated_width] : opts[:width]
-        height = ratio ? opts[:calculated_height] : opts[:height]
+      def build_extract_command(geo, input_path, output_path)
         ["vips", "extract_area", input_path, output_path,
-         x.to_s, y.to_s, width.to_s, height.to_s]
+         geo[:x].to_s, geo[:y].to_s, geo[:width].to_s, geo[:height].to_s]
       end
 
       # SVG crop: use `vips thumbnail` with --crop to crop during thumbnailing.
@@ -254,22 +240,24 @@ module JekyllImgFlow
       # the most interesting region — this is the correct behavior for SVGs
       # since they have no fixed pixel dimensions.
       def build_svg_crop_pipeline(input_path, output_path)
-        crop_op = @operations.find { |op| op[:type] == :crop }
-        opts = crop_op[:options] || {}
-        crop_width = crop_op[:ratio] ? opts[:calculated_width] : (opts[:width] || 1000)
-        crop_height = crop_op[:ratio] ? opts[:calculated_height] : (opts[:height] || 1000)
+        crop_op = find_op(:crop)
+        geo = crop_geometry(crop_op)
+        crop_width = geo[:width] || 1000
+        crop_height = geo[:height] || 1000
         format_spec = build_format_spec(output_path)
-
-        keep = opts[:keep] || crop_op[:params]&.[](:keep) || crop_op[:params]&.[](:position)
-        interestingness = case keep.to_s
-                          when "entropy" then "entropy"
-                          when "center", "centre" then "centre"
-                          else "attention"
-                          end
+        interestingness = svg_crop_interestingness(geo[:keep])
 
         [["vips", "thumbnail", input_path, format_spec,
           crop_width.to_s, "--height=#{crop_height}",
           "--crop=#{interestingness}"]]
+      end
+
+      def svg_crop_interestingness(keep)
+        case keep.to_s
+        when "entropy" then "entropy"
+        when "center", "centre" then "centre"
+        else "attention"
+        end
       end
 
       def build_copy_command(input_path, output_path)
@@ -287,8 +275,8 @@ module JekyllImgFlow
       # are executed via Open3.capture3 array form (no shell).
       def build_format_spec(output_path)
         # Build vips output specification with format and quality
-        format_op = @operations.find { |op| op[:type] == :format }
-        quality_op = @operations.find { |op| op[:type] == :quality }
+        format_op = find_op(:format)
+        quality_op = find_op(:quality)
 
         # Simple case: no format/quality operations
         return output_path unless format_op || quality_op

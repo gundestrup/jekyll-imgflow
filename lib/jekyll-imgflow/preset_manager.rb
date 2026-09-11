@@ -132,53 +132,57 @@ module JekyllImgFlow
     # @return [Hash] Tags in key => value format
     def yaml_to_tags(preset)
       tags = {}
-      preset_operations = preset["operations"] || []
-
-      preset_operations.each do |op|
+      (preset["operations"] || []).each do |op|
         next unless op.is_a?(Hash)
 
         op.each do |op_type, params|
           next unless params.is_a?(Hash)
 
-          # Store operation type for operations that don't have specific params
-          # This allows Parser to detect the operation type
-          case op_type.to_s
-          when "resize"
-            # Resize params: width, height (both optional, at least one required)
-            tags[:width] = params["width"] if params["width"]
-            tags[:height] = params["height"] if params["height"]
-          when "crop"
-            # Crop params: ratio or width/height
-            tags[:ratio] = params["ratio"] if params["ratio"]
-            tags[:aspect_ratio] = params["aspect_ratio"] if params["aspect_ratio"]
-            tags[:width] = params["width"] if params["width"] && !tags[:width]
-            tags[:height] = params["height"] if params["height"] && !tags[:height]
-          when "format"
-            # Format params: format or formats
-            if params["formats"]
-              tag_value = params["formats"].is_a?(Array) ? params["formats"].join(",") : params["formats"]
-              tags[:formats] = tag_value
-            elsif params["format"]
-              tags[:format] = params["format"]
-            end
-          when "quality"
-            tags[:quality] = params["quality"] if params["quality"]
-          when "optimize"
-            tags[:optimize] = true
-            tags[:level] = params["level"] if params["level"]
-          when "opacity"
-            tags[:opacity] = params["opacity"] if params["opacity"]
-          else
-            # Generic handling for unknown operations
-            params.each do |key, value|
-              tag_value = value.is_a?(Array) ? value.join(",") : value
-              tags[key.to_sym] = tag_value
-            end
-          end
+          merge_operation_tags(tags, op_type.to_s, params)
         end
       end
 
       tags
+    end
+
+    def merge_operation_tags(tags, op_type, params)
+      case op_type
+      when "resize"
+        tags[:width] = params["width"] if params["width"]
+        tags[:height] = params["height"] if params["height"]
+      when "crop"
+        tags[:ratio] = params["ratio"] if params["ratio"]
+        tags[:aspect_ratio] = params["aspect_ratio"] if params["aspect_ratio"]
+        tags[:width] = params["width"] if params["width"] && !tags[:width]
+        tags[:height] = params["height"] if params["height"] && !tags[:height]
+      when "format"
+        merge_format_tag(tags, params)
+      when "quality"
+        tags[:quality] = params["quality"] if params["quality"]
+      when "optimize"
+        tags[:optimize] = true
+        tags[:level] = params["level"] if params["level"]
+      when "opacity"
+        tags[:opacity] = params["opacity"] if params["opacity"]
+      else
+        merge_generic_tags(tags, params)
+      end
+    end
+
+    def merge_format_tag(tags, params)
+      if params["formats"]
+        tag_value = params["formats"].is_a?(Array) ? params["formats"].join(",") : params["formats"]
+        tags[:formats] = tag_value
+      elsif params["format"]
+        tags[:format] = params["format"]
+      end
+    end
+
+    def merge_generic_tags(tags, params)
+      params.each do |key, value|
+        tag_value = value.is_a?(Array) ? value.join(",") : value
+        tags[key.to_sym] = tag_value
+      end
     end
 
     # Merge preset tags with user options (user options override)

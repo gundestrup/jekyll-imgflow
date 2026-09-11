@@ -9,25 +9,16 @@ module JekyllImgFlow
       def process(input_path, output_path, options = {})
         ensure_output_dir(output_path)
 
-        # Validate that crop information is provided
         ratio = options[:ratio] || options[:aspect_ratio]
         has_pixel_crop = options[:width] || options[:height]
 
-        unless ratio || has_pixel_crop
-          raise ArgumentError,
-                "Crop operation requires ratio or at least one dimension (width or height)"
-        end
+        validate_crop_request(ratio, has_pixel_crop)
 
         if ratio
-          # Handle aspect ratio cropping (e.g., "16:9", "4:3")
           validate_ratio(ratio)
           handle_aspect_ratio_crop(input_path, output_path, ratio, options)
         else
-          # Handle pixel-based cropping with flexible dimensions
-          validate_positive_integer(options[:width], "width") if options[:width]
-          validate_positive_integer(options[:height], "height") if options[:height]
-          validate_positive_integer(options[:x], "x") if options[:x]
-          validate_positive_integer(options[:y], "y") if options[:y]
+          validate_pixel_dimensions(options)
           handle_pixel_crop(input_path, output_path, options)
         end
 
@@ -36,16 +27,25 @@ module JekyllImgFlow
 
       private
 
+      def validate_crop_request(ratio, has_pixel_crop)
+        return if ratio || has_pixel_crop
+
+        raise ArgumentError,
+              "Crop operation requires ratio or at least one dimension (width or height)"
+      end
+
+      def validate_pixel_dimensions(options)
+        validate_positive_integer(options[:width], "width") if options[:width]
+        validate_positive_integer(options[:height], "height") if options[:height]
+        validate_positive_integer(options[:x], "x") if options[:x]
+        validate_positive_integer(options[:y], "y") if options[:y]
+      end
+
       # Handle aspect ratio cropping
       def handle_aspect_ratio_crop(input_path, _output_path, ratio, options)
         # Calculate optimal crop dimensions for the aspect ratio
         calculated_options = calculate_aspect_ratio_dimensions(input_path, ratio, options)
-
-        # Add keep parameter for smartcrop (JPT compatibility)
-        if options[:keep] && %w[attention entropy center
-                                centre].include?(options[:keep].to_s)
-          calculated_options[:keep] = options[:keep]
-        end
+        add_keep_option(calculated_options, options[:keep])
 
         # Pass ratio and calculated options to provider (uniform interface)
         @provider.crop(ratio, calculated_options)
@@ -53,47 +53,34 @@ module JekyllImgFlow
 
       # Handle flexible pixel-based cropping
       def handle_pixel_crop(input_path, _output_path, options)
-        # Get original image dimensions
         original_width, original_height = get_original_dimensions(input_path)
 
-        # Parse dimensions (support pixels and percentages)
         crop_width = parse_dimension(options[:width], original_width)
         crop_height = parse_dimension(options[:height], original_height)
 
-        # At least one dimension must be specified
         raise ArgumentError, "At least width or height must be specified for cropping" unless crop_width || crop_height
 
         # Calculate missing dimension if only one provided
-        if crop_width && !crop_height
-          crop_height = original_height  # Keep original height
-        elsif crop_height && !crop_width
-          crop_width = original_width    # Keep original width
-        end
+        crop_width ||= original_width # Keep original width
+        crop_height ||= original_height # Keep original height
 
         # Parse positions with smart defaults - always provide values
         crop_x = parse_position_with_default(options[:x], crop_width, original_width)
         crop_y = parse_position_with_default(options[:y], crop_height, original_height)
 
-        # Validate crop area is not bigger than original
         validate_crop_dimensions(crop_x, crop_y, crop_width, crop_height, original_width,
                                  original_height)
 
-        # Build crop options with keep parameter support
-        crop_options = {
-          x: crop_x,
-          y: crop_y,
-          width: crop_width,
-          height: crop_height
-        }
+        crop_options = { x: crop_x, y: crop_y, width: crop_width, height: crop_height }
+        add_keep_option(crop_options, options[:keep])
 
-        # Add keep parameter for smartcrop (JPT compatibility)
-        if options[:keep] && %w[attention entropy center
-                                centre].include?(options[:keep].to_s)
-          crop_options[:keep] = options[:keep]
-        end
-
-        # Execute crop with calculated dimensions
         @provider.crop(nil, crop_options)
+      end
+
+      def add_keep_option(crop_options, keep)
+        return unless keep && %w[attention entropy center centre].include?(keep.to_s)
+
+        crop_options[:keep] = keep
       end
 
       # Get original image dimensions using FastImage

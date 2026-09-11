@@ -127,40 +127,35 @@ module JekyllImgFlow
       image_path = parts.shift
 
       # Parse operations as key:value pairs separated by commas or spaces
-      operations = []
       remaining = parts.join(" ")
+      operation_pairs = split_operation_pairs(remaining)
 
-      # Handle comma-separated: key:value,key:value
-      operation_pairs = if remaining.include?(",")
-                          remaining.split(",")
-                        else
-                          # Handle space-separated: key:value key:value
-                          remaining.split(/\s+/)
-                        end
-
-      operation_pairs.each do |pair|
-        next if pair.empty?
-
-        next unless pair.include?(":")
+      operations = operation_pairs.filter_map do |pair|
+        next if pair.empty? || !pair.include?(":")
 
         key, value = pair.split(":", 2)
-        # Convert numeric values using simple string methods
-        value_stripped = value.strip
-        converted_value = if value_stripped.match?(/^\d+$/)
-                            value_stripped.to_i
-                          elsif value_stripped.match?(/^\d+\.\d+$/)
-                            value_stripped.to_f
-                          else
-                            value_stripped
-                          end
-        # Store with converted value for downstream type correctness
-        operations << "#{key.strip}:#{converted_value}"
+        "#{key.strip}:#{convert_value(value.strip)}"
       end
 
       {
         image: image_path, # Use :image key for test compatibility
         operations: operations # Return as array of strings
       }
+    end
+
+    def split_operation_pairs(remaining)
+      # Handle comma-separated: key:value,key:value
+      return remaining.split(",") if remaining.include?(",")
+
+      # Handle space-separated: key:value key:value
+      remaining.split(/\s+/)
+    end
+
+    def convert_value(value)
+      return value.to_i if value.match?(/^\d+$/)
+      return value.to_f if value.match?(/^\d+\.\d+$/)
+
+      value
     end
 
     private

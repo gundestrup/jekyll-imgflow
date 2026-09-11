@@ -99,61 +99,11 @@ module JekyllImgFlow
     # @return [Hash, nil] ImgFlow preset data or nil if not convertible
     def convert_preset_to_imgflow(preset_name, preset_data)
       operations = []
-
-      # Handle multi-width presets - use the largest width as primary
-      if preset_data["widths"]
-        max_width = Array(preset_data["widths"]).max
-        operations << { "resize" => { "width" => max_width } }
-      elsif preset_data["base_width"]
-        # For pixel-ratio presets, use base_width
-        operations << { "resize" => { "width" => preset_data["base_width"] } }
-      elsif preset_data["width"]
-        # Direct width setting
-        operations << { "resize" => { "width" => preset_data["width"] } }
-      end
-
-      # Handle height (less common in Picture Tag)
-      if preset_data["height"]
-        if operations.any? && operations.last["resize"]
-          # Add height to existing resize operation
-          operations.last["resize"]["height"] = preset_data["height"]
-        else
-          operations << { "resize" => { "height" => preset_data["height"] } }
-        end
-      end
-
-      # Convert quality (if specified)
-      operations << { "quality" => { "quality" => preset_data["quality"] } } if preset_data["quality"]
-
-      # Convert formats - Picture Tag uses 'original', ImgFlow uses actual format
-      if preset_data["formats"]
-        formats = Array(preset_data["formats"]).map do |format|
-          case format
-          when "original"
-            "jpg" # Default to jpg for 'original'
-          else
-            format
-          end
-        end
-        operations << { "format" => { "formats" => formats } }
-      end
-
-      # Convert crop (aspect ratio) - handle both ratio and aspect_ratio with precedence
-      ratio_value = preset_data["ratio"] || preset_data["aspect_ratio"] || preset_data["crop"]
-      operations << { "crop" => { "ratio" => ratio_value } } if ratio_value
-
-      # Convert gravity/position - handle both position and gravity with precedence
-      position_value = preset_data["position"] || preset_data["gravity"]
-      if position_value
-        if operations.any? { |op| op["crop"] }
-          # Add to existing crop operation
-          crop_op = operations.find { |op| op["crop"] }
-          crop_op["crop"]["position"] = position_value
-        else
-          # Create new crop operation
-          operations << { "crop" => { "position" => position_value } }
-        end
-      end
+      add_resize_operation(operations, preset_data)
+      add_quality_operation(operations, preset_data)
+      add_format_operation(operations, preset_data)
+      add_crop_operation(operations, preset_data)
+      add_position_operation(operations, preset_data)
 
       return if operations.empty?
 
@@ -171,30 +121,84 @@ module JekyllImgFlow
       }
     end
 
+    def add_resize_operation(operations, preset_data)
+      width = preset_width(preset_data)
+      operations << { "resize" => { "width" => width } } if width
+
+      return unless preset_data["height"]
+
+      if operations.any? && operations.last["resize"]
+        operations.last["resize"]["height"] = preset_data["height"]
+      else
+        operations << { "resize" => { "height" => preset_data["height"] } }
+      end
+    end
+
+    def preset_width(preset_data)
+      return Array(preset_data["widths"]).max if preset_data["widths"]
+      return preset_data["base_width"] if preset_data["base_width"]
+
+      preset_data["width"] if preset_data["width"]
+    end
+
+    def add_quality_operation(operations, preset_data)
+      return unless preset_data["quality"]
+
+      operations << { "quality" => { "quality" => preset_data["quality"] } }
+    end
+
+    def add_format_operation(operations, preset_data)
+      return unless preset_data["formats"]
+
+      formats = Array(preset_data["formats"]).map do |format|
+        format == "original" ? "jpg" : format
+      end
+      operations << { "format" => { "formats" => formats } }
+    end
+
+    def add_crop_operation(operations, preset_data)
+      ratio_value = preset_data["ratio"] || preset_data["aspect_ratio"] || preset_data["crop"]
+      operations << { "crop" => { "ratio" => ratio_value } } if ratio_value
+    end
+
+    def add_position_operation(operations, preset_data)
+      position_value = preset_data["position"] || preset_data["gravity"]
+      return unless position_value
+
+      crop_op = operations.find { |op| op["crop"] }
+      if crop_op
+        crop_op["crop"]["position"] = position_value
+      else
+        operations << { "crop" => { "position" => position_value } }
+      end
+    end
+
     # Generate description for ImgFlow preset
     # @param preset_name [String] Preset name
     # @param preset_data [Hash] Original preset data
     # @return [String] Description
     def generate_description(preset_name, preset_data)
-      operations = []
+      parts = []
+      add_width_description(parts, preset_data)
+      parts << "height: #{preset_data['height']}" if preset_data["height"]
+      parts << "quality: #{preset_data['quality']}" if preset_data["quality"]
+      parts << "formats: #{Array(preset_data['formats']).join(',')}" if preset_data["formats"]
+      parts << "crop: #{preset_data['crop']}" if preset_data["crop"]
+      parts << "gravity: #{preset_data['gravity']}" if preset_data["gravity"]
 
+      "Migrated from Picture Tag preset '#{preset_name}'. #{parts.join(', ')}"
+    end
+
+    def add_width_description(parts, preset_data)
       if preset_data["widths"]
-        operations << "widths: #{Array(preset_data['widths']).join(',')}"
-        operations << "using max width: #{Array(preset_data['widths']).max}"
+        parts << "widths: #{Array(preset_data['widths']).join(',')}"
+        parts << "using max width: #{Array(preset_data['widths']).max}"
       elsif preset_data["base_width"]
-        operations << "base_width: #{preset_data['base_width']}"
-        operations << "pixel_ratios: #{Array(preset_data['pixel_ratios']).join(',')}"
+        parts << "base_width: #{preset_data['base_width']}"
+        parts << "pixel_ratios: #{Array(preset_data['pixel_ratios']).join(',')}"
       elsif preset_data["width"]
-        operations << "width: #{preset_data['width']}"
+        parts << "width: #{preset_data['width']}"
       end
-
-      operations << "height: #{preset_data['height']}" if preset_data["height"]
-      operations << "quality: #{preset_data['quality']}" if preset_data["quality"]
-      operations << "formats: #{Array(preset_data['formats']).join(',')}" if preset_data["formats"]
-      operations << "crop: #{preset_data['crop']}" if preset_data["crop"]
-      operations << "gravity: #{preset_data['gravity']}" if preset_data["gravity"]
-
-      "Migrated from Picture Tag preset '#{preset_name}'. #{operations.join(', ')}"
     end
 
     # Save ImgFlow preset to YAML file

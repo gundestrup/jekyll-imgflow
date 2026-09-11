@@ -2,6 +2,7 @@
 
 require "open3"
 require "pathname"
+require "fileutils"
 
 module JekyllImgFlow
   module Providers
@@ -10,11 +11,68 @@ module JekyllImgFlow
       # Valid smartcrop position values
       SMARTCROP_POSITIONS = %w[attention entropy center centre].freeze
 
+      # Short compass → provider position mapping used by HTTP providers.
+      COMPASS_TO_SHORT = {
+        "northwest" => "tl",
+        "northeast" => "tr",
+        "southwest" => "bl",
+        "southeast" => "br",
+        "center" => "c"
+      }.freeze
+
       attr_accessor :config
 
       def initialize(config = {})
         @config = config
         @operations = []
+      end
+
+      # Operation lookup helpers — used by all providers to avoid
+      # repeating `@operations.find { |op| op[:type] == :xxx }`.
+      def find_op(type)
+        @operations.find { |op| op[:type] == type }
+      end
+
+      def op?(type)
+        @operations.any? { |op| op[:type] == type }
+      end
+
+      # Normalize a crop operation into a geometry hash.
+      # Returns { smartcrop:, keep:, x:, y:, width:, height: } where
+      # smartcrop is true when ratio + keep + valid smartcrop position.
+      def crop_geometry(operation)
+        opts = operation[:options] || {}
+        params = operation[:params] || {}
+        keep = opts[:keep] || params[:keep] || params[:position]
+        smartcrop = operation[:ratio] && keep && SMARTCROP_POSITIONS.include?(keep.to_s)
+        coords = if operation[:ratio]
+                   { x: opts[:calculated_x], y: opts[:calculated_y],
+                     width: opts[:calculated_width], height: opts[:calculated_height] }
+                 else
+                   { x: opts[:x] || 0, y: opts[:y] || 0,
+                     width: opts[:width], height: opts[:height] }
+                 end
+        coords.merge(smartcrop: smartcrop, keep: keep)
+      end
+
+      # Extract watermark operation parts into a hash.
+      def watermark_parts(operation)
+        {
+          watermark_path: operation[:watermark_path],
+          position: operation[:options][:position],
+          opacity: operation[:options][:opacity]
+        }
+      end
+
+      # Shared compass → short position mapping (tl/tr/bl/br/c).
+      # HTTP providers (imgproxy, weserv, flyimg) all use this mapping.
+      def compass_to_short(position)
+        COMPASS_TO_SHORT[position.to_s] || position.to_s
+      end
+
+      # Input format extension (lowercased, no dot) for format preservation.
+      def input_format_ext(input_path)
+        File.extname(input_path).delete(".").downcase
       end
 
       # Check if this provider is available (must be implemented by subclasses)
@@ -204,6 +262,75 @@ module JekyllImgFlow
 
           !unsupported_operations.include?(operation)
         end
+      end
+    end
+
+    # Shared base for HTTP-based providers (imgproxy, weserv, flyimg).
+    # Subclasses must implement `service_url`, `build_combined_url`, and
+    # define a `TIMEOUT` constant. They may optionally override
+    # `provider_label` for error messages.
+    class HttpBase < BaseProvider
+      def available?
+        url = service_url
+        return false unless url
+
+        check_http_service(url)
+      end
+
+      def execute(input_path, output_path)
+        return if @operations.empty?
+
+        url = build_combined_url(input_path)
+        fetch_and_save(url, output_path)
+        output_path
+      ensure
+        reset_operations
+      end
+
+      protected
+
+      # Subclasses override to return the configured service URL or nil.
+      def service_url
+        raise NotImplementedError
+      end
+
+      # Subclasses override to build the full request URL.
+      def build_combined_url(_input_path)
+        raise NotImplementedError
+      end
+
+      # Label used in error messages (defaults to class name).
+      def provider_label
+        self.class.name.split("::").last
+      end
+
+      def timeout
+        self.class::TIMEOUT
+      end
+
+      def fetch_and_save(url, output_path)
+        response = fetch_with_timeout(url)
+        raise "#{provider_label} request failed" if response.empty?
+
+        FileUtils.mkdir_p(File.dirname(output_path))
+        File.write(output_path, response)
+      end
+
+      def fetch_with_timeout(url)
+        uri = URI(url)
+        Net::HTTP.start(uri.host, uri.port,
+                        use_ssl: uri.scheme == "https",
+                        open_timeout: timeout,
+                        read_timeout: timeout) do |http|
+          request = Net::HTTP::Get.new(uri)
+          response = http.request(request)
+
+          raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
+
+          response.body
+        end
+      rescue StandardError => e
+        raise "#{provider_label} request failed: #{e.message}"
       end
     end
   end
