@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.6] - 2026-09-12
+
+### Fixed
+
+- Weserv provider now handles SVG files without explicit pixel dimensions
+  (e.g. `width="100%"` with a large `viewBox`). When no resize or crop
+  operation is present, a default `w=2000` parameter is added so librsvg
+  rasterizes at a reasonable size instead of the full viewBox dimensions
+  (which could exceed 85 megapixels and cause memory exhaustion or
+  connection drops).
+
 ## [0.3.5] - 2026-09-12
 
 ### Changed

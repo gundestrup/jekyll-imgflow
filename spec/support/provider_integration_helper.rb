@@ -4,6 +4,11 @@ require "json"
 require "open3"
 
 module ProviderIntegrationHelper
+  # SVG files with large viewBox dimensions can cause slow processing in
+  # ImageMagick (its internal SVG parser is very slow without the rsvg
+  # delegate). Other providers (weserv via librsvg, sharp, libvips) handle
+  # SVGs correctly — the weserv provider adds a default max size for SVGs
+  # without explicit dimensions (see SVG_DEFAULT_MAX_SIZE).
   SLOW_INPUT_FORMAT_EXCLUSIONS = {
     "imagemagick" => %w[svg]
   }.freeze
@@ -13,7 +18,7 @@ module ProviderIntegrationHelper
     images = TestPictures.get(set)
     provider = provider_name.to_s.downcase
     excluded_formats = SLOW_INPUT_FORMAT_EXCLUSIONS.fetch(provider, [])
-    excluded_formats -= ["svg"] if provider == "imagemagick" && ENV["FULL_SVG_TEST"] == "true"
+    excluded_formats -= ["svg"] if ENV["FULL_SVG_TEST"] == "true"
     return images if excluded_formats.empty?
 
     skipped = images.count do |image|
@@ -22,7 +27,8 @@ module ProviderIntegrationHelper
     if skipped.positive?
       Jekyll.logger.info "ImgFlow Test:",
                          "Skipping #{skipped} input file(s) for #{provider_name}: " \
-                         "#{excluded_formats.join(', ')} (use FULL_SVG_TEST=true to include SVG for ImageMagick)."
+                         "#{excluded_formats.join(', ')} " \
+                         "(use FULL_SVG_TEST=true to include SVG)."
     end
     images.reject do |image|
       excluded_formats.include?(File.extname(image).delete_prefix("."))

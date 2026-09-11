@@ -9,6 +9,11 @@ module JekyllImgFlow
     # Weserv provider implementation using the standardized tag interface
     class Weserv < HttpBase
       TIMEOUT = 30
+      # SVGs without explicit pixel dimensions (e.g. width="100%") are valid
+      # but cause librsvg to rasterize at the viewBox size, which can be huge.
+      # When no resize operation is present, cap the rasterization at 2000px
+      # on the longest edge so weserv processes the SVG at a reasonable size.
+      SVG_DEFAULT_MAX_SIZE = 2000
 
       def service_url
         @config.respond_to?(:weserv_url) ? @config.weserv_url : nil
@@ -26,10 +31,23 @@ module JekyllImgFlow
 
         @operations.each { |operation| append_weserv_operation(operation, params) }
 
+        ensure_svg_size_limit(input_path, params)
+
         "#{service_url}/?#{params.join('&')}"
       end
 
       private
+
+      def ensure_svg_size_limit(input_path, params)
+        return unless svg_file?(input_path)
+        return if params.any? { |p| p.start_with?("w=", "h=", "crop=") || p.include?("cw=") }
+
+        params << "w=#{SVG_DEFAULT_MAX_SIZE}"
+      end
+
+      def svg_file?(input_path)
+        File.extname(input_path).downcase == ".svg"
+      end
 
       def append_weserv_operation(operation, params)
         case operation[:type]

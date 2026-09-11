@@ -98,6 +98,28 @@ ImgFlow has two processing flows: **Build-Time** (pre-generation) and **Runtime*
 
 **See:** [providers.md](docs/providers.md) for detailed provider comparison and setup
 
+### SVG File Handling
+
+SVG files are supported as input by all providers. Since SVGs are vector
+graphics, they are rasterized before format conversion (WebP, AVIF, JPG, PNG).
+
+- **Weserv** (via librsvg): When an SVG has no explicit pixel dimensions
+  (e.g. `width="100%"` with a large `viewBox`), ImgFlow automatically
+  caps the rasterization at 2000px wide to prevent memory exhaustion.
+  If a resize or crop operation is present, the target dimensions are used
+  directly.
+- **Sharp, LibVips, Imgproxy, Flyimg**: Handle SVGs via their respective
+  rasterization backends. SVGs with very large viewBox dimensions may be
+  slow or fail depending on the provider's memory limits.
+- **ImageMagick**: SVG processing is slower than other providers without
+  the `librsvg` delegate installed. Set `FULL_SVG_TEST=true` to include
+  SVGs in ImageMagick test runs.
+
+SVGs with explicit `width` and `height` attributes (in pixels, not
+percentages) are always processed at the specified size first, then resized
+to the target dimensions — this is the recommended way to author SVGs for
+image processing.
+
 ## 🚀 Quick Commands
 
 ```bash

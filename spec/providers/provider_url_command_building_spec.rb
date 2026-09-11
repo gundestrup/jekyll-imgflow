@@ -107,6 +107,29 @@ RSpec.describe "Provider URL and Command Building", :provider do
           provider_no_url.build_combined_weserv_url("/test.jpg")
         end.to raise_error(/weserv_url not set/)
       end
+
+      it "adds default w=2000 for SVG without resize" do
+        url = provider.build_combined_weserv_url("/images/test.svg")
+        expect(url).to include("w=2000")
+      end
+
+      it "does not add default w for SVG when resize is present" do
+        provider.resize(800, 600)
+        url = provider.build_combined_weserv_url("/images/test.svg")
+        expect(url).to include("w=800&h=600")
+        expect(url).not_to include("w=2000")
+      end
+
+      it "does not add default w for non-SVG without resize" do
+        url = provider.build_combined_weserv_url("/images/test.jpg")
+        expect(url).not_to include("w=2000")
+      end
+
+      it "does not add default w for SVG when crop is present" do
+        provider.crop(nil, x: 10, y: 20, width: 100, height: 80)
+        url = provider.build_combined_weserv_url("/images/test.svg")
+        expect(url).not_to include("w=2000")
+      end
     end
 
     describe "#translate_weserv_position" do
