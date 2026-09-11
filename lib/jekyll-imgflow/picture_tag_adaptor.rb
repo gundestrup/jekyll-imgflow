@@ -16,26 +16,19 @@ module JekyllImgFlow
       result = translate_to_imgflow(picture_markup)
       return "" if result[:markup].empty?
 
-      # Build ImgFlow tag with attributes
-      tag_parts = ["{% imgflow", result[:markup]]
+      "{% imgflow #{[result[:markup], *translated_attributes(result[:attributes]), '%}'].join(' ')}"
+    end
 
-      # Add HTML attributes
-      tag_parts << "alt:\"#{result[:attributes][:alt]}\"" if result[:attributes][:alt]
+    def translated_attributes(attributes)
+      parts = []
+      parts << "alt:\"#{attributes[:alt]}\"" if attributes[:alt]
+      parts.concat(prefixed_attributes(attributes[:img], "img"))
+      parts.concat(prefixed_attributes(attributes[:picture], "picture"))
+      parts
+    end
 
-      if result[:attributes][:img]&.any?
-        result[:attributes][:img].each do |name, value|
-          tag_parts << "img-#{name}:\"#{value}\""
-        end
-      end
-
-      if result[:attributes][:picture]&.any?
-        result[:attributes][:picture].each do |name, value|
-          tag_parts << "picture-#{name}:\"#{value}\""
-        end
-      end
-
-      tag_parts << "%}"
-      tag_parts.join(" ")
+    def prefixed_attributes(attributes, prefix)
+      attributes.to_h.map { |name, value| "#{prefix}-#{name}:\"#{value}\"" }
     end
 
     # Convert Picture Tag markup to ImgFlow markup with HTML attributes
@@ -57,23 +50,25 @@ module JekyllImgFlow
       categorized = categorize_arguments(args)
       return { markup: "", attributes: {} } unless categorized[:image]
 
-      # Step 2: Translate each category to ImgFlow syntax
-      imgflow_parts = []
-      imgflow_parts << categorized[:image]
-      imgflow_parts += translate_media_queries(categorized[:media_queries])
-      imgflow_parts += translate_operations(categorized[:operations])
-      imgflow_parts << "formats:webp,jpg" unless formats?(imgflow_parts)
-      imgflow_parts << "markup:#{categorized[:markup_format]}" if categorized[:markup_format] && categorized[:markup_format] != "auto"
-
-      # Step 3: Assemble result
+      imgflow_parts = translated_parts(categorized)
       {
-        markup: imgflow_parts.compact.join(" "),
+        markup: imgflow_parts.join(" "),
         attributes: categorized[:html_attributes],
         markup_format: categorized[:markup_format]
       }
     end
 
     private
+
+    def translated_parts(categorized)
+      parts = [categorized[:image]]
+      parts.concat(translate_media_queries(categorized[:media_queries]))
+      parts.concat(translate_operations(categorized[:operations]))
+      parts << "formats:webp,jpg" unless formats?(parts)
+      format = categorized[:markup_format]
+      parts << "markup:#{format}" if format && format != "auto"
+      parts.compact
+    end
 
     def extract_picture_content(markup)
       offset = 0
@@ -105,37 +100,43 @@ module JekyllImgFlow
     # @param content [String] Raw content
     # @return [Array] Parsed arguments
     def parse_arguments(content)
-      args = []
-      current = +"" # Create unfrozen string
-      in_quotes = false
-      quote_char = nil
+      state = { args: [], current: +"", in_quotes: false, quote_char: nil }
+      content.each_char { |char| consume_argument_character(state, char) }
+      state[:args] << state[:current].dup unless state[:current].empty?
+      state[:args]
+    end
 
-      content.dup.each_char do |char|
-        case char
-        when '"', "'"
-          if !in_quotes
-            in_quotes = true
-            quote_char = char
-          elsif char == quote_char
-            in_quotes = false
-            quote_char = nil
-          else
-            current << char
-          end
-        when " "
-          if in_quotes
-            current << char
-          elsif !current.empty?
-            args << current.dup
-            current = +""
-          end
-        else
-          current << char
-        end
+    def consume_argument_character(state, char)
+      if quote_character?(char)
+        consume_quote(state, char)
+      elsif char == " " && !state[:in_quotes]
+        append_argument(state)
+      else
+        state[:current] << char
       end
+    end
 
-      args << current.dup unless current.empty?
-      args
+    def quote_character?(char)
+      ["\"", "'"].include?(char)
+    end
+
+    def consume_quote(state, char)
+      if !state[:in_quotes]
+        state[:in_quotes] = true
+        state[:quote_char] = char
+      elsif char == state[:quote_char]
+        state[:in_quotes] = false
+        state[:quote_char] = nil
+      else
+        state[:current] << char
+      end
+    end
+
+    def append_argument(state)
+      return if state[:current].empty?
+
+      state[:args] << state[:current].dup
+      state[:current] = +""
     end
 
     # Categorize arguments into types
@@ -149,59 +150,65 @@ module JekyllImgFlow
         html_attributes: default_html_attributes,
         markup_format: nil
       }
-
-      i = 0
-      while i < args.length
-        arg = args[i]
-
-        case arg
-        when /^--alt$/
-          # Collect alt text until next --
-          i += 1
-          alt_parts = []
-          while i < args.length && !args[i].start_with?("--")
-            alt_parts << args[i]
-            i += 1
-          end
-          result[:html_attributes][:alt] = strip_quotes(alt_parts.join(" "))
-          next
-        when /^--link$/
-          result[:html_attributes][:link] = strip_quotes(args[i + 1]) if i + 1 < args.length
-          i += 2
-          next
-        when /^--(img|picture|source|a|parent)$/
-          element = ::Regexp.last_match(1).to_sym
-          i += 1
-          while i < args.length && !args[i].start_with?("--")
-            parse_element_attribute(args[i], result[:html_attributes][element])
-            i += 1
-          end
-          next
-        when /(mobile|tablet|desktop):/
-          device = ::Regexp.last_match(1)
-          i += 1
-          if i < args.length && args[i].include?(".")
-            image = args[i]
-            i += 1
-            crop = parse_crop_from_arg(args[i]) if i < args.length && args[i] =~ /^\d+:\d+/
-            i += 1 if crop
-            result[:media_queries][device] = { image: image, crop: crop }
-          end
-          next
-        when /^(auto|data_auto|picture|img)$/
-          result[:markup_format] = arg
-        when /\./
-          # Image path (has extension, no colon)
-          result[:image] ||= arg unless arg.include?(":")
-        else
-          # Operation argument
-          result[:operations] << arg unless arg.start_with?("--")
-        end
-
-        i += 1
-      end
-
+      index = 0
+      index = categorize_argument(args, result, index) while index < args.length
       result
+    end
+
+    def categorize_argument(args, result, index)
+      arg = args[index]
+      return parse_alt_argument(args, result, index) if arg == "--alt"
+      return parse_link_argument(args, result, index) if arg == "--link"
+      return parse_element_arguments(args, result, index) if arg.match?(/^--(img|picture|source|a|parent)$/)
+      return parse_media_argument(args, result, index) if arg.match?(/(mobile|tablet|desktop):/)
+
+      categorize_simple_argument(arg, result)
+      index + 1
+    end
+
+    def parse_alt_argument(args, result, index)
+      values, next_index = values_until_option(args, index + 1)
+      result[:html_attributes][:alt] = strip_quotes(values.join(" "))
+      next_index
+    end
+
+    def parse_link_argument(args, result, index)
+      result[:html_attributes][:link] = strip_quotes(args[index + 1]) if args[index + 1]
+      index + 2
+    end
+
+    def parse_element_arguments(args, result, index)
+      element = args[index].match(/^--(img|picture|source|a|parent)$/)[1].to_sym
+      values, next_index = values_until_option(args, index + 1)
+      values.each { |value| parse_element_attribute(value, result[:html_attributes][element]) }
+      next_index
+    end
+
+    def values_until_option(args, index)
+      start = index
+      index += 1 while index < args.length && !args[index].start_with?("--")
+      [args[start...index], index]
+    end
+
+    def parse_media_argument(args, result, index)
+      device = args[index].match(/(mobile|tablet|desktop):/)[1]
+      image = args[index + 1]
+      return index + 1 unless image&.include?(".")
+
+      crop = parse_crop_from_arg(args[index + 2])
+      result[:media_queries][device] = { image: image, crop: crop }
+      index + 2 + (crop ? 1 : 0)
+    end
+
+    def categorize_simple_argument(arg, result)
+      case arg
+      when /^(auto|data_auto|picture|img)$/
+        result[:markup_format] = arg
+      when /\./
+        result[:image] ||= arg unless arg.include?(":")
+      else
+        result[:operations] << arg unless arg.start_with?("--")
+      end
     end
 
     # Translate media queries to ImgFlow crop syntax

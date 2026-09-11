@@ -78,8 +78,9 @@ module JekyllImgFlow
       results = @batch_manager.process_all
       register_skipped_tasks(@batch_manager.completed)
 
-      # Save manifest so it's available when ImgflowTag runs
-      @manifest.save
+      # Persist newly processed defaults; unchanged builds keep page-usage resets in memory
+      # until post_write saves the final stable manifest.
+      @manifest.save unless results[:completed].zero? && results[:failed].zero?
 
       Jekyll.logger.info "✅ BuildTimeProcessor complete: #{results[:completed]} completed, #{results[:failed]} failed"
 

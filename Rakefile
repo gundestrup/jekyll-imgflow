@@ -256,7 +256,7 @@ namespace :parallel do
     cpu_count = `sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4`.to_i
     requested_workers = ENV.fetch("IMGFLOW_MAX_PARALLEL_PROCESSES", cpu_count - 1).to_i
     max_workers = [requested_workers, 1].max
-    max_workers = [max_workers, 7, work_queue.length].min
+    max_workers = [max_workers, 3, work_queue.length].min
 
     run_job = lambda do |queued_job|
       puts "  ▶ #{queued_job[:name]}"

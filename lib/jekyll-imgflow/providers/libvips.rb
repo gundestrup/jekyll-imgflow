@@ -31,24 +31,32 @@ module JekyllImgFlow
       # Each sub-array is passed directly to Open3.capture3 (no shell).
       # Returns Array[Array[String]].
       def build_vips_commands(input_path, output_path)
-        has_crop = @operations.any? { |op| op[:type] == :crop }
-        has_resize = @operations.any? { |op| op[:type] == :resize }
-        has_watermark = @operations.any? { |op| op[:type] == :watermark }
-        has_alpha = @operations.any? { |op| op[:type] == :alpha_opacity }
+        flags = operation_flags
+        operation_builder = select_operation_builder(flags)
+        operation_builder.call(input_path, output_path)
+      end
 
-        if has_watermark
-          build_watermark_pipeline(input_path, output_path, has_crop, has_resize)
-        elsif has_alpha
-          build_alpha_pipeline(input_path, output_path, has_crop, has_resize)
-        elsif has_crop && has_resize
-          build_sequential_crop_resize(input_path, output_path)
-        elsif has_resize
-          [build_resize_command(input_path, output_path)]
-        elsif has_crop
-          svg?(input_path) ? build_svg_crop_pipeline(input_path, output_path) : [build_crop_command(input_path, output_path)]
-        else
-          [build_copy_command(input_path, output_path)]
-        end
+      def select_operation_builder(flags)
+        return ->(input, output) { build_watermark_pipeline(input, output, flags[:crop], flags[:resize]) } if flags[:watermark]
+        return ->(input, output) { build_alpha_pipeline(input, output, flags[:crop], flags[:resize]) } if flags[:alpha]
+        return ->(input, output) { build_sequential_crop_resize(input, output) } if flags[:crop] && flags[:resize]
+        return ->(input, output) { [build_resize_command(input, output)] } if flags[:resize]
+        return ->(input, output) { crop_commands(input, output) } if flags[:crop]
+
+        ->(input, output) { [build_copy_command(input, output)] }
+      end
+
+      def operation_flags
+        {
+          crop: @operations.any? { |op| op[:type] == :crop },
+          resize: @operations.any? { |op| op[:type] == :resize },
+          watermark: @operations.any? { |op| op[:type] == :watermark },
+          alpha: @operations.any? { |op| op[:type] == :alpha_opacity }
+        }
+      end
+
+      def crop_commands(input_path, output_path)
+        svg?(input_path) ? build_svg_crop_pipeline(input_path, output_path) : [build_crop_command(input_path, output_path)]
       end
 
       # Convenience wrapper for backward compatibility with tests.
@@ -64,22 +72,8 @@ module JekyllImgFlow
       end
 
       def build_alpha_pipeline(input_path, output_path, has_crop, has_resize)
-        commands = []
         temp_path = input_path.gsub(/\.[^.]+$/, ".tmp_base.jpg")
-
-        if has_crop && has_resize
-          commands.concat(build_sequential_crop_resize(input_path, temp_path))
-          base_path = temp_path
-        elsif has_resize
-          commands << build_resize_command(input_path, temp_path)
-          base_path = temp_path
-        elsif has_crop
-          commands << build_crop_command(input_path, temp_path)
-          base_path = temp_path
-        else
-          base_path = input_path
-        end
-
+        commands, base_path = build_base_pipeline(input_path, temp_path, has_crop, has_resize)
         commands << build_alpha_command(base_path, output_path)
         commands << [:cleanup, temp_path] unless base_path == input_path
         commands
@@ -87,39 +81,32 @@ module JekyllImgFlow
 
       def build_watermark_pipeline(input_path, output_path, has_crop, has_resize)
         temp_path = input_path.gsub(/\.[^.]+$/, ".tmp_base.jpg")
-
-        commands = []
-
-        # Step 1: Process crop/resize/copy to produce base image
-        if has_crop && has_resize
-          commands.concat(build_sequential_crop_resize(input_path, temp_path))
-          base_path = temp_path
-        elsif has_resize
-          commands << build_resize_command(input_path, temp_path)
-          base_path = temp_path
-        elsif has_crop
-          commands << build_crop_command(input_path, temp_path)
-          base_path = temp_path
-        else
-          base_path = input_path
-        end
-
-        # Step 2: Apply alpha opacity if present (before watermark)
-        alpha_op = @operations.find { |op| op[:type] == :alpha_opacity }
-        if alpha_op
-          alpha_temp = input_path.gsub(/\.[^.]+$/, ".tmp_alpha.jpg")
-          commands << build_alpha_command(base_path, alpha_temp)
-          base_path = alpha_temp
-        end
-
-        # Step 3: Composite watermark over base
+        commands, base_path = build_base_pipeline(input_path, temp_path, has_crop, has_resize)
+        base_path, commands = apply_watermark_alpha(base_path, input_path, commands)
         commands.concat(build_composite_commands(base_path, output_path))
-
-        # Step 4: Cleanup temp files
-        temp_files = [temp_path, base_path == input_path ? nil : base_path].compact
-        temp_files.each { |f| commands << [:cleanup, f] }
-
+        cleanup_paths(commands, input_path, temp_path, base_path)
         commands
+      end
+
+      def build_base_pipeline(input_path, temp_path, has_crop, has_resize)
+        return [build_sequential_crop_resize(input_path, temp_path), temp_path] if has_crop && has_resize
+        return [[build_resize_command(input_path, temp_path)], temp_path] if has_resize
+        return [[build_crop_command(input_path, temp_path)], temp_path] if has_crop
+
+        [[], input_path]
+      end
+
+      def apply_watermark_alpha(base_path, input_path, commands)
+        alpha_op = @operations.find { |op| op[:type] == :alpha_opacity }
+        return [base_path, commands] unless alpha_op
+
+        alpha_temp = input_path.gsub(/\.[^.]+$/, ".tmp_alpha.jpg")
+        [alpha_temp, commands << build_alpha_command(base_path, alpha_temp)]
+      end
+
+      def cleanup_paths(commands, input_path, temp_path, base_path)
+        temp_files = [temp_path, base_path == input_path ? nil : base_path].compact
+        temp_files.each { |file| commands << [:cleanup, file] }
       end
 
       def build_composite_commands(base_path, output_path)
@@ -233,27 +220,31 @@ module JekyllImgFlow
         opts = crop_op[:options] || {}
         params = crop_op[:params] || {}
         keep = opts[:keep] || params[:keep] || params[:position]
+        return build_smartcrop_command(crop_op, opts, keep, input_path, output_path) if smartcrop?(crop_op, keep)
 
-        if crop_op[:ratio] && keep && %w[attention entropy center
-                                         centre].include?(keep.to_s)
-          crop_width = opts[:calculated_width]
-          crop_height = opts[:calculated_height]
-          interestingness = case keep.to_s
-                            when "entropy" then "entropy"
-                            when "center", "centre" then "centre"
-                            else "attention"
-                            end
-          ["vips", "smartcrop", input_path, output_path,
-           crop_width.to_s, crop_height.to_s,
-           "--interesting=#{interestingness}"]
-        else
-          crop_x = crop_op[:ratio] ? opts[:calculated_x] : (opts[:x] || 0)
-          crop_y = crop_op[:ratio] ? opts[:calculated_y] : (opts[:y] || 0)
-          crop_width = crop_op[:ratio] ? opts[:calculated_width] : opts[:width]
-          crop_height = crop_op[:ratio] ? opts[:calculated_height] : opts[:height]
-          ["vips", "extract_area", input_path, output_path,
-           crop_x.to_s, crop_y.to_s, crop_width.to_s, crop_height.to_s]
-        end
+        build_extract_command(crop_op, opts, input_path, output_path)
+      end
+
+      def smartcrop?(crop_op, keep)
+        crop_op[:ratio] && keep && %w[attention entropy center centre].include?(keep.to_s)
+      end
+
+      def build_smartcrop_command(_crop_op, opts, keep, input_path, output_path)
+        interestingness = %w[center centre].include?(keep.to_s) ? "centre" : keep.to_s
+        interestingness = "attention" unless %w[entropy centre].include?(interestingness)
+        ["vips", "smartcrop", input_path, output_path,
+         opts[:calculated_width].to_s, opts[:calculated_height].to_s,
+         "--interesting=#{interestingness}"]
+      end
+
+      def build_extract_command(crop_op, opts, input_path, output_path)
+        ratio = crop_op[:ratio]
+        x = ratio ? opts[:calculated_x] : (opts[:x] || 0)
+        y = ratio ? opts[:calculated_y] : (opts[:y] || 0)
+        width = ratio ? opts[:calculated_width] : opts[:width]
+        height = ratio ? opts[:calculated_height] : opts[:height]
+        ["vips", "extract_area", input_path, output_path,
+         x.to_s, y.to_s, width.to_s, height.to_s]
       end
 
       # SVG crop: use `vips thumbnail` with --crop to crop during thumbnailing.

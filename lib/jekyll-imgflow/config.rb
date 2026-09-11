@@ -28,33 +28,40 @@ module JekyllImgFlow
                 :optimize_qualities, :fallback_format, :image_modal
 
     def initialize(site)
-      shared = site.config["shared_images_configs"] || {}
-      overrides = site.config["imgflow"] || {}
-      cfg = shared.merge(overrides)
+      @site = site
+      cfg = merged_config
+      assign_core_config(cfg)
+      assign_provider_config(cfg)
+      @optimize_qualities = cfg["optimize_qualities"] || default_optimize_qualities
+      validate_backend_priority!
+    end
 
-      @site             = site
-      @originals        = cfg["originals"] || DEFAULT_ORIGINALS
-      @output           = cfg["output"] || DEFAULT_OUTPUT
-      @input_formats    = cfg["input_formats"] || DEFAULT_INPUT_FORMATS
-      @sizes            = cfg["sizes"] || DEFAULT_SIZES
-      @formats          = cfg["formats"] || DEFAULT_FORMATS
-      @quality          = cfg["quality"] || DEFAULT_QUALITY
+    def assign_core_config(cfg)
+      @originals = cfg["originals"] || DEFAULT_ORIGINALS
+      @output = cfg["output"] || DEFAULT_OUTPUT
+      @input_formats = cfg["input_formats"] || DEFAULT_INPUT_FORMATS
+      @sizes = cfg["sizes"] || DEFAULT_SIZES
+      @formats = cfg["formats"] || DEFAULT_FORMATS
+      @quality = cfg["quality"] || DEFAULT_QUALITY
       @backend_priority = cfg["backend_priority"] || DEFAULT_BACKEND_PRIORITY
-      @fallback_format  = cfg["fallback_format"] || DEFAULT_FALLBACK_FORMAT
-      @image_modal      = cfg.fetch("image_modal", DEFAULT_IMAGE_MODAL)
+      @fallback_format = cfg["fallback_format"] || DEFAULT_FALLBACK_FORMAT
+      @image_modal = cfg.fetch("image_modal", DEFAULT_IMAGE_MODAL)
+    end
 
+    def assign_provider_config(cfg)
       @imgproxy_url = cfg["imgproxy_url"]
-      @weserv_url       = cfg["weserv_url"]
-      @flyimg_url       = cfg["flyimg_url"]
-      @optimize_qualities = cfg["optimize_qualities"] || {
+      @weserv_url = cfg["weserv_url"]
+      @flyimg_url = cfg["flyimg_url"]
+    end
+
+    def default_optimize_qualities
+      {
         "low" => 30,
         "medium" => 50, # Uses default quality
         "high" => 85, # Uses default quality
         "maximum" => 95,
         "default" => 75
       }
-
-      validate_backend_priority!
     end
 
     def cache_dir

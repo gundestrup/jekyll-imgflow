@@ -50,7 +50,7 @@ case "$1" in
         ruby "$TEST_LOGGER"
         ;;
     *)
-        echo -e "${YELLOW}🧪 Running tests with logging: $@${NC}"
+        echo -e "${YELLOW}🧪 Running tests with logging: ${*}${NC}"
         ruby "$TEST_LOGGER" "$@"
         ;;
 esac

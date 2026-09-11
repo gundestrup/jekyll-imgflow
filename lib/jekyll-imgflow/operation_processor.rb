@@ -43,84 +43,64 @@ module JekyllImgFlow
     # @param page_path [String] Optional page path for manifest tracking
     # @return [String] Path to processed image
     def process_operation(original_name, operation, input_path, page_path = nil)
-      type = operation[:type]
       params = operation[:params]
       file_digest = operation[:file_digest] || @filename_generator.file_digest(input_path)
-
-      # Determine version type
       version_type = determine_version_type(params)
-
-      # Preserve original directory structure under output
-      subdir = File.dirname(original_name)
-      subdir = nil if subdir == "."
-
-      # Generate filename using FilenameGenerator (JPT compatible)
       filename = @filename_generator.generate_filename(input_path, params)
+      subdir = output_subdir(original_name)
+      output_path = @path_resolver.resolve_source_output_path(filename, subdir)
+      FileUtils.mkdir_p(File.dirname(output_path))
 
-      # Write to source directory so Jekyll copies files to _site during the write phase
-      actual_output_path = @path_resolver.resolve_source_output_path(filename, subdir)
+      process_output(operation, original_name, input_path, output_path, params)
+      register_manifest(original_name, filename, params, version_type, page_path, file_digest, subdir)
+      register_jekyll_static_file(output_path)
+      output_path
+    end
 
-      # Ensure output directory exists before processing
-      FileUtils.mkdir_p(File.dirname(actual_output_path))
+    def output_subdir(original_name)
+      subdir = File.dirname(original_name)
+      subdir == "." ? nil : subdir
+    end
 
-      # Skip processing if the output file already exists and is up-to-date.
-      # This handles legacy manifests, corrupted manifests, and any case where
-      # optimized files exist on disk but the manifest is out of sync — the
-      # version is registered in the manifest without re-running the provider.
-      if !operation[:force_processing] && output_up_to_date?(input_path, actual_output_path)
-        Jekyll.logger.debug "⏭️  ImgFlow: Output exists and up-to-date, " \
-                            "skipping provider call for #{original_name}"
+    def process_output(operation, original_name, input_path, output_path, params)
+      if !operation[:force_processing] && output_up_to_date?(input_path, output_path)
+        Jekyll.logger.debug "⏭️  ImgFlow: Output exists and up-to-date, skipping provider call for #{original_name}"
         @stats.record_cache_hit
       elsif AnimatedGifDetector.animated?(input_path)
-        # Animated GIFs must not be resized or converted — the operation
-        # would destroy the animation. Copy the original file as-is so the
-        # manifest can track it and HTML references stay valid.
-        Jekyll.logger.warn "🖼️  ImgFlow: Skipping resize for animated GIF " \
-                           "'#{original_name}' — copying original as-is to " \
-                           "preserve animation."
-        FileUtils.cp(input_path, actual_output_path)
-        @stats.record_cache_miss
+        copy_animated_image(original_name, input_path, output_path)
       else
-        # Process the operation (create the image)
-        elapsed = Benchmark.measure do
-          process_single_operation(type, input_path, actual_output_path, params)
-        end
-        @stats.record_operation_time(type, elapsed.real)
-        @stats.record_cache_miss
-
-        # Record compression ratio if we have the original size
-        if File.file?(input_path) && File.file?(actual_output_path)
-          format = params[:format] || File.extname(input_path).delete(".")
-          @stats.record_compression_ratio(format.to_s, File.size(input_path),
-                                          File.size(actual_output_path))
-        end
+        process_image(operation[:type], input_path, output_path, params)
       end
+    end
 
-      # Register in manifest
-      if @manifest
-        # Store relative path (with leading /) for manifest storage
-        relative_path = "/#{@path_resolver.resolve_relative_output_path(filename, subdir)}"
+    def copy_animated_image(original_name, input_path, output_path)
+      Jekyll.logger.warn "🖼️  ImgFlow: Skipping resize for animated GIF '#{original_name}' — " \
+                         "copying original as-is to preserve animation."
+      FileUtils.cp(input_path, output_path)
+      @stats.record_cache_miss
+    end
 
-        provider_name = @provider&.class&.provider_name || "unknown"
-        @manifest.register_version(
-          original_name,
-          relative_path,
-          params,
-          version_type,
-          page_path,
-          file_digest,
-          provider_name
-        )
-      end
+    def process_image(type, input_path, output_path, params)
+      elapsed = Benchmark.measure { process_single_operation(type, input_path, output_path, params) }
+      @stats.record_operation_time(type, elapsed.real)
+      @stats.record_cache_miss
+      record_compression_ratio(input_path, output_path, params)
+    end
 
-      # Register as Jekyll static file so Jekyll copies it to _site during
-      # the write phase. Without this, files created during pre_render (or
-      # during render via imgflow tags) are not picked up by Jekyll's static
-      # file reader, which runs before pre_render. This would leave _site
-      # without optimized images until a second build.
-      register_jekyll_static_file(actual_output_path)
+    def record_compression_ratio(input_path, output_path, params)
+      return unless File.file?(input_path) && File.file?(output_path)
 
-      actual_output_path
+      format = params[:format] || File.extname(input_path).delete(".")
+      @stats.record_compression_ratio(format.to_s, File.size(input_path), File.size(output_path))
+    end
+
+    def register_manifest(original_name, filename, params, version_type, page_path, file_digest, subdir)
+      return unless @manifest
+
+      relative_path = "/#{@path_resolver.resolve_relative_output_path(filename, subdir)}"
+      provider_name = @provider&.class&.provider_name || "unknown"
+      @manifest.register_version(original_name, relative_path, params, version_type, page_path,
+                                 file_digest, provider_name)
     end
 
     # Register a generated file as a Jekyll::StaticFile so Jekyll copies it

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-08T08:32:14+02:00",
+  "generated_at": "2026-09-11T09:25:26+02:00",
   "picture_library": "default",
   "test_images_count": 1,
   "test_sizes": [
@@ -16,34 +16,34 @@
   ],
   "providers": {
     "sharp": {
-      "build_time": 8.77,
-      "images_generated": 20,
-      "total_output_size": 19605657,
+      "build_time": 1543.11,
       "total_input_size": 3867264,
+      "images_generated": 20,
+      "total_output_size": 19113247,
       "operation_timings": {
-        "resize": 8.664
+        "resize": 1542.716
       },
       "compression_ratios": {
-        "avif": 90.6,
+        "avif": 93.2,
         "webp": 94.2,
         "png": 20.3,
         "jpg": 93.5
       },
       "status": "success",
-      "cold_cache_hits": 13,
+      "cold_cache_hits": 36,
       "cold_cache_misses": 20,
-      "warm_build_time": 0.07,
-      "cache_hits": 33,
+      "warm_build_time": 0.91,
+      "cache_hits": 56,
       "cache_misses": 0,
       "cache_hit_rate": 100.0
     },
     "libvips": {
-      "build_time": 6.97,
+      "build_time": 17.19,
+      "total_input_size": 3867264,
       "images_generated": 20,
       "total_output_size": 19309293,
-      "total_input_size": 3867264,
       "operation_timings": {
-        "resize": 6.877
+        "resize": 16.48
       },
       "compression_ratios": {
         "avif": 93.0,
@@ -52,20 +52,20 @@
         "jpg": 92.9
       },
       "status": "success",
-      "cold_cache_hits": 13,
+      "cold_cache_hits": 36,
       "cold_cache_misses": 20,
-      "warm_build_time": 0.07,
-      "cache_hits": 33,
+      "warm_build_time": 0.14,
+      "cache_hits": 56,
       "cache_misses": 0,
       "cache_hit_rate": 100.0
     },
     "imagemagick": {
-      "build_time": 5.75,
+      "build_time": 6.16,
+      "total_input_size": 3867264,
       "images_generated": 20,
       "total_output_size": 14727646,
-      "total_input_size": 3867264,
       "operation_timings": {
-        "resize": 5.647
+        "resize": 5.983
       },
       "compression_ratios": {
         "avif": 91.4,
@@ -74,10 +74,76 @@
         "jpg": 90.0
       },
       "status": "success",
-      "cold_cache_hits": 13,
+      "cold_cache_hits": 36,
       "cold_cache_misses": 20,
-      "warm_build_time": 0.08,
-      "cache_hits": 33,
+      "warm_build_time": 0.15,
+      "cache_hits": 56,
+      "cache_misses": 0,
+      "cache_hit_rate": 100.0
+    },
+    "imgproxy": {
+      "build_time": 3.36,
+      "total_input_size": 3867264,
+      "images_generated": 20,
+      "total_output_size": 13859347,
+      "operation_timings": {
+        "resize": 3.178
+      },
+      "compression_ratios": {
+        "avif": 93.0,
+        "webp": 94.4,
+        "png": 47.7,
+        "jpg": 93.2
+      },
+      "status": "success",
+      "cold_cache_hits": 36,
+      "cold_cache_misses": 20,
+      "warm_build_time": 0.14,
+      "cache_hits": 56,
+      "cache_misses": 0,
+      "cache_hit_rate": 100.0
+    },
+    "weserv": {
+      "build_time": 3.05,
+      "total_input_size": 3867264,
+      "images_generated": 20,
+      "total_output_size": 19355457,
+      "operation_timings": {
+        "resize": 2.865
+      },
+      "compression_ratios": {
+        "avif": 91.9,
+        "webp": 94.2,
+        "png": 20.3,
+        "jpg": 93.5
+      },
+      "status": "success",
+      "cold_cache_hits": 36,
+      "cold_cache_misses": 20,
+      "warm_build_time": 0.16,
+      "cache_hits": 56,
+      "cache_misses": 0,
+      "cache_hit_rate": 100.0
+    },
+    "flyimg": {
+      "build_time": 2.4,
+      "total_input_size": 3867264,
+      "images_generated": 20,
+      "total_output_size": 16165182,
+      "operation_timings": {
+        "resize": 2.179
+      },
+      "compression_ratios": {
+        "avif": 91.0,
+        "webp": 93.1,
+        "png": 40.8,
+        "jpg": 91.6
+      },
+      "status": "success",
+      "cold_cache_hits": 36,
+      "cold_cache_misses": 20,
+      "warm_build_time": 0.15,
+      "cache_hits": 56,
       "cache_misses": 0,
       "cache_hit_rate": 100.0
     }

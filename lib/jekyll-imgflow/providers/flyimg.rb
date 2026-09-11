@@ -9,7 +9,7 @@ module JekyllImgFlow
   module Providers
     # Flyimg provider implementation using the standardized tag interface
     class Flyimg < BaseProvider
-      TIMEOUT = 10
+      TIMEOUT = 60
 
       def available?
         # Check if flyimg service is running

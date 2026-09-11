@@ -170,35 +170,63 @@ module Jekyll
 
     def process_variant(components, operation, params, original_name, input_path, page_path)
       config = components[:config]
-      if determine_version_type(params, config) == :default
-        params[:format] ||= config.formats.first
-        params[:quality] ||= config.quality
+      apply_default_params(params, config)
+      variant = variant_context(components, params, original_name, input_path, config)
+
+      if variant_cached?(components, original_name, params, variant[:version_type],
+                         variant[:digest], variant[:output_path])
+        return cached_variant(components, original_name, params, variant[:version_type],
+                              variant[:digest], variant[:output_path], page_path)
       end
 
+      process_variant_output(components, operation, params, variant, original_name, input_path,
+                             page_path)
+    end
+
+    def variant_context(components, params, original_name, input_path, config)
       digest = components[:filename_generator].file_digest(input_path)
-      variant = operation.merge(params: params, file_digest: digest)
-      subdir = File.dirname(original_name)
-      subdir = nil if subdir == "."
       filename = components[:filename_generator].generate_filename(input_path, params)
-      output_path = components[:path_resolver].resolve_source_output_path(filename, subdir)
-      version_type = determine_version_type(params, config)
+      subdir = output_subdir(original_name)
+      {
+        digest: digest,
+        output_path: components[:path_resolver].resolve_source_output_path(filename, subdir),
+        version_type: determine_version_type(params, config)
+      }
+    end
 
-      if components[:manifest].version_exists?(original_name, params, version_type, digest) &&
-         File.file?(output_path)
-        components[:stats]&.record_cache_hit
-        components[:manifest].update_page_usage(original_name, params, version_type, page_path)
-        return output_path
-      end
-
+    def process_variant_output(components, operation, params, variant, original_name, input_path,
+                               page_path)
       unless components[:operation_processor]
         Jekyll.logger.warn "ImgFlow:", "No image provider available — " \
                                        "rendering original without optimization."
         return input_path
       end
 
-      components[:operation_processor].process_operation(
-        original_name, variant.merge(force_processing: true), input_path, page_path
-      )
+      operation_params = operation.merge(params: params, file_digest: variant[:digest],
+                                         force_processing: true)
+      components[:operation_processor].process_operation(original_name, operation_params, input_path,
+                                                         page_path)
+    end
+
+    def apply_default_params(params, config)
+      return unless determine_version_type(params, config) == :default
+
+      params[:format] ||= config.formats.first
+      params[:quality] ||= config.quality
+    end
+
+    def output_subdir(original_name)
+      File.dirname(original_name).then { |dir| dir == "." ? nil : dir }
+    end
+
+    def variant_cached?(components, original_name, params, version_type, digest, output_path)
+      components[:manifest].version_exists?(original_name, params, version_type, digest) && File.file?(output_path)
+    end
+
+    def cached_variant(components, original_name, params, version_type, _digest, output_path, page_path)
+      components[:stats]&.record_cache_hit
+      components[:manifest].update_page_usage(original_name, params, version_type, page_path)
+      output_path
     end
 
     def relative_result_path(result, site)

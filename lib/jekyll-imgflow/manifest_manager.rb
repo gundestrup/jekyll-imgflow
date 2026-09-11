@@ -25,30 +25,33 @@ module JekyllImgFlow
 
     # Load existing manifest or create new one
     def load_manifest(path = @manifest_path)
-      if path && File.exist?(path)
-        begin
-          data = JSON.parse(File.read(path))
+      return empty_manifest unless path && File.exist?(path)
 
-          # Handle new format with provider at top level
-          if data.is_a?(Hash) && data.key?("images")
-            @cached_provider = data["provider"]
-            images = data["images"] || {}
-          else
-            # Old format - just image data
-            @cached_provider = nil
-            images = data
-          end
+      load_manifest_file(path)
+    rescue JSON::ParserError => e
+      Jekyll.logger.warn "ImgFlow: Corrupt manifest file, starting fresh: #{e.message}"
+      empty_manifest
+    end
 
-          migrate_legacy_manifest(images)
-        rescue JSON::ParserError => e
-          Jekyll.logger.warn "ImgFlow: Corrupt manifest file, starting fresh: #{e.message}"
-          @cached_provider = nil
-          {}
-        end
+    def load_manifest_file(path)
+      data = JSON.parse(File.read(path))
+      images = manifest_images(data)
+      migrate_legacy_manifest(images)
+    end
+
+    def manifest_images(data)
+      if data.is_a?(Hash) && data.key?("images")
+        @cached_provider = data["provider"]
+        data["images"] || {}
       else
         @cached_provider = nil
-        {}
+        data
       end
+    end
+
+    def empty_manifest
+      @cached_provider = nil
+      {}
     end
 
     # Detect and migrate legacy manifest entries (pre-0.1.11 format).
@@ -232,49 +235,53 @@ module JekyllImgFlow
     # Register a new image version
     def register_version(original_name, output_path, operations, type, page_path,
                          file_digest = nil, provider = nil)
-      @manifest[original_name] ||= {
-        "versions" => { "default" => [], "specialized" => [] },
-        "file_digest" => file_digest # Store SHA256 digest of original file
-      }
-
-      # Update file digest if provided
-      @manifest[original_name]["file_digest"] = file_digest if file_digest
-
-      versions = @manifest[original_name]["versions"][type.to_s] ||= []
-      normalized_operations = normalize_operations(operations)
-
-      # Find or create version entry
-      version = versions.find { |v| same_operations?(v["operations"], normalized_operations) }
-
-      # Normalize page_path to array
-      page_paths = if page_path.is_a?(Array)
-                     page_path
-                   else
-                     (page_path ? [page_path] : [])
-                   end
+      image = manifest_image(original_name, file_digest)
+      image["file_digest"] = file_digest if file_digest
+      versions = image["versions"][type.to_s] ||= []
+      normalized = normalize_operations(operations)
+      page_paths = normalize_page_paths(page_path)
+      version = versions.find { |entry| same_operations?(entry["operations"], normalized) }
 
       if version
-        # Add pages to used_on list if not already present
-        version["used_on"] ||= []
-        page_paths.each do |path|
-          version["used_on"] << path if path && !version["used_on"].include?(path)
-        end
-        version["output"] = output_path
-        version["file_digest"] = file_digest if file_digest
-        # Update provider if provided
-        version["provider"] = provider if provider
+        update_version(version, output_path, page_paths, file_digest, provider)
       else
-        # Create new version entry
-        versions << {
-          "output" => output_path,
-          "operations" => normalized_operations,
-          "type" => type.to_s,
-          "used_on" => page_paths,
-          "created_at" => Time.now.to_i,
-          "file_digest" => file_digest,
-          "provider" => provider
-        }
+        versions << new_version(output_path, normalized, type, page_paths, file_digest, provider)
       end
+    end
+
+    def manifest_image(original_name, file_digest)
+      @manifest[original_name] ||= {
+        "versions" => { "default" => [], "specialized" => [] },
+        "file_digest" => file_digest
+      }
+    end
+
+    def normalize_page_paths(page_path)
+      if page_path.is_a?(Array)
+        page_path
+      else
+        (page_path ? [page_path] : [])
+      end
+    end
+
+    def update_version(version, output_path, page_paths, file_digest, provider)
+      version["used_on"] ||= []
+      page_paths.each { |path| version["used_on"] << path if path && !version["used_on"].include?(path) }
+      version["output"] = output_path
+      version["file_digest"] = file_digest if file_digest
+      version["provider"] = provider if provider
+    end
+
+    def new_version(output_path, operations, type, page_paths, file_digest, provider)
+      {
+        "output" => output_path,
+        "operations" => operations,
+        "type" => type.to_s,
+        "used_on" => page_paths,
+        "created_at" => Time.now.to_i,
+        "file_digest" => file_digest,
+        "provider" => provider
+      }
     end
 
     # Check if image version is default type

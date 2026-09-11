@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.3] - 2026-09-11
 
 ### Added
 
@@ -17,9 +17,22 @@
 - Added explicit Semgrep suppressions for intentional Jekyll Picture Tag MD5
   compatibility hashes and provider commands that use safe argument arrays or
   shell-escaped paths.
-- Refactored complex test helpers, performance-report helpers, HTML attribute
-  normalization, and ImgFlow operation processing without changing behavior.
-- Corrected chained collection-method alignment in the test helper suite.
+- Refactored complex test helpers, performance-report helpers, configuration,
+  Picture Tag translation, manifest registration, provider pipelines, and
+  ImgFlow operation processing without changing behavior.
+- Corrected chained collection-method alignment and shell argument display in
+  test utilities.
+- Prevented unchanged rebuilds from persisting the transient manifest state
+  created while specialized page usage is reset, keeping the final manifest
+  timestamp stable when its content is unchanged.
+- Increased the Flyimg request timeout for large PNG/TIFF processing and
+  reduced default slow-test concurrency to avoid exhausting local Docker
+  resources during comprehensive provider runs.
+
+### Changed
+
+- Updated the checked-in performance benchmark report and JSON results from the
+  full local provider test run.
 
 ### Security
 
