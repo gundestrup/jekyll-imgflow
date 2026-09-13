@@ -32,6 +32,7 @@ group :development do
   gem "rubocop-rspec", "~> 3.10.2"
   gem "ruby-lsp-rspec", "~> 0.1.29", require: false
   gem "simplecov", "~> 1.2.0"
+  gem "simplecov-cobertura", "~> 4.0.0"
   gem "webmock", "~> 3.26.2"
   gem "yard", "~> 0.9.45"
 end

@@ -195,6 +195,9 @@ GEM
     sass-embedded (1.104.0-x86_64-linux-gnu)
       google-protobuf (~> 4.31)
     simplecov (1.2.0)
+    simplecov-cobertura (4.0.0)
+      rexml
+      simplecov (~> 1.0)
     terminal-table (3.0.2)
       unicode-display_width (>= 1.1.1, < 3)
     thor (1.5.0)
@@ -230,6 +233,7 @@ DEPENDENCIES
   rubocop-rspec (~> 3.10.2)
   ruby-lsp-rspec (~> 0.1.29)
   simplecov (~> 1.2.0)
+  simplecov-cobertura (~> 4.0.0)
   webmock (~> 3.26.2)
   yard (~> 0.9.45)
 
@@ -318,6 +322,7 @@ CHECKSUMS
   sass-embedded (1.104.0-arm64-darwin) sha256=b1409415e06931b43c2a498fc430fe8ddbad9706be5bb3c4e20b60c14f56b122
   sass-embedded (1.104.0-x86_64-linux-gnu) sha256=7aeaa07beff7db254836599f1524ac7b67216729613ebc57e3828b94345f0488
   simplecov (1.2.0) sha256=ea6acd05eece5a41990e2a5171c57d15700d329326c7666c85ee8c6a0dd0977e
+  simplecov-cobertura (4.0.0) sha256=e4fb3159b1ecea545b44f5452a8611305323e78ad23eae8aed35924d072e01ea
   terminal-table (3.0.2) sha256=f951b6af5f3e00203fb290a669e0a85c5dd5b051b3b023392ccfd67ba5abae91
   thor (1.5.0) sha256=e3a9e55fe857e44859ce104a84675ab6e8cd59c650a49106a05f55f136425e73
   tsort (0.2.0) sha256=9650a793f6859a43b6641671278f79cfead60ac714148aabe4e3f0060480089f

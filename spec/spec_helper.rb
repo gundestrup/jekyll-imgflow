@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "simplecov"
+require "simplecov-cobertura" if ENV["CI"]
 require "ostruct"
 require "fastimage"
 require "open3"
@@ -14,6 +15,7 @@ TestLogger.auto_start
 
 SimpleCov.start do
   skip "/spec/"
+  formatter SimpleCov::Formatter::CoberturaFormatter if ENV["CI"]
 end
 
 # Constants for performance optimization

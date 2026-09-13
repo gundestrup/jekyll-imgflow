@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added Codecov coverage reporting: CI uploads Cobertura XML (via
+  `simplecov-cobertura`) after the test suite, with `codecov.yml` status
+  checks tracking project and patch coverage.
+
 ## [0.4.0] - 2026-09-12
 
 ### Added

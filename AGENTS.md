@@ -106,6 +106,7 @@ CI and local development read the exact Ruby version from the committed
 | RuboCop | `.rubocop.yml` | Code style (Ruby 3.4, double quotes, max line 100) |
 | RSpec | `.rspec` / `.rspec_parallel` | Test framework with coverage |
 | SimpleCov | (in spec_helper) | Coverage reporting |
+| Codecov | `codecov.yml` | Coverage upload in CI (Cobertura XML via `simplecov-cobertura`) |
 | Bundler Audit | — | Security vulnerability scanning |
 | Parallel Tests | `.parallel_tests.yml` | Parallel test execution |
 
