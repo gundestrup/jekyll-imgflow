@@ -44,35 +44,11 @@ module JekyllImgFlow
       original_paths = find_original_images
       Jekyll.logger.info "📸 Found #{original_paths.length} original images"
 
-      originals_dir = File.join(@site.source, @config.originals)
-
       # Clean up manifest entries for deleted originals
-      current_originals = original_paths.map { |path| path.sub("#{originals_dir}/", "") }
-      @manifest.cleanup_deleted_originals(current_originals)
-      @manifest.cleanup_obsolete_defaults(expected_default_operations)
-      @manifest.reset_page_usage unless incremental_build?
+      prepare_manifest(original_paths)
 
       # Build tasks for each original image
-      original_paths.reject { |path| AnimatedGifDetector.animated?(path) }.each do |path|
-        original_name = path.sub("#{originals_dir}/", "")
-        file_digest = @filename_generator.file_digest(path)
-
-        # Check if needs processing (file changed or provider changed)
-        if needs_processing?(original_name, path, file_digest)
-          Jekyll.logger.info "🔧 Queuing default versions for: #{original_name}"
-
-          # Build default tasks
-          tasks = BatchManager.build_default_tasks(
-            original_name, path, @config, @site, file_digest: file_digest
-          )
-          force_processing = source_digest_changed?(original_name, file_digest)
-          tasks.each { |task| task[:force_processing] = force_processing }
-          @batch_manager.add_tasks(tasks)
-        else
-          expected_default_operations.length.times { @operation_processor.stats.record_cache_hit }
-          Jekyll.logger.debug "⏭️  Skipping #{original_name} - already up-to-date"
-        end
-      end
+      queue_default_tasks(original_paths)
 
       # Process all queued tasks
       results = @batch_manager.process_all
@@ -88,6 +64,39 @@ module JekyllImgFlow
     end
 
     private
+
+    def prepare_manifest(original_paths)
+      originals_dir = File.join(@site.source, @config.originals)
+      current_originals = original_paths.map { |path| path.sub("#{originals_dir}/", "") }
+      @manifest.cleanup_deleted_originals(current_originals)
+      @manifest.cleanup_obsolete_defaults(expected_default_operations)
+      @manifest.reset_page_usage unless incremental_build?
+    end
+
+    def queue_default_tasks(original_paths)
+      originals_dir = File.join(@site.source, @config.originals)
+      original_paths.reject { |path| AnimatedGifDetector.animated?(path) }.each do |path|
+        queue_tasks_for(path, path.sub("#{originals_dir}/", ""))
+      end
+    end
+
+    def queue_tasks_for(path, original_name)
+      file_digest = @filename_generator.file_digest(path)
+      unless needs_processing?(original_name, path, file_digest)
+        expected_default_operations.length.times { @operation_processor.stats.record_cache_hit }
+        Jekyll.logger.debug "⏭️  Skipping #{original_name} - already up-to-date"
+        return
+      end
+
+      Jekyll.logger.info "🔧 Queuing default versions for: #{original_name}"
+
+      tasks = BatchManager.build_default_tasks(
+        original_name, path, @config, @site, file_digest: file_digest
+      )
+      force_processing = source_digest_changed?(original_name, file_digest)
+      tasks.each { |task| task[:force_processing] = force_processing }
+      @batch_manager.add_tasks(tasks)
+    end
 
     def register_skipped_tasks(completed_tasks)
       provider_name = @registry.current_provider&.class&.provider_name || "unknown"
@@ -127,10 +136,14 @@ module JekyllImgFlow
       current_provider = @registry.current_provider&.class&.provider_name || "unknown"
 
       expected_default_operations.any? do |operations|
-        version = default_versions.find do |candidate|
-          @manifest.same_operations?(candidate["operations"], operations)
-        end
+        version = find_default_version(default_versions, operations)
         !current_default_version?(version, current_provider, file_digest)
+      end
+    end
+
+    def find_default_version(default_versions, operations)
+      default_versions.find do |candidate|
+        @manifest.same_operations?(candidate["operations"], operations)
       end
     end
 

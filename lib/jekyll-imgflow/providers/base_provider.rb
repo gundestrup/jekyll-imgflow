@@ -45,14 +45,19 @@ module JekyllImgFlow
         params = operation[:params] || {}
         keep = opts[:keep] || params[:keep] || params[:position]
         smartcrop = operation[:ratio] && keep && SMARTCROP_POSITIONS.include?(keep.to_s)
-        coords = if operation[:ratio]
-                   { x: opts[:calculated_x], y: opts[:calculated_y],
-                     width: opts[:calculated_width], height: opts[:calculated_height] }
-                 else
-                   { x: opts[:x] || 0, y: opts[:y] || 0,
-                     width: opts[:width], height: opts[:height] }
-                 end
-        coords.merge(smartcrop: smartcrop, keep: keep)
+        crop_coords(operation, opts).merge(smartcrop: smartcrop, keep: keep)
+      end
+
+      # Coordinates for a crop operation: ratio crops use calculated values,
+      # explicit crops use x/y/width/height options (defaulting x/y to 0).
+      def crop_coords(operation, opts)
+        if operation[:ratio]
+          { x: opts[:calculated_x], y: opts[:calculated_y],
+            width: opts[:calculated_width], height: opts[:calculated_height] }
+        else
+          { x: opts[:x] || 0, y: opts[:y] || 0,
+            width: opts[:width], height: opts[:height] }
+        end
       end
 
       # Extract watermark operation parts into a hash.
@@ -145,17 +150,7 @@ module JekyllImgFlow
 
         # For HTTP providers, construct proper HTTP URL
         site = @config.site
-
-        # Get the relative path from site source using Pathname
-        source_path = Pathname.new(site.source)
-        file_pathname = Pathname.new(file_path)
-        relative_path = if file_pathname.absolute? && file_path.to_s.start_with?(site.source)
-                          file_pathname.relative_path_from(source_path).to_s
-                        elsif file_path.start_with?("/")
-                          file_path[1..]
-                        else
-                          file_path
-                        end
+        relative_path = relative_file_path(file_path, site)
 
         # URL-encode each path segment to handle spaces and special characters
         encoded_path = relative_path.split("/").map do |segment|
@@ -169,6 +164,18 @@ module JekyllImgFlow
         baseurl = site.config["baseurl"] || ""
 
         "#{base_url}#{baseurl}/#{encoded_path}"
+      end
+
+      # Get the relative path from site source using Pathname
+      def relative_file_path(file_path, site)
+        file_pathname = Pathname.new(file_path)
+        if file_pathname.absolute? && file_path.to_s.start_with?(site.source)
+          file_pathname.relative_path_from(Pathname.new(site.source)).to_s
+        elsif file_path.start_with?("/")
+          file_path[1..]
+        else
+          file_path
+        end
       end
 
       # Operation collection methods - these should NOT execute immediately

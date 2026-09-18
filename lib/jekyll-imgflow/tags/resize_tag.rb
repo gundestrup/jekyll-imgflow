@@ -21,19 +21,8 @@ module JekyllImgFlow
         # Calculate missing dimension to maintain aspect ratio ONLY when one dimension is missing
         width, height = calculate_missing_dimension(width, height, original_width, original_height)
 
-        # Calculate scale factors for provider
-        scale_x = width && original_width ? width.to_f / original_width : nil
-        scale_y = height && original_height ? height.to_f / original_height : nil
-
         # Provider receives ALL data - provider chooses what to use
-        resize_data = {
-          original_width: original_width,
-          original_height: original_height,
-          target_width: width,
-          target_height: height,
-          scale_x: scale_x,
-          scale_y: scale_y
-        }
+        resize_data = build_resize_data(width, height, original_width, original_height)
 
         Jekyll.logger.debug "🔍 ResizeTag: About to execute provider - input: #{input_path}, output: #{output_path}"
         @provider.resize(width, height, resize_data)
@@ -45,6 +34,17 @@ module JekyllImgFlow
       end
 
       private
+
+      def build_resize_data(width, height, original_width, original_height)
+        {
+          original_width: original_width,
+          original_height: original_height,
+          target_width: width,
+          target_height: height,
+          scale_x: width && original_width ? width.to_f / original_width : nil,
+          scale_y: height && original_height ? height.to_f / original_height : nil
+        }
+      end
 
       def calculate_missing_dimension(width, height, original_width, original_height)
         if width.nil? && height

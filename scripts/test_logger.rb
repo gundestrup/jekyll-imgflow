@@ -166,26 +166,29 @@ class TestLogger
       total = summary["example_count"] || 0
       failed = summary["failure_count"] || 0
       pending = summary["pending_count"] || 0
-      passed = total - failed - pending
 
-      status = if total.zero?
-                 "NO TESTS"
-               else
-                 (failed.zero? ? "PASSED" : "FAILED")
-               end
-      puts "✅ Status: #{status}"
+      puts "✅ Status: #{rspec_status_text(total, failed)}"
       puts "⏰  Duration: #{@current_session[:duration_seconds]}s"
       puts "📅 Timestamp: #{@current_session[:timestamp]}"
       puts "🌿 Git Branch: #{@current_session[:environment][:git_branch]}"
       puts "🔢 Git Commit: #{@current_session[:environment][:git_commit][0..7]}"
 
+      display_test_counts(total, total - failed - pending, failed, pending)
+      display_failed_examples if failed.positive?
+    end
+
+    def rspec_status_text(total, failed)
+      return "NO TESTS" if total.zero?
+
+      failed.zero? ? "PASSED" : "FAILED"
+    end
+
+    def display_test_counts(total, passed, failed, pending)
       puts "\n📊 Test Results:"
       puts "   Total Tests: #{total}"
       puts "   ✅ Passed: #{passed}"
       puts "   ❌ Failed: #{failed}"
       puts "   ⏸️  Pending: #{pending}" if pending.positive?
-
-      display_failed_examples if failed.positive?
     end
 
     def display_failed_examples
@@ -199,7 +202,9 @@ class TestLogger
       end
     end
 
-    def self.show_status
+    public
+
+    def show_status
       log_dir = File.join(Dir.pwd, "test_logs")
       puts "\n#{'=' * 60}"
       puts "📊 TEST STATUS DASHBOARD"
@@ -220,24 +225,26 @@ class TestLogger
       puts "=" * 60
     end
 
-    def self.display_latest_status(latest)
-      if latest["rspec_results"]
-        summary = latest["rspec_results"]["summary"] || {}
-        failed = summary["failure_count"] || 0
-        total = summary["example_count"] || 0
-        status = if total.zero?
-                   "⚠️ NO TESTS"
-                 else
-                   (failed.zero? ? "✅ PASSED" : "❌ FAILED")
-                 end
-        puts "📈 Status: #{status}"
-        puts "📊 Results: #{total - failed}/#{total} passed"
-      else
+    def display_latest_status(latest)
+      unless latest["rspec_results"]
         puts "📈 Status: ℹ️  Completed"
+        return
       end
+
+      summary = latest["rspec_results"]["summary"] || {}
+      failed = summary["failure_count"] || 0
+      total = summary["example_count"] || 0
+      puts "📈 Status: #{latest_status_text(total, failed)}"
+      puts "📊 Results: #{total - failed}/#{total} passed"
     end
 
-    def self.display_history(log_dir)
+    def latest_status_text(total, failed)
+      return "⚠️ NO TESTS" if total.zero?
+
+      failed.zero? ? "✅ PASSED" : "❌ FAILED"
+    end
+
+    def display_history(log_dir)
       history_file = File.join(log_dir, "test_history.json")
       return unless File.exist?(history_file)
 

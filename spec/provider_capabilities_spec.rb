@@ -354,40 +354,7 @@ RSpec.describe "Provider Capability Flags - Meta Testing", :external, :provider 
     JekyllImgFlow::ProviderRegistry.new(config)
 
     # Auto-discover all provider classes dynamically
-    all_provider_classes = []
-
-    # Method 1: Discover from ProviderRegistry (most reliable)
-    begin
-      registry_providers = JekyllImgFlow::ProviderRegistry.new(config).providers
-
-      registry_providers.each do |provider_instance|
-        provider_class = provider_instance.class
-        all_provider_classes << provider_class unless all_provider_classes.include?(provider_class)
-      end
-    rescue StandardError => e
-      warn "Failed to discover providers from registry: #{e.message}"
-    end
-    if all_provider_classes.empty?
-      providers_dir = File.join(File.dirname(__FILE__), "..", "lib", "jekyll-imgflow", "providers")
-
-      Dir.glob(File.join(providers_dir, "*.rb")).each do |file|
-        # Skip base_provider.rb
-        next if File.basename(file) == "base_provider.rb"
-
-        # Convert filename to class name
-        file_name = File.basename(file, ".rb")
-        class_name = file_name.split("_").map(&:capitalize).join
-
-        # Try to load the class
-        begin
-          full_class_name = "JekyllImgFlow::Providers::#{class_name}"
-          provider_class = Object.const_get(full_class_name)
-          all_provider_classes << provider_class unless all_provider_classes.include?(provider_class)
-        rescue NameError => e
-          warn "Could not load #{class_name}: #{e.message}"
-        end
-      end
-    end
+    all_provider_classes = discover_provider_classes(config)
 
     providers = []
     all_provider_classes.each do |provider_class|
@@ -405,5 +372,37 @@ RSpec.describe "Provider Capability Flags - Meta Testing", :external, :provider 
     end
 
     providers
+  end
+
+  # Discover provider classes: try the registry first (most reliable),
+  # fall back to scanning the providers directory.
+  def discover_provider_classes(config)
+    classes = registry_provider_classes(config)
+    classes.empty? ? file_provider_classes : classes
+  end
+
+  def registry_provider_classes(config)
+    JekyllImgFlow::ProviderRegistry.new(config).providers.each_with_object([]) do |instance, classes|
+      classes << instance.class unless classes.include?(instance.class)
+    end
+  rescue StandardError => e
+    warn "Failed to discover providers from registry: #{e.message}"
+    []
+  end
+
+  def file_provider_classes
+    providers_dir = File.join(File.dirname(__FILE__), "..", "lib", "jekyll-imgflow", "providers")
+
+    Dir.glob(File.join(providers_dir, "*.rb")).each_with_object([]) do |file, classes|
+      next if File.basename(file) == "base_provider.rb"
+
+      class_name = File.basename(file, ".rb").split("_").map(&:capitalize).join
+      begin
+        provider_class = Object.const_get("JekyllImgFlow::Providers::#{class_name}")
+        classes << provider_class unless classes.include?(provider_class)
+      rescue NameError => e
+        warn "Could not load #{class_name}: #{e.message}"
+      end
+    end
   end
 end

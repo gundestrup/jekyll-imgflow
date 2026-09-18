@@ -22,6 +22,18 @@ module JekyllImgFlow
     DEFAULT_FALLBACK_FORMAT = "jpg"
     DEFAULT_IMAGE_MODAL = true
 
+    # Core config keys mapped to their defaults (assigned as @ivar per key).
+    CORE_CONFIG_DEFAULTS = {
+      "originals" => DEFAULT_ORIGINALS,
+      "output" => DEFAULT_OUTPUT,
+      "input_formats" => DEFAULT_INPUT_FORMATS,
+      "sizes" => DEFAULT_SIZES,
+      "formats" => DEFAULT_FORMATS,
+      "quality" => DEFAULT_QUALITY,
+      "backend_priority" => DEFAULT_BACKEND_PRIORITY,
+      "fallback_format" => DEFAULT_FALLBACK_FORMAT
+    }.freeze
+
     attr_reader :site, :originals, :output, :input_formats, :sizes, :formats,
                 :quality, :backend_priority, :imgproxy_url,
                 :weserv_url, :flyimg_url,
@@ -37,14 +49,9 @@ module JekyllImgFlow
     end
 
     def assign_core_config(cfg)
-      @originals = cfg["originals"] || DEFAULT_ORIGINALS
-      @output = cfg["output"] || DEFAULT_OUTPUT
-      @input_formats = cfg["input_formats"] || DEFAULT_INPUT_FORMATS
-      @sizes = cfg["sizes"] || DEFAULT_SIZES
-      @formats = cfg["formats"] || DEFAULT_FORMATS
-      @quality = cfg["quality"] || DEFAULT_QUALITY
-      @backend_priority = cfg["backend_priority"] || DEFAULT_BACKEND_PRIORITY
-      @fallback_format = cfg["fallback_format"] || DEFAULT_FALLBACK_FORMAT
+      CORE_CONFIG_DEFAULTS.each do |key, default|
+        instance_variable_set("@#{key}", cfg[key] || default)
+      end
       @image_modal = cfg.fetch("image_modal", DEFAULT_IMAGE_MODAL)
     end
 

@@ -147,26 +147,32 @@ module JekyllImgFlow
 
     def merge_operation_tags(tags, op_type, params)
       case op_type
-      when "resize"
-        tags[:width] = params["width"] if params["width"]
-        tags[:height] = params["height"] if params["height"]
-      when "crop"
-        tags[:ratio] = params["ratio"] if params["ratio"]
-        tags[:aspect_ratio] = params["aspect_ratio"] if params["aspect_ratio"]
-        tags[:width] = params["width"] if params["width"] && !tags[:width]
-        tags[:height] = params["height"] if params["height"] && !tags[:height]
-      when "format"
-        merge_format_tag(tags, params)
-      when "quality"
-        tags[:quality] = params["quality"] if params["quality"]
-      when "optimize"
-        tags[:optimize] = true
-        tags[:level] = params["level"] if params["level"]
-      when "opacity"
-        tags[:opacity] = params["opacity"] if params["opacity"]
+      when "resize" then merge_resize_tags(tags, params)
+      when "crop" then merge_crop_tags(tags, params)
+      when "format" then merge_format_tag(tags, params)
+      when "quality" then tags[:quality] = params["quality"] if params["quality"]
+      when "optimize" then merge_optimize_tags(tags, params)
+      when "opacity" then tags[:opacity] = params["opacity"] if params["opacity"]
       else
         merge_generic_tags(tags, params)
       end
+    end
+
+    def merge_resize_tags(tags, params)
+      tags[:width] = params["width"] if params["width"]
+      tags[:height] = params["height"] if params["height"]
+    end
+
+    def merge_crop_tags(tags, params)
+      tags[:ratio] = params["ratio"] if params["ratio"]
+      tags[:aspect_ratio] = params["aspect_ratio"] if params["aspect_ratio"]
+      tags[:width] = params["width"] if params["width"] && !tags[:width]
+      tags[:height] = params["height"] if params["height"] && !tags[:height]
+    end
+
+    def merge_optimize_tags(tags, params)
+      tags[:optimize] = true
+      tags[:level] = params["level"] if params["level"]
     end
 
     def merge_format_tag(tags, params)

@@ -81,19 +81,29 @@ class ParallelProviderRunner
     puts "\n📊 Test Results Summary:"
     puts "=" * 50
 
-    passed = results.count { |r| r[:status] == :passed }
     failed = results.count { |r| r[:status] == :failed }
     errors = results.count { |r| r[:status] == :error }
+
+    print_result_counts(results)
+    print_individual_results(results)
+
+    # Exit with appropriate code
+    exit_code = (failed + errors).positive? ? 1 : 0
+    exit(exit_code)
+  end
+
+  def print_result_counts(results)
     total_duration = results.sum { |r| r[:duration] }
 
-    puts "✅ Passed: #{passed}"
-    puts "❌ Failed: #{failed}"
-    puts "💥 Errors: #{errors}"
+    puts "✅ Passed: #{results.count { |r| r[:status] == :passed }}"
+    puts "❌ Failed: #{results.count { |r| r[:status] == :failed }}"
+    puts "💥 Errors: #{results.count { |r| r[:status] == :error }}"
     puts "⏱️  Total time: #{total_duration.round(2)}s"
 
     puts "🚀 Parallel speedup: #{(results.sum { |r| r[:duration] } / total_duration).round(2)}x" if parallel_available?
+  end
 
-    # Show individual results
+  def print_individual_results(results)
     puts "\n📋 Individual Results:"
     status_icons = {
       passed: "✅",
@@ -107,10 +117,6 @@ class ParallelProviderRunner
       puts "  #{status_icon} #{result[:provider]}: #{result[:duration].round(2)}s"
       puts "    Error: #{result[:error]}" if result[:error]
     end
-
-    # Exit with appropriate code
-    exit_code = (failed + errors).positive? ? 1 : 0
-    exit(exit_code)
   end
 end
 

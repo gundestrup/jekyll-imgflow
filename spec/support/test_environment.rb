@@ -108,18 +108,24 @@ module TestEnvironment
     end
 
     def site_url(provider: nil, port: nil)
-      port ||= if !source_server_required? && provider &&
-                  PROVIDER_PORT_ENV.key?(provider.to_s.downcase)
-                 provider_site_port(provider)
-               else
-                 current_source_port
-               end
-      host = if source_server_required? || http_provider?(provider)
-               "host.docker.internal"
-             else
-               "localhost"
-             end
-      "http://#{host}:#{port}"
+      "http://#{site_host(provider)}:#{port || site_port(provider)}"
+    end
+
+    def site_port(provider)
+      if !source_server_required? && provider &&
+         PROVIDER_PORT_ENV.key?(provider.to_s.downcase)
+        provider_site_port(provider)
+      else
+        current_source_port
+      end
+    end
+
+    def site_host(provider)
+      if source_server_required? || http_provider?(provider)
+        "host.docker.internal"
+      else
+        "localhost"
+      end
     end
 
     def provider_site_port(provider)

@@ -7,12 +7,42 @@
 - Added Codecov coverage reporting: CI uploads Cobertura XML (via
   `simplecov-cobertura`) after the test suite, with `codecov.yml` status
   checks tracking project and patch coverage.
+- Added SonarCloud quality gate badge to the README.
+
+### Changed
+
+- Decomposed CodeFactor-flagged complex methods into focused helpers:
+  `crop_coords`/`relative_file_path` extracted in `BaseProvider`,
+  `prepare_manifest`/`queue_default_tasks`/`queue_tasks_for`/
+  `find_default_version` in `BuildTimeProcessor`, per-operation merge
+  helpers in `PresetManager`, `matching_variant_path` in `ModalAssets`,
+  `build_resize_data` in `ResizeTag`, status/count helpers in
+  `TestLogger`, `print_result_counts`/`print_individual_results` in
+  `ParallelProviderRunner`, and discovery/validation/output-info helpers
+  in `provider_test_helper.rb`, `provider_capabilities_spec.rb`, and
+  `TestEnvironment.site_url`.
+- `Config#assign_core_config` now iterates a `CORE_CONFIG_DEFAULTS`
+  key→default map instead of repeating `@x = cfg[...] || DEFAULT` lines.
+
+### Fixed
+
+- Resolved SonarQube analysis findings: pinned `semgrep==1.177.0` with
+  `--only-binary :all:` in CI, replaced `[` with `[[` in
+  `scripts/run_tests.sh`, and replaced raw `ENV[...]` access with
+  `ENV.fetch` defaults in `spec/spec_helper.rb` and
+  `spec/support/test_pictures.rb`.
+- `TestLogger.show_status` was unreachable — `def self.` inside
+  `class << self` defined it on the singleton-of-singleton, so
+  `rake test_status` and `scripts/run_tests.sh status` raised
+  `NoMethodError`. The status methods are now regular public class
+  methods.
+- `ProviderTestHelper.print_summary` computed a provider summary but
+  discarded it; it now logs the summary via `Jekyll.logger`.
+- `ProviderTestHelper.test_single_provider` referenced an undefined
+  `context` variable that only worked by accident through RSpec's
+  top-level DSL; the caller's context is now passed through explicitly.
 
 ## [0.4.0] - 2026-09-12
-
-### Added
-
-- Added SonarCloud quality gate badge to the README.
 
 ### Changed
 
@@ -62,11 +92,6 @@
   connection drops).
 - Removed the duplicate `show_status` definition in `scripts/test_logger.rb`
   that shadowed the canonical implementation in `class << self`.
-- Resolved SonarQube analysis findings: pinned `semgrep==1.177.0` with
-  `--only-binary :all:` in CI, replaced `[` with `[[` in
-  `scripts/run_tests.sh`, and replaced raw `ENV[...]` access with
-  `ENV.fetch` defaults in `spec/spec_helper.rb` and
-  `spec/support/test_pictures.rb`.
 
 ## [0.3.3] - 2026-09-11
 

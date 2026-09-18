@@ -31,7 +31,7 @@ module ProviderTestHelper
       provider_name = provider.class.name.split("::").last
 
       begin
-        result = test_single_provider(provider, test_image_path, operations)
+        result = test_single_provider(provider, test_image_path, operations, context)
         results[provider_name] = result
 
         next if result[:success]
@@ -49,7 +49,7 @@ module ProviderTestHelper
     results
   end
 
-  def self.test_single_provider(provider, test_image_path, operations)
+  def self.test_single_provider(provider, test_image_path, operations, context = nil)
     result = {
       provider: provider.class.name.split("::").last,
       available: provider.available?,
@@ -72,50 +72,7 @@ module ProviderTestHelper
     result[:output_dir] = output_dir
 
     begin
-      # Generate output path first (needed for tag processing)
-      output_filename = generate_output_filename(test_image_path, operations)
-      output_path = File.join(output_dir, output_filename)
-      result[:output_path] = output_path
-
-      # Use proper tag interface for agnostic data flow
-      tag_result = process_operations_with_tags(provider, test_image_path, output_path, operations,
-                                                context)
-      result[:tag_result] = tag_result
-
-      # Test command generation (for CLI providers)
-      if provider.respond_to?(:execute_command)
-        # Capture command without executing
-        command = capture_provider_command(provider, test_image_path, output_path)
-        result[:command_generated] = command
-
-      end
-
-      # Execute through provider (already done by tags)
-      # Tags call provider.execute() internally
-
-      # Validate output
-      if File.exist?(output_path)
-        output_info = FastImage.new(output_path)
-        result[:output_info] = {
-          size: output_info.size,
-          type: output_info.type,
-          file_size: File.size(output_path)
-        }
-
-        # Validate expected results
-        validation_errors = validate_output(test_image_path, output_path, operations, output_info)
-        result[:validation_errors] = validation_errors
-
-        if validation_errors.empty?
-          result[:success] = true
-          result[:summary] =
-            "#{output_info.type} #{output_info.size.join('x')} (#{File.size(output_path)} bytes)"
-        else
-          result[:error] = validation_errors.join("; ")
-        end
-      else
-        result[:error] = "Output file not created"
-      end
+      run_provider_test(provider, test_image_path, operations, output_dir, result, context)
     rescue StandardError => e
       result[:error] = e.message
       result[:exception] = e
@@ -125,6 +82,56 @@ module ProviderTestHelper
     end
 
     result
+  end
+
+  def self.run_provider_test(provider, test_image_path, operations, output_dir, result, context)
+    # Generate output path first (needed for tag processing)
+    output_filename = generate_output_filename(test_image_path, operations)
+    output_path = File.join(output_dir, output_filename)
+    result[:output_path] = output_path
+
+    # Use proper tag interface for agnostic data flow
+    tag_result = process_operations_with_tags(provider, test_image_path, output_path, operations,
+                                              context)
+    result[:tag_result] = tag_result
+
+    # Test command generation (for CLI providers)
+    if provider.respond_to?(:execute_command)
+      # Capture command without executing
+      command = capture_provider_command(provider, test_image_path, output_path)
+      result[:command_generated] = command
+    end
+
+    # Execute through provider (already done by tags)
+    # Tags call provider.execute() internally
+
+    validate_test_output(test_image_path, output_path, operations, result)
+  end
+
+  def self.validate_test_output(test_image_path, output_path, operations, result)
+    unless File.exist?(output_path)
+      result[:error] = "Output file not created"
+      return
+    end
+
+    output_info = FastImage.new(output_path)
+    result[:output_info] = {
+      size: output_info.size,
+      type: output_info.type,
+      file_size: File.size(output_path)
+    }
+
+    # Validate expected results
+    validation_errors = validate_output(test_image_path, output_path, operations, output_info)
+    result[:validation_errors] = validation_errors
+
+    if validation_errors.empty?
+      result[:success] = true
+      result[:summary] =
+        "#{output_info.type} #{output_info.size.join('x')} (#{File.size(output_path)} bytes)"
+    else
+      result[:error] = validation_errors.join("; ")
+    end
   end
 
   def self.capture_provider_command(provider, input_path, output_path)
@@ -142,51 +149,61 @@ module ProviderTestHelper
   end
 
   def self.validate_output(_input_path, _output_path, operations, output_info)
-    errors = []
+    validate_format_output(operations, output_info) +
+      validate_resize_output(operations, output_info) +
+      validate_crop_output(operations, output_info)
+  end
 
-    # Validate format conversion
+  # Validate format conversion
+  def self.validate_format_output(operations, output_info)
     format_op = operations.find { |op| op[:type] == :format }
-    if format_op
-      expected_format = normalize_format(format_op[:format])
-      actual_format = normalize_format(output_info.type)
-      errors << "Format mismatch: expected #{format_op[:format]}, got #{output_info.type}" unless actual_format == expected_format
-    end
+    return [] unless format_op
 
-    # Validate resize operations
+    expected_format = normalize_format(format_op[:format])
+    actual_format = normalize_format(output_info.type)
+    return [] if actual_format == expected_format
+
+    ["Format mismatch: expected #{format_op[:format]}, got #{output_info.type}"]
+  end
+
+  # Validate resize operations
+  def self.validate_resize_output(operations, output_info)
     resize_op = operations.find { |op| op[:type] == :resize }
-    if resize_op
-      expected_width = resize_op[:width]
-      expected_height = resize_op[:height]
-      actual_width, actual_height = output_info.size
+    return [] unless resize_op
 
-      # If both dimensions specified, expect exact match
-      if expected_width && expected_height
-        if actual_width != expected_width || actual_height != expected_height
-          errors << "Size mismatch: expected #{expected_width}x#{expected_height}, got #{actual_width}x#{actual_height}"
-        end
-      # If only width specified, expect correct width with aspect ratio preservation
-      elsif expected_width
-        errors << "Width mismatch: expected #{expected_width}, got #{actual_width}" if actual_width != expected_width
-      # If only height specified, expect correct height with aspect ratio preservation
-      elsif expected_height
-        errors << "Height mismatch: expected #{expected_height}, got #{actual_height}" if actual_height != expected_height
-      end
+    expected_width = resize_op[:width]
+    expected_height = resize_op[:height]
+    actual_width, actual_height = output_info.size
+
+    # If both dimensions specified, expect exact match
+    if expected_width && expected_height
+      return [] if actual_width == expected_width && actual_height == expected_height
+
+      ["Size mismatch: expected #{expected_width}x#{expected_height}, " \
+       "got #{actual_width}x#{actual_height}"]
+    # If only one dimension specified, expect it with aspect ratio preservation
+    elsif expected_width && actual_width != expected_width
+      ["Width mismatch: expected #{expected_width}, got #{actual_width}"]
+    elsif expected_height && actual_height != expected_height
+      ["Height mismatch: expected #{expected_height}, got #{actual_height}"]
+    else
+      []
     end
+  end
 
-    # Validate crop operations
+  # Validate crop operations (only when no resize was also requested)
+  def self.validate_crop_output(operations, output_info)
     crop_op = operations.find { |op| op[:type] == :crop }
     resize_op = operations.find { |op| op[:type] == :resize }
-    if crop_op && !resize_op
-      expected_width = crop_op[:width]
-      expected_height = crop_op[:height]
-      actual_width, actual_height = output_info.size
+    return [] unless crop_op && !resize_op
 
-      if actual_width != expected_width || actual_height != expected_height
-        errors << "Crop size mismatch: expected #{expected_width}x#{expected_height}, got #{actual_width}x#{actual_height}"
-      end
-    end
+    expected_width = crop_op[:width]
+    expected_height = crop_op[:height]
+    actual_width, actual_height = output_info.size
+    return [] if actual_width == expected_width && actual_height == expected_height
 
-    errors
+    ["Crop size mismatch: expected #{expected_width}x#{expected_height}, " \
+     "got #{actual_width}x#{actual_height}"]
   end
 
   def self.normalize_format(format)
@@ -200,75 +217,63 @@ module ProviderTestHelper
 
     # For single operation, use simple tag approach
     if operations.length == 1
-      op = operations.first
-      tag_class = get_tag_class_for_operation(op[:type])
-      tag = tag_class.new(provider)
+      process_single_operation(provider, test_image_path, output_path, operations.first)
+    else
+      process_operation_chain(provider, test_image_path, output_path, operations)
+    end
+  end
 
-      # Extract options for this operation
-      options = extract_options_for_operation(op)
+  # Process a single operation through its tag interface and return output info.
+  def self.process_single_operation(provider, input_path, output_path, operation)
+    tag = get_tag_class_for_operation(operation[:type]).new(provider)
+
+    # Process through tag interface (includes agnostic data flow)
+    tag.process(input_path, output_path, extract_options_for_operation(operation))
+
+    output_info_result(output_path)
+  end
+
+  # For multiple operations, process them sequentially (chaining):
+  # each operation's output becomes the next operation's input.
+  def self.process_operation_chain(provider, test_image_path, output_path, operations)
+    current_input = test_image_path
+
+    operations.each_with_index do |op, index|
+      tag = get_tag_class_for_operation(op[:type]).new(provider)
+      temp_output = chained_output_path(output_path, index, operations.length)
 
       # Process through tag interface (includes agnostic data flow)
-      result = tag.process(test_image_path, output_path, options)
+      tag.process(current_input, temp_output, extract_options_for_operation(op))
 
-      # Return output info
-      if File.exist?(output_path)
-        require "fastimage"
-        output_info = FastImage.new(output_path)
-        {
-          output_path: output_path,
-          output_info: {
-            size: output_info.size,
-            type: output_info.type,
-            file_size: File.size(output_path)
-          }
-        }
-      else
-        {}
-      end
-    else
-      # For multiple operations, process them sequentially (chaining)
-      results = []
-      current_input = test_image_path
-      current_output = output_path
-
-      operations.each_with_index do |op, index|
-        tag_class = get_tag_class_for_operation(op[:type])
-        tag = tag_class.new(provider)
-
-        # Extract options for this operation
-        options = extract_options_for_operation(op)
-
-        # For chained operations, use temporary files between operations
-        temp_output = if operations.length > 1 && index < operations.length - 1
-                        output_path.gsub(/(\.[^.]+)$/, "_temp_#{index}\\1")
-                      else
-                        current_output
-                      end
-
-        # Process through tag interface (includes agnostic data flow)
-        result = tag.process(current_input, temp_output, options)
-        results << result
-
-        # Chain operations: output becomes input for next operation
-        current_input = temp_output
-      end
-
-      # Return final output info
-      if File.exist?(current_output)
-        require "fastimage"
-        output_info = FastImage.new(current_output)
-        {
-          output_path: current_output,
-          output_info: {
-            size: output_info.size,
-            type: output_info.type,
-            file_size: File.size(current_output)
-          }
-        }
-      else
-        {}
-      end
+      # Chain operations: output becomes input for next operation
+      current_input = temp_output
     end
+
+    output_info_result(output_path)
+  end
+
+  # Intermediate operations write to temp files; the last one writes the
+  # final output path.
+  def self.chained_output_path(output_path, index, total)
+    return output_path if index >= total - 1
+
+    output_path.gsub(/(\.[^.]+)$/, "_temp_#{index}\\1")
+  end
+
+  # Return output info hash for a produced file, or {} when absent.
+  def self.output_info_result(path)
+    return {} unless File.exist?(path)
+
+    require "fastimage"
+    output_info = FastImage.new(path)
+    {
+      output_path: path,
+      output_info: {
+        size: output_info.size,
+        type: output_info.type,
+        file_size: File.size(path)
+      }
+    }
   end
 
   # Get appropriate tag class for operation type
@@ -358,21 +363,16 @@ module ProviderTestHelper
   end
 
   def self.print_summary(results)
-    results.length
     successful_providers = results.count { |_, result| result[:success] }
     available_providers = results.count { |_, result| result[:available] }
 
-    results.each_value do |result|
-      if result[:success]
-        "✅"
-      else
-        (result[:available] ? "❌" : "⏸️")
-      end
+    Jekyll.logger.info "📊 Provider Test Summary: #{successful_providers}/#{available_providers} " \
+                       "available providers succeeded"
+    results.each do |provider_name, result|
+      next if result[:success] || !result[:available]
+
+      Jekyll.logger.info "   ❌ #{provider_name}: #{result[:error]}"
     end
-
-    return if successful_providers == available_providers && available_providers > 0
-
-    nil if available_providers == 0
   end
 
   # Predefined operation sets for comprehensive testing

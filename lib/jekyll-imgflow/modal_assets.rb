@@ -135,15 +135,21 @@ module JekyllImgFlow
 
       max_width = @config.sizes.values.max
       Dir.children(directory).filter_map do |filename|
-        candidate = JekyllImgFlow::FilenameGenerator.new.parse_filename(filename)
-        next unless candidate[:base_name] == parsed[:base_name]
-        next unless candidate[:hash] == parsed[:hash]
-        next if max_width && candidate[:width] > max_width
-
-        File.join(File.dirname(result), filename)
+        matching_variant_path(filename, parsed, max_width, result)
       end
     rescue Errno::ENOENT
       []
+    end
+
+    # Return the output path for +filename+ when it is a variant of the same
+    # image (same base name and content hash) within the max configured width.
+    def matching_variant_path(filename, parsed, max_width, result)
+      candidate = JekyllImgFlow::FilenameGenerator.new.parse_filename(filename)
+      return unless candidate[:base_name] == parsed[:base_name]
+      return unless candidate[:hash] == parsed[:hash]
+      return if max_width && candidate[:width] > max_width
+
+      File.join(File.dirname(result), filename)
     end
 
     def modal_width(result)
