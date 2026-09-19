@@ -90,9 +90,10 @@ rake check_docker_images  # Check if pinned Docker images are outdated (run befo
 
 See [docs/parallel_testing.md](docs/parallel_testing.md) for parallel test setup and [docs/scripts.md](docs/scripts.md) for utility scripts.
 
-Git hooks are installed with `bin/install-hooks.sh`:
+Git hooks live in `bin/hooks/` as tracked files; `bin/install-hooks.sh`
+enables them by setting `core.hooksPath` (run once after cloning):
 
-- `pre-commit` runs RuboCop.
+- `pre-commit` runs RuboCop + Semgrep.
 - `pre-push` runs `rake ci`, which mirrors the GitHub Actions test and style
   checks, then verifies Docker image pins for release tags.
 
@@ -171,8 +172,8 @@ Release prerequisites:
 
 - Authenticate GitHub CLI once with `gh auth login`.
 - Keep the working tree free of untracked files.
-- Install git hooks once with `bin/install-hooks.sh` (pre-commit: rubocop,
-  pre-push: rubocop + rspec + docker image check on tag pushes).
+- Install git hooks once with `bin/install-hooks.sh` (pre-commit: rubocop
+  + semgrep, pre-push: `rake ci` + docker image check on tag pushes).
 
 The release flow uses rake tasks and a trusted-publishing GitHub Actions
 workflow (`.github/workflows/release.yml`). Pushing a `v*` tag triggers the

@@ -41,7 +41,8 @@ bin/imgflow_migrate_presets --preview  # Preview migration
 ### Git Hooks
 
 ```bash
-bin/install-hooks.sh                  # Install pre-commit (rubocop) and pre-push (rubocop + rspec) hooks
+bin/install-hooks.sh                  # Enable tracked bin/hooks/ via core.hooksPath
+                                      # pre-commit: rubocop + semgrep, pre-push: rake ci
 ```
 
 ## Quick Reference

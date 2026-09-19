@@ -30,8 +30,9 @@ GitHub Actions workflow. It includes external tests that can run with local
 CLI providers. Docker-backed HTTP provider tests remain local-only and should
 be run with the test services started.
 
-Install or refresh the Git hooks with `bin/install-hooks.sh`. The pre-commit
-hook runs RuboCop; the pre-push hook runs the CI-equivalent checks and, for
+Install or refresh the Git hooks with `bin/install-hooks.sh` (sets
+`core.hooksPath` to the tracked `bin/hooks/`). The pre-commit hook runs
+RuboCop + Semgrep; the pre-push hook runs the CI-equivalent checks and, for
 release tags, verifies Docker image pins.
 
 **Commands:** See [rake.md](rake.md) for the full Rake task reference.
@@ -117,7 +118,7 @@ See [docker.md](docker.md#troubleshooting) for Docker troubleshooting.
 ## Scripts
 
 - `create-test-images.sh` - Download test images
-- `bin/install-hooks.sh` - Install git hooks (pre-commit: rubocop, pre-push: rubocop + rspec)
+- `bin/install-hooks.sh` - Enable git hooks via `core.hooksPath` (pre-commit: rubocop + semgrep, pre-push: `rake ci`)
 
 **See:** [scripts.md](scripts.md) for the full scripts reference.
 

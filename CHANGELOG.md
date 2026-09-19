@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Moved git hooks into `bin/hooks/` as tracked files and switched
+  `bin/install-hooks.sh` to set `core.hooksPath` instead of generating
+  copies into `.git/hooks/` — the generated `pre-commit` (with
+  `semgrep --pro`) had drifted from the installed hook (without it).
+- Corrected hook documentation: `pre-commit` has always run RuboCop +
+  Semgrep, not RuboCop alone (AGENTS.md, docs/development.md,
+  docs/scripts.md).
+
 ## [0.4.1] - 2026-09-18
 
 ### Added
