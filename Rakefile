@@ -60,6 +60,42 @@ namespace :version do
       abort "CHANGELOG.md has no '## [#{version}]' entry. Add one before releasing."
     end
   end
+
+  desc "Verify Ruby-version literals in config and docs match .ruby-version"
+  task :check_consistency do
+    # .ruby-version is the single source; the gemspec floor derives from it
+    floor = File.read(".ruby-version").strip[/\d+\.\d+/] ||
+            File.read("jekyll-imgflow.gemspec")[/required_ruby_version\s*=\s*">=\s*([\d.]+)"/, 1]
+    abort "Could not determine the Ruby floor (.ruby-version / gemspec)" unless floor
+
+    # Static config that can't derive: .rubocop.yml TargetRubyVersion
+    problems = File.read(".rubocop.yml").scan(/TargetRubyVersion:\s*([\d.]+)/).filter_map do |match|
+      ".rubocop.yml: TargetRubyVersion #{match[0]} != #{floor} (.ruby-version)" if match[0] != floor
+    end
+
+    # Doc literals — CHANGELOG and docs/performance are historical records
+    # (old releases and benchmark runs legitimately cite older versions)
+    problems += `git ls-files '*.md' '*.json'`.split
+                                              .grep_v(%r{CHANGELOG|test_logs/|docs/performance/}).flat_map do |file|
+      File.read(file).scan(/Ruby\s*(?:>=\s*)?(\d+\.\d+)\b/i).filter_map do |match|
+        "#{file}: 'Ruby #{match[0]}' but .ruby-version floor is #{floor}" if match[0] != floor
+      end
+    end
+
+    if problems.empty?
+      puts "✅ Ruby-version literals consistent (#{floor})"
+    else
+      problems.each { |problem| warn "❌ #{problem}" }
+      abort "Update the literal or .ruby-version — don't let docs drift."
+    end
+  end
+
+  desc "Pre-release gate: CHANGELOG entry + version consistency"
+  task pre_release: %i[check_changelog check_consistency] do
+    version = File.read(VERSION_FILE)[/VERSION = "([^"]+)"/, 1]
+    puts ""
+    puts "✅ Pre-release checks complete for version #{version}"
+  end
 end
 
 desc "Run tests (parallel by default, SEQUENTIAL=true for sequential)"

@@ -15,7 +15,10 @@ Gem::Specification.new do |s|
   s.files       = Dir["lib/**/*"].reject { |f| File.extname(f) == ".md" || File.basename(f) == ".DS_Store" } + ["README.md", "LICENSE"]
   s.homepage    = "https://github.com/gundestrup/jekyll-imgflow"
   s.license     = "AGPL-3.0-or-later"
-  s.required_ruby_version = ">= 3.4.0"
+  # Floor derives from .ruby-version (major.minor + .0) so a Ruby bump
+  # is a one-file change. If the consumer floor ever needs to lag the
+  # dev pin, revert this to a literal.
+  s.required_ruby_version = ">= #{File.read(File.expand_path('.ruby-version', __dir__))[/\d+\.\d+/]}.0"
 
   s.add_dependency "benchmark", "~> 0.5.0"
   s.add_dependency "fastimage", "~> 2.4.1"

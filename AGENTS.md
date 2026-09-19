@@ -82,6 +82,8 @@ rake bundler_audit  # Security scan
 rake version:show   # Print current gem version
 rake version:bump[patch]  # Bump version (patch/minor/major)
 rake version:check_changelog  # Verify CHANGELOG has current version entry
+rake version:check_consistency  # Verify Ruby literals match .ruby-version
+rake version:pre_release  # Both checks above, before tagging
 rake start_services  # Start Docker test services (recreates stale containers)
 rake stop_services   # Stop Docker test services
 rake check_services  # Check if Docker services are running
@@ -118,7 +120,7 @@ CI and local development read the exact Ruby version from the committed
 - **Line length:** Max 100 characters
 - **Method length:** Max 50 lines (RuboCop)
 - **Cyclomatic complexity:** Max 12 (RuboCop)
-- **Hash syntax:** Ruby 1.9+ syntax (`key: value`), not hash rockets
+- **Hash syntax:** modern syntax (`key: value`), not hash rockets
 - **No trailing commas** in hash literals
 - **Namespace:** `JekyllImgFlow::` for library code, `Jekyll::ImgflowTag` for the Liquid tag
 - **Providers:** Inherit `JekyllImgFlow::Providers::BaseProvider`, implement `available?` and `execute`
@@ -191,8 +193,8 @@ bundle exec rake 'version:bump[patch]'    # or minor/major
 # 3. Add a CHANGELOG entry: "## [0.1.12] - YYYY-MM-DD"
 #    (the rake task prints the exact header to add)
 
-# 4. Verify the CHANGELOG entry exists
-bundle exec rake version:check_changelog
+# 4. Verify the CHANGELOG entry + Ruby-version consistency
+bundle exec rake version:pre_release
 
 # 5. Commit the version bump and changelog
 git add lib/jekyll-imgflow/version.rb CHANGELOG.md Gemfile.lock

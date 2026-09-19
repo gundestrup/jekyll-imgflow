@@ -2,6 +2,9 @@
 
 source "https://rubygems.org"
 
+# Ruby version comes from .ruby-version — one file drives dev, CI, gemspec.
+ruby File.read(File.expand_path(".ruby-version", __dir__)).strip
+
 # Pull runtime dependencies from the gemspec automatically.
 # Development dependencies are declared below in the :development group,
 # not in the gemspec, to avoid drift between the two files.

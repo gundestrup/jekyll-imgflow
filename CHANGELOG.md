@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `.ruby-version` is now the single source for the Ruby version: the
+  Gemfile reads it directly and the gemspec derives
+  `required_ruby_version` from it, joining CI which already did.
+- Added `rake version:check_consistency` (flags Ruby literals that
+  drift from `.ruby-version`, including `.rubocop.yml`'s
+  `TargetRubyVersion`) and `rake version:pre_release`, which runs it
+  together with `version:check_changelog` before tagging.
+- Removed the stale "980 examples" test count from agent steering
+  files — counts that change on their own shouldn't be restated.
+
 ### Fixed
 
 - Moved git hooks into `bin/hooks/` as tracked files and switched
