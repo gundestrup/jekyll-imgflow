@@ -14,7 +14,7 @@ RSpec.describe JekyllImgFlow::ManifestManager, :unit do
 
   before(:all) do
     # Create one real site as foundation for manifest testing
-    test_base_dir = File.join(File.expand_path("../..", __dir__), "tmp", "tests")
+    test_base_dir = File.join(TestDirectoryHelper::PROJECT_ROOT, "tmp", "test_sites")
     FileUtils.mkdir_p(test_base_dir)
     @test_site_dir = File.join(test_base_dir, "manifest_manager_real")
 

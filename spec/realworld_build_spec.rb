@@ -71,7 +71,7 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
     end
 
     # Gemfile — reference the plugin via path so `jekyll build` loads it
-    project_root = File.expand_path("../..", __dir__)
+    project_root = TestDirectoryHelper::PROJECT_ROOT
     File.write(File.join(site_dir, "Gemfile"), <<~GEMFILE)
       source "https://rubygems.org"
       gem "jekyll"
