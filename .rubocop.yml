@@ -19,10 +19,8 @@ AllCops:
   SuggestExtensions: false
 
 # Plugins — loaded after AllCops so they pick up TargetRubyVersion
-require:
-  - rubocop-markdown
-
 plugins:
+  - rubocop-md
   - rubocop-performance
   - rubocop-rake
   - rubocop-rspec
