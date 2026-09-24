@@ -40,6 +40,9 @@ tmp/
 .windsurfrules
 CLAUDE.md
 
+# Node development tools
+node_modules/
+
 # Ruby LSP cache
 .ruby-lsp/
 

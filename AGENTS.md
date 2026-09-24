@@ -175,7 +175,7 @@ Release prerequisites:
 - Authenticate GitHub CLI once with `gh auth login`.
 - Keep the working tree free of untracked files.
 - Install git hooks once with `bin/install-hooks.sh` (pre-commit: rubocop
-  + semgrep, pre-push: `rake ci` + docker image check on tag pushes).
+  - semgrep, pre-push: `rake ci` + docker image check on tag pushes).
 
 The release flow uses rake tasks and a trusted-publishing GitHub Actions
 workflow (`.github/workflows/release.yml`). Pushing a `v*` tag triggers the

@@ -317,8 +317,8 @@ namespace :parallel do
   end
 end
 
-desc "Run all quality checks (style, security, tests)"
-task quality: %i[rubocop bundler_audit spec]
+desc "Run all quality checks (style, docs, security, tests)"
+task quality: %i[rubocop markdownlint bundler_audit spec]
 
 desc "Run tests only (fast) - excludes slow and external tests by default"
 task :spec_fast do
@@ -701,6 +701,11 @@ task :rubocop do
   sh "bundle exec rubocop"
 end
 
+desc "Lint Markdown documentation"
+task :markdownlint do
+  sh "npm run lint:markdown"
+end
+
 desc "Auto-fix RuboCop issues"
 task :rubocop_fix do
   sh "bundle exec rubocop -a"
@@ -738,6 +743,8 @@ task :ci do
 
   sh "bundle exec rubocop"
   Jekyll.logger.info "✅ Style checks passed"
+  sh "npx --yes markdownlint-cli2@0.23.2"
+  Jekyll.logger.info "✅ Markdown checks passed"
   sh "bundle exec rspec --format progress --tag ~slow"
   Jekyll.logger.info "✅ CI checks passed"
 end

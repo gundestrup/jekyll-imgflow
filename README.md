@@ -37,7 +37,7 @@ imgflow:
 > **Configuration:** Only `originals` and `output` are required in `_config.yml`
 > — everything else has sensible defaults. See the
 > [Installation Guide](docs/installation.md#4-add-to-_configyml) for full options.
-
+>
 > **Note:** Image references require exact filenames (or paths relative to
 > `originals`). There is no fuzzy matching during the build yet — if you type
 > `photo.jpg` but the file is `photo.jpeg`, the build will fail with an error.
@@ -57,21 +57,25 @@ imgflow:
 ## 📚 Documentation
 
 ### Getting Started
+
 - **[Installation Guide](docs/installation.md)** - Detailed setup instructions
 - **[Basic Usage](docs/usage/)** - Core functionality and examples
 - **[Picture Tag Migration](docs/picture_tag_migration.md)** - Migrate from Picture Tag
 
 ### Configuration
+
 - **[Provider Setup](docs/providers.md)** - Configure image providers
 - **[Docker Services](docs/docker.md)** - Using Docker containers
 - **[Presets System](docs/usage/presets.md)** - Predefined configurations
 
 ### Development
+
 - **[Development Guide](docs/development.md)** - Contributing and setup
 - **[Testing Guide](docs/testing.md)** - Running and writing tests
 - **[Scripts Reference](docs/scripts.md)** - Development utilities
 
 ### Performance
+
 - **[Provider Comparison](docs/providers.md)** - Performance benchmarks
 - **[Parallel Testing](docs/parallel_testing.md)** - Fast test execution
 
@@ -82,6 +86,7 @@ ImgFlow has two processing flows: **Build-Time** (pre-generation) and **Runtime*
 **See:** [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed component architecture and data flow
 
 ### Quick Overview
+
 - **Build-Time Flow** - Pre-generate images during Jekyll build
 - **Runtime Flow** - Process images on-demand during template rendering
 - **Providers** - Image processing backends (CLI tools, HTTP APIs)
@@ -90,11 +95,13 @@ ImgFlow has two processing flows: **Build-Time** (pre-generation) and **Runtime*
 ## 🎯 Provider Support
 
 ### HTTP API Services (Recommended)
+
 - **[Imgproxy](https://github.com/imgproxy/imgproxy)** - Fast, reliable (Port 4022)
 - **[Weserv](https://github.com/weserv/images)** - Battle-tested (Port 4026)
 - **[Flyimg](https://github.com/flyimg/flyimg)** - On-the-fly processing (Port 4030)
 
 ### CLI Tools (Local)
+
 - **[Sharp](https://github.com/lovell/sharp)** - Node.js/libvips processing
 - **[ImageMagick](https://github.com/ImageMagick/ImageMagick)** - Feature-rich
 - **[LibVips](https://github.com/libvips/libvips)** - Memory efficient
@@ -145,6 +152,7 @@ rake check_services                  # Verify services
 ## 📦 Installation
 
 ### Quick Setup
+
 ```bash
 # Add to Gemfile
 gem 'jekyll-imgflow'
@@ -208,7 +216,7 @@ bin/imgflow_migrate_presets
 Latest benchmarks show **Sharp** as the fastest provider:
 
 | Provider | Time (s) | Speed |
-|----------|----------|-------|
+| ---------- | ---------- | ------- |
 | [Sharp](https://github.com/lovell/sharp) | 13.97 | 🏆 Fastest |
 | [LibVips](https://github.com/libvips/libvips) | 21.89 | Very Fast |
 | [Weserv](https://github.com/weserv/images) | 30.19 | Fast |
@@ -220,6 +228,7 @@ Latest benchmarks show **Sharp** as the fastest provider:
 ## 🛠️ Development
 
 ### Quick Setup
+
 ```bash
 # Clone and setup
 git clone <repository>
@@ -241,6 +250,7 @@ semgrep ci
 ```
 
 ### Key Files
+
 - **`lib/jekyll-imgflow.rb`** - Main module
 - **`lib/jekyll-imgflow/imgflow_tag.rb`** - Main tag implementation
 - **`lib/jekyll-imgflow/html_generator.rb`** - HTML generation
