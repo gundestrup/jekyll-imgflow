@@ -15,6 +15,9 @@ TestLogger.auto_start
 
 SimpleCov.start do
   skip "/spec/"
+  # parallel_rspec workers and long sequential runs outlive the 600s default;
+  # expired resultsets are silently dropped from the merged coverage report.
+  merge_timeout 1800
   formatter SimpleCov::Formatter::CoberturaFormatter if ENV["CI"]
 end
 
