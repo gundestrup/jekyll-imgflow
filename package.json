@@ -6,7 +6,7 @@
     "lint:markdown": "markdownlint-cli2"
   },
   "devDependencies": {
-    "markdownlint-cli2": "0.23.2",
+    "markdownlint-cli2": "0.23.3",
     "sharp-cli": "6.1.0"
   },
   "overrides": {
