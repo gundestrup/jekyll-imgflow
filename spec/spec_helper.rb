@@ -17,7 +17,9 @@ SimpleCov.start do
   skip "/spec/"
   # parallel_rspec workers and long sequential runs outlive the 600s default;
   # expired resultsets are silently dropped from the merged coverage report.
-  merge_timeout 1800
+  # A full `rake ci` sequential run takes ~60 min, so 1800s still dropped
+  # early resultsets — allow two hours.
+  merge_timeout 7200
   formatter SimpleCov::Formatter::CoberturaFormatter if ENV["CI"]
 end
 
