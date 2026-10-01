@@ -167,6 +167,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       template = Liquid::Template.parse("{% imgflow #{test_image_name} preset:hero %}")
 
       html = template.render(liquid_context)
+      # nosemgrep: ruby-redos-string-scan — asserting on plugin-generated HTML, not user input
       paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
 
       expect(html).to include("<picture", "type=\"image/webp\"")
@@ -201,6 +202,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 %}")
 
       html = template.render(liquid_context)
+      # nosemgrep: ruby-redos-string-scan — asserting on plugin-generated HTML, not user input
       paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
 
       expect(html).to include("<picture")
@@ -220,6 +222,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 formats:avif,png %}")
 
       html = template.render(liquid_context)
+      # nosemgrep: ruby-redos-string-scan — asserting on plugin-generated HTML, not user input
       paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
 
       expect(html).to include("<picture", "type=\"image/avif\"")
@@ -236,6 +239,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 formats:webp,jpg %}")
 
       html = template.render(liquid_context)
+      # nosemgrep: ruby-redos-string-scan — asserting on plugin-generated HTML, not user input
       paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
 
       expect(html).to include("<picture", "type=\"image/webp\"")
@@ -250,6 +254,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 format:avif %}")
 
       html = template.render(liquid_context)
+      # nosemgrep: ruby-redos-string-scan — asserting on plugin-generated HTML, not user input
       paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
 
       expect(html).not_to include("<picture")
@@ -265,6 +270,7 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
       template = Liquid::Template.parse("{% imgflow #{test_image_name} width:400 %}")
 
       html = template.render(liquid_context)
+      # nosemgrep: ruby-redos-string-scan — asserting on plugin-generated HTML, not user input
       paths = html.scan(/(?:src|srcset)="([^"]+)"/).flatten
 
       expect(html).to include("<picture")

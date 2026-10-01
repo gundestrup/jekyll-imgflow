@@ -204,6 +204,7 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
       html = File.read(index_html_path)
 
       # Extract src="..." paths from generated <img> tags
+      # nosemgrep: ruby-redos-string-scan — asserting on built Jekyll output, not user input
       src_paths = html.scan(/src="([^"]+)"/).flatten
                       .select { |p| p.include?("assets/images/optimized") }
 
@@ -283,6 +284,7 @@ RSpec.describe "Realworld Jekyll build — optimized image placement", :integrat
     it "HTML still references valid files after rebuild" do
       expect(File.exist?(index_html_path)).to be(true)
       html = File.read(index_html_path)
+      # nosemgrep: ruby-redos-string-scan — asserting on built Jekyll output, not user input
       src_paths = html.scan(/src="([^"]+)"/).flatten
                       .select { |p| p.include?("assets/images/optimized") }
 

@@ -242,7 +242,7 @@ rake download_test_images
 rake ci
 
 # Run the local Semgrep Pro rules directly
-semgrep scan --pro --config .semgrep.yml --error lib/
+semgrep scan --pro --config .semgrep.yml --error .
 
 # Sync the repository scan and findings with the Semgrep dashboard
 # (requires semgrep login or SEMGREP_APP_TOKEN)

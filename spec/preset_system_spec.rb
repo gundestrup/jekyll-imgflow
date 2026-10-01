@@ -90,6 +90,7 @@ RSpec.describe "Preset System", :integration, :system do
       end
 
       it "parses tag calls correctly" do
+        # nosemgrep: ruby-redos-string-scan — scanning committed preset fixture content, not user input
         tag_calls = preset_content.scan(/\{% imgflow_(\w+)\s+([^%]+)%\}/).map do |tag, content|
           [tag, content.strip]
         end
@@ -345,6 +346,7 @@ RSpec.describe "Preset System", :integration, :system do
       it "generates square thumbnails" do
         # This example verifies preset operation expansion; full processing is covered by
         # the OperationProcessor integration examples below.
+        # nosemgrep: ruby-redos-string-scan — scanning committed preset fixture content, not user input
         tag_calls = thumbnail_preset.scan(/\{% imgflow_(\w+)\s+([^%]+)%\}/).map do |tag, content|
           [tag, content.strip]
         end
@@ -376,6 +378,7 @@ RSpec.describe "Preset System", :integration, :system do
       it "generates gallery-sized images" do
         # This example verifies preset operation expansion; full processing is covered by
         # the OperationProcessor integration examples below.
+        # nosemgrep: ruby-redos-string-scan — scanning committed preset fixture content, not user input
         tag_calls = gallery_preset.scan(/\{% imgflow_(\w+)\s+([^%]+)%\}/).map do |tag, content|
           [tag, content.strip]
         end
@@ -404,6 +407,7 @@ RSpec.describe "Preset System", :integration, :system do
 
       it "handles invalid tag syntax gracefully" do
         # This example verifies the preset tag structure before parser integration.
+        # nosemgrep: ruby-redos-string-scan — scanning committed preset fixture content, not user input
         matches = invalid_preset.scan(/\{% imgflow_(\w+)\s+([^%]+)%\}/).map do |tag, content|
           [tag, content.strip]
         end
@@ -424,6 +428,7 @@ RSpec.describe "Preset System", :integration, :system do
 
       it "handles missing parameters gracefully" do
         # This example verifies the preset tag structure before parser integration.
+        # nosemgrep: ruby-redos-string-scan — scanning committed preset fixture content, not user input
         matches = incomplete_preset.scan(/\{% imgflow_(\w+)\s+([^%]+)%\}/).map do |tag, content|
           [tag, content.strip]
         end
@@ -443,6 +448,7 @@ RSpec.describe "Preset System", :integration, :system do
 
       it "handles unsupported formats gracefully" do
         # This example verifies the preset tag structure before parser integration.
+        # nosemgrep: ruby-redos-string-scan — scanning committed preset fixture content, not user input
         matches = unsupported_preset.scan(/\{% imgflow_(\w+)\s+([^%]+)%\}/).map do |tag, content|
           [tag, content.strip]
         end
@@ -477,6 +483,7 @@ RSpec.describe "Preset System", :integration, :system do
         # This example measures preset parsing performance independently of image processing.
         start_time = Time.now
 
+        # nosemgrep: ruby-redos-string-scan — scanning committed preset fixture content, not user input
         tag_calls = large_preset.scan(/\{% imgflow_(\w+)\s+([^%]+)%\}/).map do |tag, content|
           [tag, content.strip]
         end
