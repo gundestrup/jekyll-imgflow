@@ -6,7 +6,7 @@ A [Jekyll](https://jekyllrb.com/) plugin for automatic image optimization with m
 
 [![CI](https://github.com/gundestrup/jekyll-imgflow/actions/workflows/ci.yml/badge.svg)](https://github.com/gundestrup/jekyll-imgflow/actions/workflows/ci.yml)
 [![Gem Version](https://img.shields.io/gem/v/jekyll-imgflow)](https://rubygems.org/gems/jekyll-imgflow)
-[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundestrup/jekyll-imgflow)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundestrup/jekyll-imgflow)
 [![Status](https://img.shields.io/badge/status-active-success)](https://github.com/gundestrup/jekyll-imgflow)
 [![Semgrep](https://img.shields.io/badge/Semgrep-scanned-1B2B34?logo=semgrep&logoColor=white)](https://semgrep.dev/)
 [![CodeFactor](https://www.codefactor.io/repository/github/gundestrup/jekyll-imgflow/badge)](https://www.codefactor.io/repository/github/gundestrup/jekyll-imgflow)
