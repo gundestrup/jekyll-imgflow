@@ -1,0 +1,47 @@
+{
+  "repo_notes": [
+    { "content": "Jekyll plugin (Ruby 3.4+) for automatic image optimization: generates responsive <picture> output (WebP/AVIF/JPG/PNG) via multiple provider backends — Sharp, ImageMagick, LibVips, plus HTTP providers Imgproxy, Weserv, Flyimg." },
+    { "content": "Two processing flows: Build-Time (pre-generate default variants during jekyll build) and Runtime (on-demand specialized versions when {% imgflow %} tags render)." },
+    { "content": "ManifestManager is the single source of truth for generated image versions — persisted to <source>/<cache_dir>/imgflow-manifest.json, survives _site wipes, uses per-version SHA-256 source digests for cache invalidation." },
+    { "content": "ProviderRegistry auto-discovers providers from lib/jekyll-imgflow/providers/*.rb and picks the first available from config.backend_priority; TagRegistry auto-discovers tags from lib/jekyll-imgflow/tags/*_tag.rb." },
+    { "content": "Namespace split: JekyllImgFlow:: for library code, Jekyll::ImgflowTag for the Liquid tag. Providers inherit Providers::BaseProvider (available?/execute); tags inherit Tags::BaseTag (process)." },
+    { "content": "Regression history: the v0.1.6 optimized-images-wiped bug was masked by keep_files in spec_helper — second-build realworld spec (tagged :slow) is the guard; run bundle exec rspec --tag slow before releases." },
+    { "content": "See AGENTS.md and docs/ARCHITECTURE.md for the full component map and conventions." }
+  ],
+  "pages": [
+    {
+      "title": "Architecture Overview",
+      "purpose": "Build-time vs runtime processing flows, hooks.rb lifecycle integration, ManifestManager state, and how {% imgflow %} produces <picture> markup",
+      "page_notes": [{ "content": "Include Mermaid diagram: tag/hook -> BuildTimeProcessor/runtime path -> provider -> manifest -> <picture>" }]
+    },
+    {
+      "title": "Providers",
+      "purpose": "Provider contract (BaseProvider, available?/execute), CLI providers (Sharp/ImageMagick/LibVips) vs HTTP providers (Imgproxy/Weserv/Flyimg), backend_priority selection, Docker test services",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "ManifestManager",
+      "purpose": "Version tracking, SHA-256 digest invalidation, manifest persistence location and why it survives jekyll clean / _site wipes",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "Tags",
+      "purpose": "{% imgflow %} and other tags: markup parsing, width requirement, modal/link/markup options, TagRegistry discovery",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "Configuration",
+      "purpose": "imgflow: config keys — originals/output dirs, formats, backend_priority, cache_dir, presets — and _config.yml examples",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "Testing",
+      "purpose": "RSpec conventions (:unit/:slow tags, mock Docker services, second-build realworld spec), parallel testing, coverage gates, and the v0.1.6 wipe-bug lesson",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "Release Process",
+      "purpose": "version:bump -> CHANGELOG -> version:pre_release -> tag push -> release.yml trusted publishing to RubyGems; Docker image pin check before releases"
+    }
+  ]
+}

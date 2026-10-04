@@ -36,7 +36,8 @@ tmp/
 .idea/
 
 # AI tooling config (local)
-.devin/
+.devin/*
+!.devin/wiki.json
 .windsurfrules
 CLAUDE.md
 
