@@ -48,6 +48,17 @@ RSpec.describe "JekyllImgFlow Hooks", :unit do
       expect(Jekyll.logger).to have_received(:info)
         .with("🔌 ImgFlow: Initializing components on site").at_least(:once)
     end
+
+    it "finishes manifest cleanup at normal priority before fingerprinting" do
+      callbacks = Jekyll::Hooks.instance_variable_get(:@registry).fetch(:site).fetch(:post_write)
+      callback = callbacks.find do |hook|
+        hook.source_location&.first&.end_with?("/lib/jekyll-imgflow/hooks.rb")
+      end
+      priority = Jekyll::Hooks.instance_variable_get(:@hook_priority)
+
+      expect(callback).not_to be_nil
+      expect(priority.fetch(callback).first).to eq(-Jekyll::Hooks::PRIORITY_MAP.fetch(:normal))
+    end
   end
 
   describe "after_init hook behavior" do

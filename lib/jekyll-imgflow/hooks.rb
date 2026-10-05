@@ -33,7 +33,7 @@ module JekyllImgFlow
   end
 
   # Save final manifest after template rendering (single writer)
-  Jekyll::Hooks.register :site, :post_write do |site|
+  Jekyll::Hooks.register :site, :post_write, priority: :normal do |site|
     Jekyll.logger.info "🔌 ImgFlow post_write hook - saving final manifest with page usage"
 
     if site.imgflow_components && site.imgflow_components[:manifest]
