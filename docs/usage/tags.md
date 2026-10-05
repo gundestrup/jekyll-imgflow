@@ -1,5 +1,10 @@
 # ImgFlow Tag System - Standardized Interface
 
+> **Looking for `{% imgflow %}` parameters?** This page covers the internal
+> provider operation interface. The user-facing options (`width:`, `alt:`,
+> `modal:`, `markup:`, …) are documented in
+> [tag-options.md](tag-options.md).
+
 All ImgFlow providers must implement these standardized tags to ensure compatibility across different image processing backends.
 
 ## 🏷️ Standard Tag Interface

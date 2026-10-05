@@ -2,8 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- `docs/usage/tag-options.md` — the complete `{% imgflow %}` parameter
+  reference (operations, HTML attributes including `link:`/`modal:`, and
+  `markup:` output formats); linked from the README docs index and from
+  the provider-interface page that previously looked like tag docs.
+
 ### Changed
 
+- The `:site, :post_write` manifest hook is explicitly `priority: :normal`
+  (20) — ordinary post-write transforms run first, then
+  jekyll-fingerprint-flow (default 12), then jekyll-compress-flow (default
+  10) generates compressed siblings from the final fingerprinted HTML.
 - `.ruby-version` is now the single source for the Ruby version: the
   Gemfile reads it directly and the gemspec derives
   `required_ruby_version` from it, joining CI which already did.

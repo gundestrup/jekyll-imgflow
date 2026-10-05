@@ -60,6 +60,7 @@ imgflow:
 
 - **[Installation Guide](docs/installation.md)** - Detailed setup instructions
 - **[Basic Usage](docs/usage/)** - Core functionality and examples
+- **[Tag Options](docs/usage/tag-options.md)** - Every `{% imgflow %}` parameter
 - **[Picture Tag Migration](docs/picture_tag_migration.md)** - Migrate from Picture Tag
 
 ### Configuration
@@ -177,6 +178,8 @@ imgflow:
 
 **See:** [installation.md](docs/installation.md) for detailed installation and
 [all configuration options](docs/installation.md#4-add-to-_configyml),
+[tag-options.md](docs/usage/tag-options.md) for every `{% imgflow %}` option
+(operations, HTML attributes, `markup:` output formats),
 [presets.md](docs/usage/presets.md) for the preset system
 
 ## 🐳 Docker Setup (Recommended)
