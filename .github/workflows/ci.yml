@@ -39,6 +39,8 @@ jobs:
             WINDSURF.md
             .devin/*.md
             .github/**/*.md
+      - name: Audit dev dependencies
+        run: npm ci --ignore-scripts && npm run audit
 
   test:
     runs-on: ubuntu-26.04

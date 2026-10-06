@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Security
+
+- Dev-tooling audit gate: `scripts/npm-audit.mjs` + `.audit-allow.json`
+  wired as the `audit` npm script — patchable transitive deps forced via
+  `overrides` (smol-toml 1.9.0, katex 0.18.2); the unpatched braces
+  advisory is allowlisted with reason + expiry (dev-only linting).
+- Rakefile `ci` markdownlint pin corrected 0.23.2 to 0.23.3 (matches
+  `package.json`).
+
 ### Added
 
 - `JekyllImgFlow::Interface.to_h` — the public `{% imgflow %}` surface

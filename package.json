@@ -3,13 +3,15 @@
   "private": true,
   "description": "Pinned development tools for Jekyll ImgFlow",
   "scripts": {
-    "lint:markdown": "markdownlint-cli2"
+    "lint:markdown": "markdownlint-cli2",
+    "audit": "node scripts/npm-audit.mjs"
   },
   "devDependencies": {
     "markdownlint-cli2": "0.23.3",
     "sharp-cli": "6.1.0"
   },
   "overrides": {
-    "smol-toml": "1.8.0"
+    "smol-toml": "^1.9.0",
+    "katex": "^0.18.2"
   }
 }

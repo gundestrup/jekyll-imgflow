@@ -743,7 +743,7 @@ task :ci do
 
   sh "bundle exec rubocop"
   Jekyll.logger.info "✅ Style checks passed"
-  sh "npx --yes markdownlint-cli2@0.23.2"
+  sh "npx --yes markdownlint-cli2@0.23.3"
   Jekyll.logger.info "✅ Markdown checks passed"
   sh "bundle exec rspec --format progress --tag ~slow"
   Jekyll.logger.info "✅ CI checks passed"
