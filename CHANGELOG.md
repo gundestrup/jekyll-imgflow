@@ -1,6 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.3] - 2026-10-06
+
+### Security
+
+- `sharp` forced to 0.35.5 via npm `overrides` — sharp-cli 6.1.0 pins
+  exactly 0.35.4, which the audit gate flags for a use-after-free in
+  bundled librsvg (GHSA-wq5f-xc86-pv6w / CVE-2026-96889). The override
+  ships libvips with the patched librsvg 2.63.2; remove it once
+  sharp-cli bumps its pin. Dev tooling only — the gem is pure Ruby.
 
 ### Added
 
@@ -10,6 +18,10 @@
   Wired into the local pre-push hook (services auto-start if down); kept out
   of GitHub CI to save runner resources. Without the env var the aggregate
   suite only exercised CLI providers end-to-end.
+
+### Changed
+
+- flyimg test image pin bumped 1.12.5 to 1.12.6.
 
 ## [0.4.2] - 2026-10-06
 
