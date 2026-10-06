@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- `rake test_http_providers` — runs `provider_meta_testing_spec.rb` once per
+  HTTP provider (`IMGFLOW_TEST_PROVIDER` lane: imgproxy, weserv, flyimg),
+  giving each its WEBrick source server reachable via host.docker.internal.
+  Wired into the local pre-push hook (services auto-start if down); kept out
+  of GitHub CI to save runner resources. Without the env var the aggregate
+  suite only exercised CLI providers end-to-end.
+
 ## [0.4.2] - 2026-10-06
 
 ### Security

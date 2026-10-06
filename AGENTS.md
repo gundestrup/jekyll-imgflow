@@ -87,6 +87,7 @@ rake version:pre_release  # Both checks above, before tagging
 rake start_services  # Start Docker test services (recreates stale containers)
 rake stop_services   # Stop Docker test services
 rake check_services  # Check if Docker services are running
+rake test_http_providers  # HTTP provider end-to-end lanes (imgproxy/weserv/flyimg; needs Docker services)
 rake check_docker_images  # Check if pinned Docker images are outdated (run before releases)
 ```
 
@@ -97,7 +98,10 @@ enables them by setting `core.hooksPath` (run once after cloning):
 
 - `pre-commit` runs RuboCop + Semgrep.
 - `pre-push` runs `rake ci`, which mirrors the GitHub Actions test and style
-  checks, then verifies Docker image pins for release tags.
+  checks, then `rake test_http_providers` — one `IMGFLOW_TEST_PROVIDER` lane per
+  HTTP provider (local-only, kept out of CI to save runner resources; services
+  are started automatically if down) — and verifies Docker image pins for
+  release tags.
 
 CI and local development read the exact Ruby version from the committed
 `.ruby-version` file. The Sharp CLI version is declared in `package.json`.

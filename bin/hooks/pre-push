@@ -25,6 +25,29 @@ else
     exit 1
 fi
 
+# HTTP provider end-to-end lanes — local-only (kept out of GitHub CI to save
+# runner resources). Runs provider_meta_testing_spec.rb once per HTTP provider
+# via IMGFLOW_TEST_PROVIDER, which starts a WEBrick source server reachable
+# from the containers through host.docker.internal.
+echo ""
+echo "🐳 Running HTTP provider lanes (local-only, mirrors per-provider test mode)..."
+if ! bundle exec rake check_services >/dev/null 2>&1; then
+    echo "   Docker test services not running — starting them..."
+    if ! bundle exec rake start_services; then
+        echo "❌ Could not start Docker test services"
+        echo "   Skip with: git push --no-verify"
+        exit 1
+    fi
+fi
+if bundle exec rake test_http_providers >/dev/null 2>&1; then
+    echo "✅ HTTP provider lanes passed (imgproxy, weserv, flyimg)"
+else
+    echo "❌ HTTP provider tests failed"
+    echo "   Run 'bundle exec rake test_http_providers' for details"
+    echo "   Skip with: git push --no-verify"
+    exit 1
+fi
+
 # Only check Docker image pins when pushing a release tag
 if [ "$PUSHING_TAG" = true ]; then
     echo ""

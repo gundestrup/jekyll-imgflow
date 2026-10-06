@@ -1047,6 +1047,32 @@ task :test_providers do
   end
 end
 
+desc "Run HTTP provider end-to-end tests (one lane per provider, needs Docker services)"
+task :test_http_providers do
+  providers = %w[imgproxy weserv flyimg]
+  Jekyll.logger.info "🧪 Running HTTP provider end-to-end tests..."
+  Jekyll.logger.info "📝 One lane per provider via IMGFLOW_TEST_PROVIDER (each starts a"
+  Jekyll.logger.info "   WEBrick source server the container fetches through host.docker.internal)"
+  Jekyll.logger.info ""
+
+  Rake::Task[:check_services].invoke
+  Jekyll.logger.info ""
+
+  failed = providers.reject do |provider|
+    Jekyll.logger.info "🔸 Provider lane: #{provider}"
+    system({ "IMGFLOW_TEST_PROVIDER" => provider },
+           "bundle exec rspec spec/provider_meta_testing_spec.rb --format progress")
+  end
+
+  if failed.empty?
+    Jekyll.logger.info "🎉 ALL HTTP PROVIDER LANES PASSED (#{providers.join(', ')})"
+  else
+    Jekyll.logger.error "❌ HTTP provider lanes failed:"
+    failed.each { |provider| Jekyll.logger.error "  - #{provider}" }
+    exit 1
+  end
+end
+
 desc "Run Jekyll integration tests only"
 task :test_jekyll do
   Jekyll.logger.info "🧪 Running Jekyll Integration Tests..."
@@ -1891,6 +1917,7 @@ task :help do
   Jekyll.logger.info ""
   Jekyll.logger.info "  🔧 Individual Test Tasks:"
   Jekyll.logger.info "  rake test_providers     # Run provider capabilities tests only"
+  Jekyll.logger.info "  rake test_http_providers # Run HTTP provider lanes (imgproxy/weserv/flyimg, needs Docker)"
   Jekyll.logger.info "  rake test_jekyll        # Run Jekyll integration tests only"
   Jekyll.logger.info "  rake test_picture       # Run Picture Tag integration tests only"
   Jekyll.logger.info "  rake test_coverage_focused # Run coverage-focused tests (high coverage files)"
