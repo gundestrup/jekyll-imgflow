@@ -23,7 +23,7 @@ supported (`alt:"A long caption"`).
 | `quality:` | provider default | Compression quality 0–100 (per-format via `optimize_qualities` config) |
 | `format:` | — | Single output format (`webp`, `avif`, `jpg`, `png`) |
 | `formats:` | config | Comma-separated output format list |
-| `optimize` | — | Run the optimize operation |
+| `optimize:` | — | Run the optimize operation |
 | `level:` | `medium` | Optimization level |
 | `watermark:` | — | Watermark text/image |
 | `opacity:` | — | Watermark/alpha opacity 0.0–1.0 |

@@ -281,6 +281,36 @@ RSpec.describe "Jekyll::ImgflowTag Integration", :integration, :system do
     end
   end
 
+  describe "markup format selection through tags" do
+    before do
+      unless site.respond_to?(:imgflow_components)
+        site.define_singleton_method(:imgflow_components) { @imgflow_components }
+        site.define_singleton_method(:imgflow_components=) { |value| @imgflow_components = value }
+      end
+    end
+
+    it "renders a bare URL for markup:direct_url" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 markup:direct_url %}")
+
+      html = template.render(liquid_context)
+
+      expect(html).to start_with("http")
+      expect(html).not_to include("<")
+    end
+
+    it "keeps <img> for markup:img even when multiple formats are generated" do
+      site.imgflow_components = nil
+      template = Liquid::Template.parse("{% imgflow #{test_image_name} width:300 markup:img %}")
+
+      html = template.render(liquid_context)
+
+      expect(html).not_to include("<picture")
+      expect(html).to include("<img")
+      expect(html).to include("srcset=")
+    end
+  end
+
   describe "complex markup scenarios" do
     it "handles multiple operations" do
       complex_markup = "#{test_image_name} resize width:1200 height:800 format formats:webp,avif,jpg quality:90"

@@ -185,6 +185,7 @@ module JekyllImgFlow
         operations: [],
         html_attributes: {},
         raw_options: raw_options,
+        markup_format: nil,
         preset: nil,
         error: error_message
       }
@@ -196,6 +197,7 @@ module JekyllImgFlow
         operations: operations,
         html_attributes: html_attributes,
         raw_options: raw_options,
+        markup_format: raw_options[:markup] || raw_options[:markup_format],
         preset: raw_options[:preset]
       }
     end

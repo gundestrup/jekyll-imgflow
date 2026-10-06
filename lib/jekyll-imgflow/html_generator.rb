@@ -6,6 +6,11 @@ module JekyllImgFlow
   class HtmlGenerator
     include ModalWrapper
 
+    # Markup formats accepted via `markup:` (see docs/usage/tag-options.md).
+    # Unknown values fall back to `img`.
+    MARKUP_FORMATS = %w[img picture auto data_img data_picture data_auto
+                        direct_url naked_srcset].freeze
+
     # Generate HTML based on markup format and attributes
     # @param results [Array<String>] Processed image paths
     # @param attributes [Hash] HTML attributes by element

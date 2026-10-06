@@ -12,7 +12,8 @@ Gem::Specification.new do |s|
                   "and responsive image generation with modern picture tags."
   s.authors     = ["Svend Gundestrup"]
   s.email       = "svend@gundestrup.dk"
-  s.files       = Dir["lib/**/*"].reject { |f| File.extname(f) == ".md" || File.basename(f) == ".DS_Store" } + ["README.md", "LICENSE"]
+  s.files       = Dir["lib/**/*"].reject { |f| File.extname(f) == ".md" || File.basename(f) == ".DS_Store" } +
+                  ["README.md", "LICENSE", "interface.yml"]
   s.homepage    = "https://github.com/gundestrup/jekyll-imgflow"
   s.license     = "AGPL-3.0-or-later"
   # Floor derives from .ruby-version (major.minor + .0) so a Ruby bump

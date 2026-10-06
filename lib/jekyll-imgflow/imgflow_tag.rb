@@ -113,7 +113,8 @@ module Jekyll
       relative_modal_results = modal_results.uniq.map do |result|
         relative_result_path(result, site)
       end
-      parsed = parsed.merge(markup_format: "picture") if relative_results.length > 1
+      auto_markup = [nil, "auto"].include?(parsed[:markup_format])
+      parsed = parsed.merge(markup_format: "picture") if relative_results.length > 1 && auto_markup
       generate_html(relative_results, parsed.merge(modal_results: relative_modal_results), context)
     end
 

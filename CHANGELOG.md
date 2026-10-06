@@ -4,6 +4,13 @@
 
 ### Added
 
+- `JekyllImgFlow::Interface.to_h` — the public `{% imgflow %}` surface
+  (operation params, HTML attributes, `markup:` formats, config keys)
+  derived from `Parser`/`HtmlGenerator`/`Configuration` constants,
+  serialized to a committed `interface.yml` by `rake interface` for
+  downstream tooling (e.g. the jekyll-imgflow-vscode parity spec).
+- `spec/interface_spec.rb` pins code ↔ manifest ↔ docs: a stale
+  `interface.yml` or undocumented declared item fails the suite.
 - `docs/usage/tag-options.md` — the complete `{% imgflow %}` parameter
   reference (operations, HTML attributes including `link:`/`modal:`, and
   `markup:` output formats); linked from the README docs index and from
@@ -27,6 +34,12 @@
 
 ### Fixed
 
+- `markup:` was parsed into `raw_options` but never surfaced as
+  `markup_format`, so `{% imgflow x.jpg markup:direct_url %}` silently
+  rendered the default markup. The parser now maps `markup:`/
+  `markup_format:` through, covered by end-to-end tag specs. An explicit
+  `markup:` also takes precedence over the automatic `<picture>` upgrade
+  for multi-format output.
 - Moved git hooks into `bin/hooks/` as tracked files and switched
   `bin/install-hooks.sh` to set `core.hooksPath` instead of generating
   copies into `.git/hooks/` — the generated `pre-commit` (with

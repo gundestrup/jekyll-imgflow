@@ -29,6 +29,7 @@ require_relative "jekyll-imgflow/imgflow_tag"
 require_relative "jekyll-imgflow/picture_tag_adaptor"
 require_relative "jekyll-imgflow/picture_tag_preset_migrator"
 require_relative "jekyll-imgflow/hooks"
+require_relative "jekyll-imgflow/interface"
 
 module JekyllImgFlow
 end
