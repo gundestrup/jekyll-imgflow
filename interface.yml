@@ -2,7 +2,7 @@
 # Public tag/config surface for tooling (editor extensions, doc linters).
 ---
 gem: jekyll-imgflow
-version: 0.4.1
+version: 0.4.2
 tags:
   imgflow:
     params:

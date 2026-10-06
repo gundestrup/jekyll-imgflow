@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-06
+
 ### Security
 
 - Dev-tooling audit gate: `scripts/npm-audit.mjs` + `.audit-allow.json`
