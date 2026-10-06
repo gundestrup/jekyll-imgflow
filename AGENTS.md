@@ -114,6 +114,7 @@ CI and local development read the exact Ruby version from the committed
 | RSpec | `.rspec` / `.rspec_parallel` | Test framework with coverage |
 | SimpleCov | (in spec_helper) | Coverage reporting |
 | Codecov | `codecov.yml` | Coverage upload in CI (Cobertura XML via `simplecov-cobertura`) |
+| SonarQube Cloud | `sonar-project.properties` | CI scan in `ci.yml`; imports `coverage/coverage.json` (SimpleCov JSON) |
 | Bundler Audit | — | Security vulnerability scanning |
 | Parallel Tests | `.parallel_tests.yml` | Parallel test execution |
 

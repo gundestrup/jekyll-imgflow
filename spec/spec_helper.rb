@@ -20,7 +20,11 @@ SimpleCov.start do
   # A full `rake ci` sequential run takes ~60 min, so 1800s still dropped
   # early resultsets — allow two hours.
   merge_timeout 7200
-  formatter SimpleCov::Formatter::CoberturaFormatter if ENV["CI"]
+  if ENV["CI"]
+    formatter SimpleCov::Formatter::MultiFormatter.new(
+      [SimpleCov::Formatter::CoberturaFormatter, SimpleCov::Formatter::JSONFormatter]
+    )
+  end
 end
 
 # Constants for performance optimization
