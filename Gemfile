@@ -28,7 +28,7 @@ group :development do
   gem "parallel_tests", "~> 5.8.0"
   gem "rake", "~> 13.4.2"
   gem "rspec", "~> 3.13.2"
-  gem "rubocop", "~> 1.91.0"
+  gem "rubocop", "~> 1.92.0"
   gem "rubocop-md", "~> 2.0"
   gem "rubocop-performance", "~> 1.27.0"
   gem "rubocop-rake", "~> 0.7.1"
@@ -36,6 +36,6 @@ group :development do
   gem "ruby-lsp-rspec", "~> 0.1.29", require: false
   gem "simplecov", "~> 1.3.0"
   gem "simplecov-cobertura", "~> 4.0.0"
-  gem "webmock", "~> 3.26.2"
+  gem "webmock", "~> 3.30.0"
   gem "yard", "~> 0.9.45"
 end
