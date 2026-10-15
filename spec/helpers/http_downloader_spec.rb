@@ -176,13 +176,13 @@ RSpec.describe JekyllImgFlow::Helpers::HttpDownloader, :external, :unit do
       it "raises error for invalid URL scheme" do
         expect do
           described_class.download("ftp://example.com/file.jpg")
-        end.to raise_error
+        end.to raise_error(RuntimeError, /not an HTTP URI/)
       end
 
       it "raises error for malformed URL" do
         expect do
           described_class.download("not a url")
-        end.to raise_error
+        end.to raise_error(URI::InvalidURIError)
       end
 
       it "handles redirect without location header" do
