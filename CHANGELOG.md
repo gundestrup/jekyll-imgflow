@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Dev-tooling bump: `webmock` `~> 3.30.0` → `~> 3.34.0` (test-only gem).
+
 - CI: Semgrep moved from an inline `pip3 install semgrep==1.177.0` pin to hashed `.github/requirements-ci.txt` (compiled from `requirements-ci.in`, Python 3.12), installed with `--require-hashes`. Bumped Semgrep to 1.180.0. Added `.github/dependabot.yml` covering github-actions, bundler, npm, and the new `/.github` pip requirements.
 
 ## [0.4.3] - 2026-10-06

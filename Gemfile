@@ -36,6 +36,6 @@ group :development do
   gem "ruby-lsp-rspec", "~> 0.1.29", require: false
   gem "simplecov", "~> 1.3.0"
   gem "simplecov-cobertura", "~> 4.0.0"
-  gem "webmock", "~> 3.30.0"
+  gem "webmock", "~> 3.34.0"
   gem "yard", "~> 0.9.45"
 end
