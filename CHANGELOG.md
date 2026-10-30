@@ -8,6 +8,19 @@
 
 - CI: Semgrep moved from an inline `pip3 install semgrep==1.177.0` pin to hashed `.github/requirements-ci.txt` (compiled from `requirements-ci.in`, Python 3.12), installed with `--require-hashes`. Bumped Semgrep to 1.180.0. Added `.github/dependabot.yml` covering github-actions, bundler, npm, and the new `/.github` pip requirements.
 
+### Dependency updates
+
+- Ruby: `rubocop` 1.92.0 → 1.92.2 (patch).
+- npm: `markdownlint-cli2` 0.23.3 → 0.24.0; added `re2js` `^2.9.1`
+  override to fix GHSA-gg6h-894w-4m9c (ReDoS in lookbehind matching,
+  transitive via markdownlint ≥ 0.42.0).
+- GitHub Actions: `SonarSource/sonarqube-scan-action` v8.3.0 → v8.4.0;
+  `DavidAnson/markdownlint-cli2-action` v24.2.0 → v25.0.0;
+  Semgrep container 1.182.0 → 1.183.0.
+- Docker image pins: `flyimg/flyimg` 1.12.6 → 1.12.12;
+  `ghcr.io/imgproxy/imgproxy` v4.0.14 → v4.0.20.
+  `docs/docker.md` image table updated to match.
+
 ## [0.4.3] - 2026-10-06
 
 ### Security
