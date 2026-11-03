@@ -52,6 +52,10 @@ rake parallel:test             # Parallel testing via Rake
 
 **See:** [docker.md](docker.md) for Docker service configuration, ports, and troubleshooting.
 
+Test tasks that need the HTTP providers start these services automatically
+and stop them when the run finishes. Use the commands below only to keep
+services up across repeated test runs:
+
 ```bash
 rake start_services           # Start services (pulls latest pinned images)
 rake check_services           # Verify services are running

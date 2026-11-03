@@ -143,9 +143,10 @@ rake quick                           # Quick checks (style + tests)
 rake test                            # All tests
 rake parallel:test                   # Parallel testing (faster)
 
-# Docker Services
-rake start_services                  # Start services (pulls latest pinned images)
+# Docker Services (test tasks start/stop these automatically)
+rake start_services                  # Start services manually for repeated test runs
 rake check_services                  # Verify services
+rake stop_services                   # Stop services
 ```
 
 **See:** [testing.md](docs/testing.md) for comprehensive testing guide, [scripts.md](docs/scripts.md) for development utilities, and [rake.md](docs/rake.md) for all available Rake tasks
@@ -183,6 +184,10 @@ imgflow:
 [presets.md](docs/usage/presets.md) for the preset system
 
 ## 🐳 Docker Setup (Recommended)
+
+Test tasks that need the HTTP providers (e.g. `rake test_http_providers`)
+start these services automatically and stop them when the run finishes.
+Use the commands below only to keep services up across repeated runs:
 
 ```bash
 # Start all services (pulls latest pinned images first)

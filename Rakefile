@@ -303,9 +303,12 @@ namespace :parallel do
     end
 
     puts "🐌 Running #{work_queue.length} parallel slow jobs with #{max_workers} workers"
-    results = Parallel.map(work_queue, in_processes: max_workers, &run_job)
-    serial_jobs.each do |queued_job|
-      results << run_job.call(queued_job)
+    results = with_docker_services do
+      Parallel.map(work_queue, in_processes: max_workers, &run_job).tap do |mapped|
+        serial_jobs.each do |queued_job|
+          mapped << run_job.call(queued_job)
+        end
+      end
     end
 
     failed = results.reject { |result| result[:success] }
@@ -766,17 +769,19 @@ task :test_comprehensive do
   Jekyll.logger.info "🚀 ImgFlow Comprehensive Test Suite"
   Jekyll.logger.info "=" * 50
   Rake::Task[:check_gems].invoke
-  Rake::Task[:check_services].invoke
-  Jekyll.logger.info ""
-  Jekyll.logger.info "📝 Running all non-slow RSpec examples once"
-  Jekyll.logger.info "   Run rake parallel:slow for real provider and system builds"
-  Jekyll.logger.info ""
+  with_docker_services do
+    Rake::Task[:check_services].invoke
+    Jekyll.logger.info ""
+    Jekyll.logger.info "📝 Running all non-slow RSpec examples once"
+    Jekyll.logger.info "   Run rake parallel:slow for real provider and system builds"
+    Jekyll.logger.info ""
 
-  if system("bundle exec rspec --tag ~slow --format documentation")
-    Jekyll.logger.info "🎉 ALL DEFAULT TESTS PASSED! 🎉"
-  else
-    Jekyll.logger.error "❌ Default test suite failed"
-    exit 1
+    if system("bundle exec rspec --tag ~slow --format documentation")
+      Jekyll.logger.info "🎉 ALL DEFAULT TESTS PASSED! 🎉"
+    else
+      Jekyll.logger.error "❌ Default test suite failed"
+      exit 1
+    end
   end
 end
 
@@ -840,47 +845,49 @@ task :test_all do
     exit 1
   end
 
-  Jekyll.logger.info "📝 Running test files..."
-  Jekyll.logger.info "   🔄 Parallel tests: #{other_files.length} files" unless other_files.empty?
-  Jekyll.logger.info "   🔗 Integration tests: #{integration_files.length} files (sequential)" unless integration_files.empty?
-  Jekyll.logger.info ""
+  with_docker_services do
+    Jekyll.logger.info "📝 Running test files..."
+    Jekyll.logger.info "   🔄 Parallel tests: #{other_files.length} files" unless other_files.empty?
+    Jekyll.logger.info "   🔗 Integration tests: #{integration_files.length} files (sequential)" unless integration_files.empty?
+    Jekyll.logger.info ""
 
-  success = true
+    success = true
 
-  # Run other tests in parallel for better performance
-  unless other_files.empty?
-    if other_files.length > 1
-      Jekyll.logger.info "🚀 Running parallel tests..."
-      success = system("bundle exec parallel_rspec #{other_files.join(' ')} --type rspec")
-    else
-      success = system("bundle exec rspec #{other_files.join(' ')} --format progress")
+    # Run other tests in parallel for better performance
+    unless other_files.empty?
+      if other_files.length > 1
+        Jekyll.logger.info "🚀 Running parallel tests..."
+        success = system("bundle exec parallel_rspec #{other_files.join(' ')} --type rspec")
+      else
+        success = system("bundle exec rspec #{other_files.join(' ')} --format progress")
+      end
     end
-  end
 
-  # Run integration tests sequentially to avoid service contention
-  if success && !integration_files.empty?
-    Jekyll.logger.info "🔗 Running integration tests sequentially..."
-    success = system("bundle exec rspec #{integration_files.join(' ')} --format documentation")
-  end
+    # Run integration tests sequentially to avoid service contention
+    if success && !integration_files.empty?
+      Jekyll.logger.info "🔗 Running integration tests sequentially..."
+      success = system("bundle exec rspec #{integration_files.join(' ')} --format documentation")
+    end
 
-  if success
-    Jekyll.logger.info ""
-    Jekyll.logger.info "=" * 50
-    Jekyll.logger.info "🎉 ALL TESTS PASSED! 🎉"
-    Jekyll.logger.info ""
-    Jekyll.logger.info "✅ Tags System Tests"
-    Jekyll.logger.info "✅ Presets System Tests"
-    Jekyll.logger.info "✅ Core System Tests"
-    Jekyll.logger.info "✅ Integration Tests"
-    Jekyll.logger.info ""
-    Jekyll.logger.info "🚀 ImgFlow plugin is ready for production!"
-  else
-    Jekyll.logger.error ""
-    Jekyll.logger.error "=" * 50
-    Jekyll.logger.error "❌ Some tests failed!"
-    Jekyll.logger.error ""
-    Jekyll.logger.error "Please check the failed tests and fix any issues before deployment."
-    exit 1
+    if success
+      Jekyll.logger.info ""
+      Jekyll.logger.info "=" * 50
+      Jekyll.logger.info "🎉 ALL TESTS PASSED! 🎉"
+      Jekyll.logger.info ""
+      Jekyll.logger.info "✅ Tags System Tests"
+      Jekyll.logger.info "✅ Presets System Tests"
+      Jekyll.logger.info "✅ Core System Tests"
+      Jekyll.logger.info "✅ Integration Tests"
+      Jekyll.logger.info ""
+      Jekyll.logger.info "🚀 ImgFlow plugin is ready for production!"
+    else
+      Jekyll.logger.error ""
+      Jekyll.logger.error "=" * 50
+      Jekyll.logger.error "❌ Some tests failed!"
+      Jekyll.logger.error ""
+      Jekyll.logger.error "Please check the failed tests and fix any issues before deployment."
+      exit 1
+    end
   end
 end
 
@@ -996,15 +1003,17 @@ task :test_integration do
   ]
   failed_files = []
 
-  integration_files.each do |file|
-    next unless File.exist?(file)
+  with_docker_services do
+    integration_files.each do |file|
+      next unless File.exist?(file)
 
-    Jekyll.logger.info "🔸 Running #{File.basename(file)}..."
-    if system("bundle exec rspec #{file} --format progress")
-      Jekyll.logger.info "✅ #{File.basename(file)} PASSED"
-    else
-      Jekyll.logger.error "❌ #{File.basename(file)} FAILED"
-      failed_files << file
+      Jekyll.logger.info "🔸 Running #{File.basename(file)}..."
+      if system("bundle exec rspec #{file} --format progress")
+        Jekyll.logger.info "✅ #{File.basename(file)} PASSED"
+      else
+        Jekyll.logger.error "❌ #{File.basename(file)} FAILED"
+        failed_files << file
+      end
     end
   end
 
@@ -1047,21 +1056,24 @@ task :test_providers do
   end
 end
 
-desc "Run HTTP provider end-to-end tests (one lane per provider, needs Docker services)"
+desc "Run HTTP provider end-to-end tests (one lane per provider, auto-starts/stops Docker services)"
 task :test_http_providers do
   providers = %w[imgproxy weserv flyimg]
   Jekyll.logger.info "🧪 Running HTTP provider end-to-end tests..."
   Jekyll.logger.info "📝 One lane per provider via IMGFLOW_TEST_PROVIDER (each starts a"
   Jekyll.logger.info "   WEBrick source server the container fetches through host.docker.internal)"
+  Jekyll.logger.info "📝 Docker services are started if needed and stopped when done"
   Jekyll.logger.info ""
 
-  Rake::Task[:check_services].invoke
-  Jekyll.logger.info ""
+  failed = with_docker_services do
+    Rake::Task[:check_services].invoke
+    Jekyll.logger.info ""
 
-  failed = providers.reject do |provider|
-    Jekyll.logger.info "🔸 Provider lane: #{provider}"
-    system({ "IMGFLOW_TEST_PROVIDER" => provider },
-           "bundle exec rspec spec/provider_meta_testing_spec.rb --format progress")
+    providers.reject do |provider|
+      Jekyll.logger.info "🔸 Provider lane: #{provider}"
+      system({ "IMGFLOW_TEST_PROVIDER" => provider },
+             "bundle exec rspec spec/provider_meta_testing_spec.rb --format progress")
+    end
   end
 
   if failed.empty?
@@ -1077,14 +1089,16 @@ desc "Run Jekyll integration tests only"
 task :test_jekyll do
   Jekyll.logger.info "🧪 Running Jekyll Integration Tests..."
   Rake::Task[:check_gems].invoke
-  Rake::Task[:check_services].invoke
-  Jekyll.logger.info ""
+  with_docker_services do
+    Rake::Task[:check_services].invoke
+    Jekyll.logger.info ""
 
-  if system("bundle exec rspec spec/jekyll_integration_spec.rb --format documentation")
-    Jekyll.logger.info "✅ Jekyll integration tests passed"
-  else
-    Jekyll.logger.error "❌ Jekyll integration tests failed"
-    exit 1
+    if system("bundle exec rspec spec/jekyll_integration_spec.rb --format documentation")
+      Jekyll.logger.info "✅ Jekyll integration tests passed"
+    else
+      Jekyll.logger.error "❌ Jekyll integration tests failed"
+      exit 1
+    end
   end
 end
 
@@ -1118,14 +1132,16 @@ desc "Run Picture Tag integration tests only"
 task :test_picture do
   Jekyll.logger.info "🧪 Running Picture Tag Integration Tests..."
   Rake::Task[:check_gems].invoke
-  Rake::Task[:check_services].invoke
-  Jekyll.logger.info ""
+  with_docker_services do
+    Rake::Task[:check_services].invoke
+    Jekyll.logger.info ""
 
-  if system("bundle exec rspec spec/picture_tag_integration_spec.rb --format documentation")
-    Jekyll.logger.info "✅ Picture Tag integration tests passed"
-  else
-    Jekyll.logger.error "❌ Picture Tag integration tests failed"
-    exit 1
+    if system("bundle exec rspec spec/picture_tag_integration_spec.rb --format documentation")
+      Jekyll.logger.info "✅ Picture Tag integration tests passed"
+    else
+      Jekyll.logger.error "❌ Picture Tag integration tests failed"
+      exit 1
+    end
   end
 end
 
@@ -1149,37 +1165,39 @@ task :performance_benchmark, [:test_set] do |_t, args|
     exit 1
   end
 
-  # Check services first
-  Jekyll.logger.info "🔍 Checking services availability..."
-  unless system("rake check_services")
-    Jekyll.logger.error "❌ Service check failed! Please fix issues before running benchmark."
-    exit 1
-  end
-
-  Jekyll.logger.info "✅ All services verified"
-
-  # Set environment and run benchmark
-  ENV["PERFORMANCE"] = "true"
-
-  Jekyll.logger.info "\n🏃 Running performance benchmark with #{test_set} test set..."
-  Jekyll.logger.info "   This will take several minutes..."
-  Jekyll.logger.info "   Press Ctrl+C to cancel"
-
-  sleep 2
-
-  # Run the actual benchmark script
-  benchmark_script = File.expand_path("scripts/performance_benchmark.rb", __dir__)
-
-  if File.exist?(benchmark_script)
-    if system("ruby #{benchmark_script}")
-      show_performance_results
-    else
-      Jekyll.logger.error "❌ Benchmark execution failed!"
+  with_docker_services do
+    # Check services first
+    Jekyll.logger.info "🔍 Checking services availability..."
+    unless system("rake check_services")
+      Jekyll.logger.error "❌ Service check failed! Please fix issues before running benchmark."
       exit 1
     end
-  else
-    Jekyll.logger.error "❌ Benchmark script not found: #{benchmark_script}"
-    exit 1
+
+    Jekyll.logger.info "✅ All services verified"
+
+    # Set environment and run benchmark
+    ENV["PERFORMANCE"] = "true"
+
+    Jekyll.logger.info "\n🏃 Running performance benchmark with #{test_set} test set..."
+    Jekyll.logger.info "   This will take several minutes..."
+    Jekyll.logger.info "   Press Ctrl+C to cancel"
+
+    sleep 2
+
+    # Run the actual benchmark script
+    benchmark_script = File.expand_path("scripts/performance_benchmark.rb", __dir__)
+
+    if File.exist?(benchmark_script)
+      if system("ruby #{benchmark_script}")
+        show_performance_results
+      else
+        Jekyll.logger.error "❌ Benchmark execution failed!"
+        exit 1
+      end
+    else
+      Jekyll.logger.error "❌ Benchmark script not found: #{benchmark_script}"
+      exit 1
+    end
   end
 end
 
@@ -1754,15 +1772,24 @@ def docker_files_available?
   File.exist?(DOCKER_COMPOSE_FILE) && File.exist?(DOCKER_ENV_FILE)
 end
 
-desc "Start test Docker services (pulls missing pinned images, recreates stale containers)"
-task :start_services do
+def docker_compose_cmd
+  ["docker-compose", "-f", DOCKER_COMPOSE_FILE, "--env-file", DOCKER_ENV_FILE]
+end
+
+def docker_services_ready?
+  statuses = DockerServiceStatus.statuses(
+    compose_file: DOCKER_COMPOSE_FILE, env_file: DOCKER_ENV_FILE
+  )
+  statuses.values.all? { |item| DockerServiceStatus.ready?(item) }
+end
+
+def start_docker_services
   abort "❌ #{DOCKER_COMPOSE_FILE} and #{DOCKER_ENV_FILE} are required" unless docker_files_available?
 
-  compose = ["docker-compose", "-f", DOCKER_COMPOSE_FILE, "--env-file", DOCKER_ENV_FILE]
   Jekyll.logger.info "Starting Docker services (pulling only missing images, recreating stale containers)..."
-  unless system(*compose, "up", "-d", "--pull", "missing", "--force-recreate", "--remove-orphans")
+  unless system(*docker_compose_cmd, "up", "-d", "--pull", "missing", "--force-recreate", "--remove-orphans")
     Jekyll.logger.error "Failed to start Docker services. Recent logs:"
-    system(*compose, "logs", "--tail", "20")
+    system(*docker_compose_cmd, "logs", "--tail", "20")
     abort "Docker compose up failed"
   end
 
@@ -1777,13 +1804,40 @@ task :start_services do
   Jekyll.logger.info "✅ All Docker test services are ready"
 end
 
+# Warn-only stop for automatic teardown: a cleanup failure must never mask a
+# test result, so unlike `rake stop_services` this never aborts.
+def stop_docker_services
+  Jekyll.logger.info "🛑 Stopping Docker services..."
+  if system(*docker_compose_cmd, "down", "--remove-orphans")
+    Jekyll.logger.info "✅ Docker services stopped"
+  else
+    Jekyll.logger.warn "⚠️  Failed to stop Docker services — run 'rake stop_services' manually"
+  end
+end
+
+# Runs the block with the Docker test services up, then always tears them down
+# (even on failure/abort). Services are started first if they are not ready.
+def with_docker_services
+  abort "❌ #{DOCKER_COMPOSE_FILE} and #{DOCKER_ENV_FILE} are required" unless docker_files_available?
+
+  start_docker_services unless docker_services_ready?
+  yield
+ensure
+  stop_docker_services if docker_files_available?
+end
+
+desc "Start test Docker services (pulls missing pinned images, recreates stale containers)"
+task :start_services do
+  start_docker_services
+end
+
 desc "Stop test Docker services"
 task :stop_services do
   abort "❌ #{DOCKER_COMPOSE_FILE} and #{DOCKER_ENV_FILE} are required" unless docker_files_available?
 
   Jekyll.logger.info "🛑 Stopping Docker services..."
-  compose = ["docker-compose", "-f", DOCKER_COMPOSE_FILE, "--env-file", DOCKER_ENV_FILE]
-  abort "❌ Failed to stop Docker services" unless system(*compose, "down", "--remove-orphans")
+  abort "❌ Failed to stop Docker services" unless
+    system(*docker_compose_cmd, "down", "--remove-orphans")
 
   Jekyll.logger.info "✅ Docker services stopped"
 end

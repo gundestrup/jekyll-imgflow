@@ -11,6 +11,8 @@ include:
 services:
   imgproxy:
     container_name: imgflow-imgproxy-test
+    # Test services never restart: tasks bring them up and tear them down per run
+    restart: "no"
     ports:
       - "${IMGPROXY_PORT}:8080"
     volumes:
@@ -18,6 +20,7 @@ services:
 
   weserv:
     container_name: imgflow-weserv-test
+    restart: "no"
     ports:
       - "${WESERV_PORT}:80"
     volumes:
@@ -44,6 +47,7 @@ services:
 
   flyimg:
     container_name: imgflow-flyimg-test
+    restart: "no"
     ports:
       - "${FLYIMG_PORT}:80"
     volumes:

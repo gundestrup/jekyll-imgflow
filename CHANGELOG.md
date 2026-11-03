@@ -4,6 +4,18 @@
 
 ### Changed
 
+- **Docker test service lifecycle** — service-dependent rake tasks
+  (`test_http_providers`, `test_jekyll`, `test_picture`, `test_integration`,
+  `test_comprehensive`, `test_all`, `performance_benchmark`, `parallel:slow`)
+  now start the Docker test services automatically if they are not running
+  and always stop them when the run finishes (pass or fail). Containers no
+  longer linger after test runs or pre-push. `start_services`/`stop_services`
+  remain for keeping services up across repeated test runs.
+- **Test containers no longer restart automatically** — `docker-compose.test.yml`
+  overrides the `restart: unless-stopped` policy inherited from
+  `docker-compose.base.yml` with `restart: "no"`, so test containers no longer
+  survive Docker daemon or host restarts. The production compose file keeps
+  `restart: unless-stopped`.
 - Dev-tooling bump: `webmock` `~> 3.30.0` → `~> 3.34.0` (test-only gem).
 
 - CI: Semgrep moved from an inline `pip3 install semgrep==1.177.0` pin to hashed `.github/requirements-ci.txt` (compiled from `requirements-ci.in`, Python 3.12), installed with `--require-hashes`. Bumped Semgrep to 1.180.0. Added `.github/dependabot.yml` covering github-actions, bundler, npm, and the new `/.github` pip requirements.

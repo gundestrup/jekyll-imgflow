@@ -26,7 +26,9 @@ npm install -g "sharp-cli@${SHARP_CLI_VERSION}"
 ```
 
 Docker-backed HTTP provider tests are intentionally run locally rather than in
-CI. Start them with `rake start_services` when running those provider tests.
+CI. Tasks such as `rake test_http_providers` start the services automatically
+and stop them when done; use `rake start_services` only to keep them up across
+repeated runs.
 
 ## Test Structure
 

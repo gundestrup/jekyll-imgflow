@@ -4,6 +4,11 @@ ImgFlow provides Docker services for image optimization. These services can be u
 
 ## Quick Start
 
+You usually do not need to manage these manually: test tasks that need the
+HTTP providers start the services automatically and stop them when the run
+finishes. The commands below are for keeping services up across repeated
+test runs or for production use:
+
 ```bash
 # Start all services (pulls missing images, recreates stale containers)
 rake start_services
