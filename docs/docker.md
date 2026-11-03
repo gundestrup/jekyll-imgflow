@@ -26,7 +26,7 @@ rake stop_services
 | --- | ---: | --- | --- | --- |
 | **Imgproxy** | 4022 | `ghcr.io/imgproxy/imgproxy:v4.0.20` | HTTP API | Fast, reliable |
 | **Weserv** | 4026 | `ghcr.io/weserv/images:5.x` | HTTP API | Battle-tested |
-| **Flyimg** | 4030 | `flyimg/flyimg:1.12.12` | HTTP API | On-the-fly |
+| **Flyimg** | 4030 | `flyimg/flyimg:1.12.13` | HTTP API | On-the-fly |
 
 ### Manual-Only Services (Web UI - No Programmatic Access)
 

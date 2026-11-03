@@ -17,9 +17,12 @@
 - GitHub Actions: `SonarSource/sonarqube-scan-action` v8.3.0 → v8.4.0;
   `DavidAnson/markdownlint-cli2-action` v24.2.0 → v25.0.0;
   Semgrep container 1.182.0 → 1.183.0.
-- Docker image pins: `flyimg/flyimg` 1.12.6 → 1.12.12;
+- Docker image pins: `flyimg/flyimg` 1.12.6 → 1.12.12 → 1.12.13;
   `ghcr.io/imgproxy/imgproxy` v4.0.14 → v4.0.20.
   `docs/docker.md` image table updated to match.
+- Gem updates: `fastimage` 2.4.1 → 2.4.3, `sass-embedded` 1.105.1 → 1.107.1,
+  `addressable` 2.9.0 → 2.9.2, `csv` 3.3.6 → 3.3.7, `io-console` 0.9.4 → 0.9.5,
+  `mime-types-data` → 3.2026.1027, `parallel_tests` 5.8.0 → 5.9.0.
 
 ## [0.4.3] - 2026-10-06
 

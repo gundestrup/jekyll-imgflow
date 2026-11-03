@@ -25,7 +25,7 @@ group :development do
   gem "debug", "~> 1.11.1", require: false
   gem "ostruct", "~> 0.6.1"
   gem "parallel", "~> 2.2"
-  gem "parallel_tests", "~> 5.8.0"
+  gem "parallel_tests", "~> 5.9.0"
   gem "rake", "~> 13.4.2"
   gem "rspec", "~> 3.13.2"
   gem "rubocop", "~> 1.92.0"

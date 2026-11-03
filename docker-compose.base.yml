@@ -32,9 +32,9 @@ services:
       - imgflow-network
 
   # Flyimg HTTP service (official image)
-  # Pinned to 1.12.12 for reproducibility (project releases frequently).
+  # Pinned to 1.12.13 for reproducibility (project releases frequently).
   flyimg:
-    image: flyimg/flyimg:1.12.12
+    image: flyimg/flyimg:1.12.13
     restart: unless-stopped
     shm_size: 1gb
     networks:
