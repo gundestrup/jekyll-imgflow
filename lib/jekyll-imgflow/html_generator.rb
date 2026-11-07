@@ -5,6 +5,7 @@ module JekyllImgFlow
   # Supports Picture Tag compatibility with multiple markup formats and attributes
   class HtmlGenerator
     include ModalWrapper
+    include IntrinsicDimensions
 
     # Markup formats accepted via `markup:` (see docs/usage/tag-options.md).
     # Unknown values fall back to `img`.
@@ -110,7 +111,7 @@ module JekyllImgFlow
     # Generate standard <picture> element with <source> tags
     def generate_picture_element
       picture_attrs = build_attributes(@attributes[:picture])
-      img_attrs = build_img_attributes
+      img_attrs = build_img_attributes(find_fallback_image(@results))
 
       html = "<picture#{picture_attrs}>"
 
@@ -137,8 +138,8 @@ module JekyllImgFlow
 
     # Generate standard <img> element
     def generate_img_element
-      img_attrs = build_img_attributes
       primary = @results.first
+      img_attrs = build_img_attributes(primary)
 
       # Build srcset if multiple results
       srcset_attr = if @results.length > 1
@@ -154,7 +155,7 @@ module JekyllImgFlow
     # Generate <picture> element with data-* attributes for lazy loading
     def generate_data_picture_element
       picture_attrs = build_attributes(@attributes[:picture])
-      img_attrs = build_data_img_attributes
+      img_attrs = build_data_img_attributes(find_fallback_image(@results))
 
       html = "<picture#{picture_attrs}>"
 
@@ -181,8 +182,8 @@ module JekyllImgFlow
 
     # Generate <img> element with data-* attributes for lazy loading
     def generate_data_img_element
-      img_attrs = build_data_img_attributes
       primary = @results.first
+      img_attrs = build_data_img_attributes(primary)
 
       # Build data-srcset if multiple results
       srcset_attr = if @results.length > 1
@@ -206,18 +207,16 @@ module JekyllImgFlow
     end
 
     # Build img attributes including alt, loading, and custom attributes
-    def build_img_attributes
-      attrs = @attributes[:img].dup
-      attrs["alt"] = @attributes[:alt] if @attributes[:alt]
+    def build_img_attributes(result = nil)
+      attrs = base_img_attrs(result)
       attrs["loading"] = "lazy" unless attrs["loading"]
 
       build_attributes(attrs)
     end
 
     # Build img attributes with data-* for lazy loading
-    def build_data_img_attributes
-      attrs = @attributes[:img].dup
-      attrs["alt"] = @attributes[:alt] if @attributes[:alt]
+    def build_data_img_attributes(result = nil)
+      attrs = base_img_attrs(result)
       attrs["class"] = [attrs["class"], "lazy"].compact.join(" ")
 
       build_attributes(attrs)

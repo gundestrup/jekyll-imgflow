@@ -36,6 +36,18 @@
   `addressable` 2.9.0 → 2.9.2, `csv` 3.3.6 → 3.3.7, `io-console` 0.9.4 → 0.9.5,
   `mime-types-data` → 3.2026.1027, `parallel_tests` 5.8.0 → 5.9.0.
 
+## [0.4.4] - 2026-11-07
+
+### Added
+
+- **Intrinsic `width`/`height` on `<img>`** — the emitted `<img>` (and the
+  `<picture>` fallback) now carries the generated file's pixel dimensions,
+  read via `FastImage`, so browsers reserve the correct aspect-ratio box
+  before download. Fixes layout shift (CLS) / Lighthouse "unsized images".
+  User-supplied `img-width:`/`img-height:` always win; dimensions are
+  skipped when the file can't be read. Implemented in a new
+  `JekyllImgFlow::IntrinsicDimensions` module included by `HtmlGenerator`.
+
 ## [0.4.3] - 2026-10-06
 
 ### Security

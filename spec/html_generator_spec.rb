@@ -558,6 +558,64 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
     end
   end
 
+  describe "intrinsic width/height attributes" do
+    let(:source) { Dir.mktmpdir("imgflow-generator-spec") }
+    let(:site) { create_mock_site(config: { "url" => "https://example.com" }, source: source) }
+    let(:context) { double("context", registers: { site: site }) }
+    let(:config) do
+      double("config", formats: %w[avif webp png jpg], fallback_format: "jpg", image_modal: false)
+    end
+    let(:image_rel) { "assets/images/optimized/photo-800-abc123.jpg" }
+    let(:image_abs) { File.join(source, image_rel) }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(image_abs))
+      # 200x133 fixture
+      FileUtils.cp("spec/fixtures/originals/artificial-small.jpg", image_abs)
+    end
+
+    after { FileUtils.remove_entry(source) }
+
+    it "emits intrinsic width and height on the img element" do
+      html = JekyllImgFlow::HtmlGenerator.generate([image_rel], {}, "img", context, config)
+
+      expect(html).to include('width="200"')
+      expect(html).to include('height="133"')
+    end
+
+    it "emits intrinsic width and height on the picture fallback img" do
+      results = [image_rel.sub(".jpg", ".avif"), image_rel]
+      html = JekyllImgFlow::HtmlGenerator.generate(results, {}, "picture", context, config)
+
+      expect(html).to match(/<img [^>]*width="200"[^>]*>/)
+      expect(html).to match(/<img [^>]*height="133"[^>]*>/)
+    end
+
+    it "emits intrinsic width and height on data_img markup" do
+      html = JekyllImgFlow::HtmlGenerator.generate([image_rel], {}, "data_img", context, config)
+
+      expect(html).to include('width="200"')
+      expect(html).to include('height="133"')
+    end
+
+    it "keeps user-supplied dimensions" do
+      attrs = { img: { "width" => "50", "height" => "33" } }
+      html = JekyllImgFlow::HtmlGenerator.generate([image_rel], attrs, "img", context, config)
+
+      expect(html).to include('width="50"')
+      expect(html).to include('height="33"')
+      expect(html).not_to include('width="200"')
+    end
+
+    it "does not emit dimensions it cannot read" do
+      html = JekyllImgFlow::HtmlGenerator.generate(["assets/images/optimized/missing-400-deadbeef.jpg"],
+                                                   {}, "img", context, config)
+
+      expect(html).not_to include('width="')
+      expect(html).not_to include('height="')
+    end
+  end
+
   describe "modal behavior" do
     let(:modal_config) do
       double("config", formats: %w[avif webp png jpg], fallback_format: "jpg", image_modal: true)
