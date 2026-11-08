@@ -8,6 +8,7 @@ require "jekyll"
 require "net/http"
 require "fileutils"
 require "json"
+require "rbconfig"
 require "parallel"
 require_relative "lib/jekyll-imgflow/tasks"
 require_relative "spec/support/test_environment"
@@ -1783,8 +1784,38 @@ def docker_services_ready?
   statuses.values.all? { |item| DockerServiceStatus.ready?(item) }
 end
 
+def docker_daemon_running?
+  system("docker", "info", out: File::NULL, err: File::NULL)
+end
+
+# Ensures the Docker daemon is reachable before compose commands run. On macOS
+# a stopped Docker Desktop is launched and waited on; elsewhere we abort with a
+# clear message instead of letting `docker-compose` fail cryptically.
+def ensure_docker_daemon
+  return if docker_daemon_running?
+
+  if RbConfig::CONFIG["host_os"].match?(/darwin/i)
+    Jekyll.logger.info "🐳 Docker daemon not running — starting Docker Desktop..."
+    abort "❌ Failed to launch Docker Desktop. Is it installed?" unless system("open", "-a", "Docker")
+  else
+    abort "❌ Docker daemon not running. Start it (e.g. 'systemctl start docker') and retry"
+  end
+
+  timeout = Integer(ENV.fetch("DOCKER_DAEMON_TIMEOUT", "120"), 10)
+  Jekyll.logger.info "⏳ Waiting up to #{timeout}s for the Docker daemon..."
+  deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+  until docker_daemon_running?
+    abort "❌ Docker daemon did not start within #{timeout}s" if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+    sleep 2
+  end
+  Jekyll.logger.info "✅ Docker daemon is up"
+end
+
 def start_docker_services
   abort "❌ #{DOCKER_COMPOSE_FILE} and #{DOCKER_ENV_FILE} are required" unless docker_files_available?
+
+  ensure_docker_daemon
 
   Jekyll.logger.info "Starting Docker services (pulling only missing images, recreating stale containers)..."
   unless system(*docker_compose_cmd, "up", "-d", "--pull", "missing", "--force-recreate", "--remove-orphans")
@@ -1807,6 +1838,8 @@ end
 # Warn-only stop for automatic teardown: a cleanup failure must never mask a
 # test result, so unlike `rake stop_services` this never aborts.
 def stop_docker_services
+  return unless docker_daemon_running?
+
   Jekyll.logger.info "🛑 Stopping Docker services..."
   if system(*docker_compose_cmd, "down", "--remove-orphans")
     Jekyll.logger.info "✅ Docker services stopped"

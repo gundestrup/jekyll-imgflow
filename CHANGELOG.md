@@ -18,6 +18,12 @@
   and always stop them when the run finishes (pass or fail). Containers no
   longer linger after test runs or pre-push. `start_services`/`stop_services`
   remain for keeping services up across repeated test runs.
+- **Docker daemon auto-start** — `start_docker_services` now launches Docker
+  Desktop on macOS when the daemon is down, waiting up to
+  `DOCKER_DAEMON_TIMEOUT` (default 120s); on other platforms it aborts with a
+  clear message instead of a cryptic `docker-compose` failure. The pre-push
+  hook prints the last 20 lines of the HTTP provider lanes on failure instead
+  of discarding the output.
 - **Test containers no longer restart automatically** — `docker-compose.test.yml`
   overrides the `restart: unless-stopped` policy inherited from
   `docker-compose.base.yml` with `restart: "no"`, so test containers no longer

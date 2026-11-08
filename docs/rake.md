@@ -56,7 +56,7 @@ rake docs                 # Show docs structure
 ### 🔧 Setup & Services
 
 - `rake download_test_images` - Download test images
-- `rake start_services` - Start Docker test services (pulls missing images, recreates stale containers, removes orphans). Only needed to keep services up across repeated test runs — service-dependent test tasks start them automatically and always stop them when done
+- `rake start_services` - Start Docker test services (pulls missing images, recreates stale containers, removes orphans). Only needed to keep services up across repeated test runs — service-dependent test tasks start them automatically and always stop them when done. If the Docker daemon is down, these tasks launch Docker Desktop on macOS (waiting up to `DOCKER_DAEMON_TIMEOUT`, default 120s) or abort with a clear message elsewhere
 - `rake stop_services` - Stop Docker test services
 - `rake check_services` - Check service availability
 - `rake check_docker_images` - Check if pinned Docker images are outdated (run before releases)

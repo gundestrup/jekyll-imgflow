@@ -87,7 +87,7 @@ rake version:pre_release  # Both checks above, before tagging
 rake start_services  # Start Docker test services manually (only needed to keep them up across runs)
 rake stop_services   # Stop Docker test services
 rake check_services  # Check if Docker services are running
-rake test_http_providers  # HTTP provider end-to-end lanes (imgproxy/weserv/flyimg; auto-starts/stops Docker services)
+rake test_http_providers  # HTTP provider end-to-end lanes (imgproxy/weserv/flyimg; auto-starts Docker daemon on macOS and Docker services, always stops services)
 rake check_docker_images  # Check if pinned Docker images are outdated (run before releases)
 ```
 

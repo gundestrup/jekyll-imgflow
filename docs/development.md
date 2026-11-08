@@ -27,8 +27,8 @@ architecture, and data flow. Key points:
 
 `rake ci` runs RuboCop and `bundle exec rspec --tag ~slow`, matching the
 GitHub Actions workflow. It includes external tests that can run with local
-CLI providers. Docker-backed HTTP provider tests remain local-only and should
-be run with the test services started.
+CLI providers. Docker-backed HTTP provider tests remain local-only; they start
+the test services (and Docker Desktop on macOS) automatically.
 
 Install or refresh the Git hooks with `bin/install-hooks.sh` (sets
 `core.hooksPath` to the tracked `bin/hooks/`). The pre-commit hook runs
@@ -53,7 +53,8 @@ rake parallel:test             # Parallel testing via Rake
 **See:** [docker.md](docker.md) for Docker service configuration, ports, and troubleshooting.
 
 Test tasks that need the HTTP providers start these services automatically
-and stop them when the run finishes. Use the commands below only to keep
+(launching Docker Desktop on macOS if the daemon is down) and stop them when
+the run finishes. Use the commands below only to keep
 services up across repeated test runs:
 
 ```bash
