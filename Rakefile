@@ -2047,3 +2047,8 @@ task :test_coverage_focused do
     exit 1
   end
 end
+
+desc "Generate docs/assets demo captures (needs Chrome, ffmpeg, img2webp)"
+task "docs:demo" do
+  sh "scripts/docs-demo.sh"
+end

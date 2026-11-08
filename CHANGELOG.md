@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- `rake docs:demo` — captures the checked-in illustrative overview as
+  animated AVIF + WebP + static PNG (headless Chrome + ffmpeg + img2webp;
+  build-host tools), embedded in README via `<picture>`. Examples are
+  schematic, not generated from a live Jekyll build.
+
 ### Changed
 
 - **Docker test service lifecycle** — service-dependent rake tasks

@@ -15,6 +15,19 @@ A [Jekyll](https://jekyllrb.com/) plugin for automatic image optimization with m
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code%20Companion-jekyll--imgflow-blue?logo=visual-studio-code)](https://github.com/gundestrup/jekyll-imgflow-vscode)
 [![License](https://img.shields.io/github/license/gundestrup/jekyll-imgflow)](LICENSE)
 
+<!-- markdownlint-disable MD033 -->
+<picture>
+  <source
+    srcset="docs/assets/jekyll-imgflow-demo.avif"
+    type="image/avif">
+  <source
+    srcset="docs/assets/jekyll-imgflow-demo.webp"
+    type="image/webp">
+  <img src="docs/assets/jekyll-imgflow-demo.png"
+       alt="jekyll-imgflow demo">
+</picture>
+<!-- markdownlint-enable MD033 -->
+
 ## 🚀 Quick Start
 
 ```bash
