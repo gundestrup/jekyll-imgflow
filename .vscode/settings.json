@@ -3,5 +3,11 @@
     "identifier": "rbenv"
   },
   "rubyLsp.formatter": "rubocop",
-  "rubyLsp.linters": ["rubocop"]
+  "rubyLsp.linters": [
+    "rubocop"
+  ],
+  "sonarlint.connectedMode.project": {
+    "connectionId": "gundestrup",
+    "projectKey": "gundestrup_jekyll-imgflow"
+  }
 }
