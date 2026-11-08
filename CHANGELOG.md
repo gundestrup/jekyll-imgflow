@@ -35,6 +35,10 @@
 - Gem updates: `fastimage` 2.4.1 → 2.4.3, `sass-embedded` 1.105.1 → 1.107.1,
   `addressable` 2.9.0 → 2.9.2, `csv` 3.3.6 → 3.3.7, `io-console` 0.9.4 → 0.9.5,
   `mime-types-data` → 3.2026.1027, `parallel_tests` 5.8.0 → 5.9.0.
+- Gem updates: `sass-embedded` 1.107.1 → 1.108.1, `irb` 1.18.0 → 1.19.0,
+  `mime-types-data` → 3.2026.1103, `rspec-*` 3.13.x patches;
+  `BUNDLED WITH` 2.7.2 → 4.0.24.
+- GitHub Actions: `ruby/setup-ruby` v1.335.0 → v1.338.0.
 
 ## [0.4.4] - 2026-11-07
 
