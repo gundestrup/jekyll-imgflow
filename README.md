@@ -58,6 +58,19 @@ imgflow:
 > For editor autocomplete while writing `{% imgflow %}` tags, install the
 > [VS Code companion extension](https://github.com/gundestrup/jekyll-imgflow-vscode).
 
+<!-- markdownlint-disable MD033 -->
+<picture>
+  <source
+    srcset="https://raw.githubusercontent.com/gundestrup/jekyll-imgflow-vscode/main/docs/assets/image-flow.avif"
+    type="image/avif">
+  <source
+    srcset="https://raw.githubusercontent.com/gundestrup/jekyll-imgflow-vscode/main/docs/assets/image-flow.webp"
+    type="image/webp">
+  <img src="https://raw.githubusercontent.com/gundestrup/jekyll-imgflow-vscode/main/docs/assets/image-flow.png"
+       alt="jekyll-imgflow-vscode: filename, width/format and markup parameter autocomplete">
+</picture>
+<!-- markdownlint-enable MD033 -->
+
 ## ✨ Key Features
 
 - **Multiple Providers**: [Sharp](https://github.com/lovell/sharp), [ImageMagick](https://github.com/ImageMagick/ImageMagick), [LibVips](https://github.com/libvips/libvips), [Imgproxy](https://github.com/imgproxy/imgproxy), [Weserv](https://github.com/weserv/images), [Flyimg](https://github.com/flyimg/flyimg)
