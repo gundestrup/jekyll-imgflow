@@ -3,5 +3,15 @@
     "package": "braces",
     "reason": "No patched release (all <=3.0.3 affected). Dev-only transitive dep of markdownlint-cli2 globbing; exploitation needs attacker-controlled glob patterns committed to the repo.",
     "expires": "2027-01-06"
+  },
+  "https://github.com/advisories/GHSA-3g3m-2fjr-6pw4": {
+    "package": "glob",
+    "reason": "Patched only in 14.0.2+; consumer sharp-cli pins glob ^13.0.6, so no in-range fix exists. DoS via AbortSignal bypass needs attacker-controlled cancellation timing/patterns — dev-only globbing of this repo's own files.",
+    "expires": "2027-02-09"
+  },
+  "https://github.com/advisories/GHSA-g3hv-75wg-m249": {
+    "package": "minimatch",
+    "reason": "Patched only in 11.0.1+; consumers pin ^10 (glob@13 via sharp-cli), so no in-range fix exists. globparts-amplification DoS needs attacker-controlled glob patterns — dev-only matching of this repo's own file patterns.",
+    "expires": "2027-02-09"
   }
 }
