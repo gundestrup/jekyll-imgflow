@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.5] - 2026-11-10
 
 ### Added
 
@@ -9,7 +9,24 @@
   build-host tools), embedded in README via `<picture>`. Examples are
   schematic, not generated from a live Jekyll build.
 
+### Security
+
+- `.audit-allow.json`: allowlisted two dev-only npm advisories with no
+  in-range fix — `glob` (GHSA-3g3m-2fjr-6pw4, patched only in 14.x while
+  sharp-cli pins ^13) and `minimatch` (GHSA-g3hv-75wg-m249, patched only
+  in 11.x while consumers pin ^10), both expiring 2027-02-09. Dev tooling
+  only — the gem is pure Ruby.
+
 ### Changed
+
+- Gemspec description rewritten in RDoc markup (`==` heading at column 0)
+  so rubygems.org renders it as structured markup instead of a single
+  paragraph, and now mentions the jekyll-imgflow-vscode companion
+  extension.
+- Gemspec metadata links completed: `homepage_uri`, `source_code_uri`,
+  `changelog_uri`, and `bug_tracker_uri` for the rubygems.org link panel.
+- `CHANGELOG.md` added to `spec.files` so it ships inside the packaged gem.
+- `jekyll` runtime dependency now bounded `< 5.0` (was unbounded `>= 4.0`).
 
 - **Docker test service lifecycle** — service-dependent rake tasks
   (`test_http_providers`, `test_jekyll`, `test_picture`, `test_integration`,
