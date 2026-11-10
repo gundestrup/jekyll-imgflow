@@ -9,7 +9,9 @@ Gem::Specification.new do |s|
   s.description = "ImgFlow provides automatic image optimization for Jekyll with " \
                   "support for multiple providers (Sharp, ImageMagick, LibVips, " \
                   "Imgproxy, Weserv, Flyimg), multiple formats (AVIF, WebP, PNG, JPG), " \
-                  "and responsive image generation with modern picture tags."
+                  "and responsive image generation with modern picture tags. " \
+                  "A companion VS Code extension (jekyll-imgflow-vscode) " \
+                  "provides tag autocomplete; see the README for animated demos."
   s.authors     = ["Svend Gundestrup"]
   s.email       = "svend@gundestrup.dk"
   s.files       = Dir["lib/**/*"].reject { |f| File.extname(f) == ".md" || File.basename(f) == ".DS_Store" } +
