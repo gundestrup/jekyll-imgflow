@@ -107,7 +107,12 @@ See [providers.md](providers.md) for the benchmark-ordered comparison.
 brew install imagemagick vips
 
 # Ubuntu/Debian
-sudo apt-get install imagemagick libvips-tools
+# The libheif-plugin-* packages are required for AVIF on Debian trixie /
+# Ubuntu 24.04+, where the codecs are split out of libheif — without them
+# `vips` fails with "heifsave: Unsupported compression" and ImgFlow emits
+# an HTML comment instead of an image. (libvips-dev pulls libvips-tools.)
+sudo apt-get install imagemagick libvips-dev \
+  libheif-plugin-aomenc libheif-plugin-aomdec libheif-plugin-libde265
 ```
 
 **Option B: Docker Services**
