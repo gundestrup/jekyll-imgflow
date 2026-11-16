@@ -261,10 +261,10 @@ module Jekyll
       base_attrs = parsed[:html_attributes] || {}
 
       # Build element-specific attribute structure
+      prefixes = %w[picture- source- a- parent-]
       {
-        img: base_attrs.reject do |k, _v|
-          k.to_s.start_with?("picture-", "source-", "a-", "parent-")
-        end,
+        img: base_attrs.transform_keys(&:to_s).except("alt", "link", "modal")
+                       .reject { |k, _v| k.start_with?(*prefixes) },
         picture: extract_prefixed_attrs(base_attrs, "picture-"),
         source: extract_prefixed_attrs(base_attrs, "source-"),
         a: extract_prefixed_attrs(base_attrs, "a-"),

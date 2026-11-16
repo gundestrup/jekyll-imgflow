@@ -24,7 +24,7 @@ module JekyllImgFlow
     private
 
     def base_img_attrs(result = nil)
-      attrs = @attributes[:img].dup
+      attrs = @attributes[:img].transform_keys(&:to_s)
       attrs["alt"] = @attributes[:alt] if @attributes[:alt]
       inject_intrinsic_dimensions(attrs, result)
       attrs

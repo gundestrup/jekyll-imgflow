@@ -382,6 +382,18 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
       expect(html).to eq("/assets/images/optimized/#{expected_filename}")
     end
 
+    it "does not duplicate attributes when img keys are symbols" do
+      symbol_attrs = { img: { alt: "Test Image", loading: "eager", class: "hero" },
+                       alt: "Test Image" }
+      html = JekyllImgFlow::HtmlGenerator.generate(test_results, symbol_attrs, "img", context,
+                                                   config)
+      img_tag = html[/<img[^>]*>/]
+
+      expect(img_tag.scan(" alt=").size).to eq(1)
+      expect(img_tag.scan(" loading=").size).to eq(1)
+      expect(img_tag).to include('loading="eager"')
+    end
+
     it "handles empty attributes hash gracefully" do
       html = JekyllImgFlow::HtmlGenerator.generate(test_results, {}, "img", context, config)
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.6] - 2026-11-16
+
+### Fixed
+
+- `{% imgflow %}` no longer emits duplicated attributes on the generated
+  `<img>` element. `extract_element_attributes` kept `alt`, `link`, and
+  `modal` in the per-element attribute bucket as symbol keys while
+  `base_img_attrs` merged string-keyed generated attributes, so the
+  output carried e.g. both `alt="…"` twice and `loading="eager"` plus a
+  spurious `loading="lazy"`. The tag now strips control options from the
+  `img` attribute set and normalizes its keys to strings; `loading:eager`
+  is respected and the `modal="false"` control option no longer leaks as
+  a literal attribute.
+
 ## [0.4.5] - 2026-11-10
 
 ### Added

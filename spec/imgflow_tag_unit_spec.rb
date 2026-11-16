@@ -18,8 +18,19 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       parsed = { html_attributes: { alt: "Test image", class: "hero" } }
       result = tag.send(:extract_element_attributes, parsed)
 
-      expect(result[:img][:alt]).to eq("Test image")
-      expect(result[:img][:class]).to eq("hero")
+      expect(result[:img]).to eq("class" => "hero")
+      expect(result[:alt]).to eq("Test image")
+    end
+
+    it "excludes control options from img attributes" do
+      parsed = { html_attributes: { alt: "Alt", link: "/link", modal: "false",
+                                    loading: "eager", class: "hero" } }
+      result = tag.send(:extract_element_attributes, parsed)
+
+      expect(result[:img]).to eq("loading" => "eager", "class" => "hero")
+      expect(result[:alt]).to eq("Alt")
+      expect(result[:link]).to eq("/link")
+      expect(result[:modal]).to eq("false")
     end
 
     it "separates picture-prefixed attributes" do
@@ -27,7 +38,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
                                     alt: "Test" } }
       result = tag.send(:extract_element_attributes, parsed)
 
-      expect(result[:img][:alt]).to eq("Test")
+      expect(result[:alt]).to eq("Test")
       expect(result[:picture]).to eq("class" => "responsive")
     end
 
