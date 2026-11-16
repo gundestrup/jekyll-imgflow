@@ -146,6 +146,22 @@ RSpec.describe "Jekyll Integration", :integration, :system do
         expect(html).to include('loading="lazy"')
       end
 
+      it "emits each attribute once and respects loading:eager" do
+        results = ["/assets/images/optimized/test.jpg"]
+        parsed = {
+          html_attributes: { alt: "Test Image", class: "hero",
+                             loading: "eager", modal: "false" }
+        }
+
+        html = tag.send(:generate_html, results, parsed, context)
+        img_tag = html[/<img[^>]*>/]
+
+        expect(img_tag.scan(" alt=").size).to eq(1)
+        expect(img_tag.scan(" loading=").size).to eq(1)
+        expect(img_tag).to include('loading="eager"')
+        expect(img_tag).not_to include("modal=")
+      end
+
       it "returns empty string for empty results" do
         html = tag.send(:generate_html, [], { html_attributes: {} }, context)
 
