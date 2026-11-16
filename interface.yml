@@ -2,7 +2,7 @@
 # Public tag/config surface for tooling (editor extensions, doc linters).
 ---
 gem: jekyll-imgflow
-version: 0.4.5
+version: 0.4.6
 tags:
   imgflow:
     params:
@@ -27,6 +27,12 @@ tags:
     - title
     - watermark
     - width
+    param_prefixes:
+    - a-
+    - img-
+    - parent-
+    - picture-
+    - source-
 filters: []
 config:
   imgflow:

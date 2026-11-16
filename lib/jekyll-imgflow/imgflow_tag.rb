@@ -261,7 +261,7 @@ module Jekyll
       base_attrs = parsed[:html_attributes] || {}
 
       # Build element-specific attribute structure
-      prefixes = %w[picture- source- a- parent- img-]
+      prefixes = JekyllImgFlow::Parser::ELEMENT_ATTR_PREFIXES
       {
         img: base_attrs.transform_keys(&:to_s).except("alt", "link", "modal")
                        .reject { |k, _v| k.start_with?(*prefixes) }

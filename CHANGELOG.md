@@ -2,6 +2,15 @@
 
 ## [0.4.6] - 2026-11-16
 
+### Added
+
+- `interface.yml` now exposes `tags.imgflow.param_prefixes`
+  (`a-`, `img-`, `parent-`, `picture-`, `source-`) so editor tooling can
+  recognize element-scoped attributes instead of flagging them as
+  unknown params.
+- `docs/usage/tag-options.md`: element-scoped attribute table
+  (`img-*:`/`picture-*:`/`source-*:`/`a-*:`/`parent-*:`).
+
 ### Fixed
 
 - `{% imgflow %}` no longer emits duplicated attributes on the generated

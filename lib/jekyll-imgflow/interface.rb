@@ -7,8 +7,11 @@ module JekyllImgFlow
   # tooling like editor extensions can consume it without parsing Ruby.
   module Interface
     TAGS = {
-      "imgflow" => (Parser::OPERATION_PARAMS + Parser::HTML_ATTRIBUTES + %i[markup])
-                   .map(&:to_s).sort.freeze
+      "imgflow" => {
+        "params" => (Parser::OPERATION_PARAMS + Parser::HTML_ATTRIBUTES + %i[markup])
+                    .map(&:to_s).sort.freeze,
+        "param_prefixes" => Parser::ELEMENT_ATTR_PREFIXES
+      }
     }.freeze
 
     # Config keys read outside CORE_CONFIG_DEFAULTS in config.rb
@@ -21,7 +24,7 @@ module JekyllImgFlow
       {
         "gem" => "jekyll-imgflow",
         "version" => VERSION,
-        "tags" => TAGS.transform_values { |params| { "params" => params } },
+        "tags" => TAGS,
         "filters" => [],
         "config" => {
           "imgflow" => (Config::CORE_CONFIG_DEFAULTS.keys + EXTRA_CONFIG_KEYS).sort

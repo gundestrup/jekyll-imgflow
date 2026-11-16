@@ -39,6 +39,16 @@ supported (`alt:"A long caption"`).
 | `link:` | — | Wrap the image in `<a href="…">` — use with `modal:false` |
 | `modal:` | `image_modal` config (`true`) | Click-to-zoom; `modal:false` disables per image |
 
+Element-scoped attributes use a prefix to target a specific element:
+
+| Prefix | Element | Example |
+| ------ | ------- | ------- |
+| `img-*:` | `<img>` | `img-id:"hero"`, `img-aria-label:"…"` |
+| `picture-*:` | `<picture>` | `picture-class:"wrap"` |
+| `source-*:` | `<source>` | `source-media:"(min-width: 800px)"` |
+| `a-*:` | `<a>` (with `link:`/`modal:`) | `a-rel:"noopener"` |
+| `parent-*:` | parent wrapper | `parent-class:"figure"` |
+
 ## Output markup (`markup:`)
 
 | Value | Emits |

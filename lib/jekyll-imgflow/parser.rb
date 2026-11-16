@@ -11,6 +11,10 @@ module JekyllImgFlow
                           optimize level watermark opacity position keep preset].freeze
     HTML_ATTRIBUTES = %i[alt class title loading link modal].freeze
 
+    # Element-scoped attribute prefixes routed to specific markup elements
+    ELEMENT_ATTR_PREFIXES = %w[a- img- parent- picture- source-].freeze
+    ELEMENT_ATTR_PATTERN = /\A(?:a|img|parent|picture|source)-/
+
     # Simple operation mappings for single-parameter operations
     SIMPLE_OPERATIONS = {
       quality: ->(val) { { type: :quality, params: { quality: val } } },
@@ -159,7 +163,7 @@ module JekyllImgFlow
 
     def self.extract_html_attributes(options)
       options.slice(*HTML_ATTRIBUTES).merge(
-        options.select { |k, _v| k.to_s.match?(/\A(?:img|picture|source|a|parent)-/) }
+        options.select { |k, _v| k.to_s.match?(ELEMENT_ATTR_PATTERN) }
       )
     end
 
