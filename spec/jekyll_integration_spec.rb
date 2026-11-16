@@ -124,9 +124,9 @@ RSpec.describe "Jekyll Integration", :integration, :system do
         # Use TestPictures expected filename
         expected_filename = TestPictures.expected_filename(test_image_name, :lg, :jpg)
         results = ["/assets/images/optimized/#{expected_filename}"]
-        parsed = {
-          html_attributes: { alt: "Test Image", class: "hero" }
-        }
+        # Build parsed input through the real parser so the spec verifies
+        # the actual parser -> tag data contract, not a hand-rolled shape
+        parsed = JekyllImgFlow::Parser.parse('test.jpg alt:"Test Image" class:hero', nil)
 
         html = tag.send(:generate_html, results, parsed, context)
 
@@ -139,7 +139,7 @@ RSpec.describe "Jekyll Integration", :integration, :system do
 
       it "adds lazy loading by default" do
         results = ["/assets/images/optimized/test.jpg"]
-        parsed = { html_attributes: {} }
+        parsed = JekyllImgFlow::Parser.parse("test.jpg", nil)
 
         html = tag.send(:generate_html, results, parsed, context)
 
@@ -148,10 +148,9 @@ RSpec.describe "Jekyll Integration", :integration, :system do
 
       it "emits each attribute once and respects loading:eager" do
         results = ["/assets/images/optimized/test.jpg"]
-        parsed = {
-          html_attributes: { alt: "Test Image", class: "hero",
-                             loading: "eager", modal: "false" }
-        }
+        parsed = JekyllImgFlow::Parser.parse(
+          'test.jpg alt:"Test Image" class:hero loading:eager modal:false', nil
+        )
 
         html = tag.send(:generate_html, results, parsed, context)
         img_tag = html[/<img[^>]*>/]

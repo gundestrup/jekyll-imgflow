@@ -15,7 +15,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
 
   describe "#extract_element_attributes" do
     it "extracts basic img attributes" do
-      parsed = { html_attributes: { alt: "Test image", class: "hero" } }
+      parsed = JekyllImgFlow::Parser.parse('x.jpg alt:"Test image" class:hero', nil)
       result = tag.send(:extract_element_attributes, parsed)
 
       expect(result[:img]).to eq("class" => "hero")
@@ -23,8 +23,9 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
     end
 
     it "excludes control options from img attributes" do
-      parsed = { html_attributes: { alt: "Alt", link: "/link", modal: "false",
-                                    loading: "eager", class: "hero" } }
+      parsed = JekyllImgFlow::Parser.parse(
+        'x.jpg alt:"Alt" link:/link modal:false loading:eager class:hero', nil
+      )
       result = tag.send(:extract_element_attributes, parsed)
 
       expect(result[:img]).to eq("loading" => "eager", "class" => "hero")
@@ -34,8 +35,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
     end
 
     it "separates picture-prefixed attributes" do
-      parsed = { html_attributes: { "picture-class": "responsive",
-                                    alt: "Test" } }
+      parsed = JekyllImgFlow::Parser.parse('x.jpg picture-class:"responsive" alt:"Test"', nil)
       result = tag.send(:extract_element_attributes, parsed)
 
       expect(result[:alt]).to eq("Test")
@@ -43,32 +43,32 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
     end
 
     it "separates source-prefixed attributes" do
-      parsed = { html_attributes: { "source-media": "(min-width: 800px)",
-                                    alt: "Test" } }
+      parsed = JekyllImgFlow::Parser.parse(
+        'x.jpg source-media:"(min-width: 800px)" alt:"Test"', nil
+      )
       result = tag.send(:extract_element_attributes, parsed)
 
       expect(result[:source]).to eq("media" => "(min-width: 800px)")
     end
 
     it "separates a-prefixed attributes" do
-      parsed = { html_attributes: { "a-href": "/link",
-                                    alt: "Test" } }
+      parsed = JekyllImgFlow::Parser.parse('x.jpg a-href:"/link" alt:"Test"', nil)
       result = tag.send(:extract_element_attributes, parsed)
 
       expect(result[:a]).to eq("href" => "/link")
     end
 
     it "separates parent-prefixed attributes" do
-      parsed = { html_attributes: { "parent-class": "wrapper",
-                                    alt: "Test" } }
+      parsed = JekyllImgFlow::Parser.parse('x.jpg parent-class:"wrapper" alt:"Test"', nil)
       result = tag.send(:extract_element_attributes, parsed)
 
       expect(result[:parent]).to eq("class" => "wrapper")
     end
 
     it "strips img-prefixed attributes into img attributes" do
-      parsed = { html_attributes: { "img-id": "main", "img-data-foo": "bar",
-                                    class: "hero" } }
+      parsed = JekyllImgFlow::Parser.parse(
+        'x.jpg img-id:"main" img-data-foo:"bar" class:hero', nil
+      )
       result = tag.send(:extract_element_attributes, parsed)
 
       expect(result[:img]).to eq("class" => "hero", "id" => "main",
@@ -76,7 +76,7 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
     end
 
     it "extracts link attribute" do
-      parsed = { html_attributes: { link: "true", alt: "Test" } }
+      parsed = JekyllImgFlow::Parser.parse('x.jpg link:true alt:"Test"', nil)
       result = tag.send(:extract_element_attributes, parsed)
 
       expect(result[:link]).to eq("true")
