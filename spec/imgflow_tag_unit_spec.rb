@@ -66,6 +66,15 @@ RSpec.describe "Jekyll::ImgflowTag Unit", :unit do
       expect(result[:parent]).to eq("class" => "wrapper")
     end
 
+    it "strips img-prefixed attributes into img attributes" do
+      parsed = { html_attributes: { "img-id": "main", "img-data-foo": "bar",
+                                    class: "hero" } }
+      result = tag.send(:extract_element_attributes, parsed)
+
+      expect(result[:img]).to eq("class" => "hero", "id" => "main",
+                                 "data-foo" => "bar")
+    end
+
     it "extracts link attribute" do
       parsed = { html_attributes: { link: "true", alt: "Test" } }
       result = tag.send(:extract_element_attributes, parsed)

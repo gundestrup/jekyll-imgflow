@@ -66,6 +66,22 @@ RSpec.describe JekyllImgFlow::Parser, :unit do
         expect(result[:html_attributes][:alt]).to include("Hero")
         expect(result[:html_attributes][:class]).to include("banner")
       end
+
+      it "keeps element-prefixed attributes" do
+        result = described_class.parse(
+          'image.jpg picture-class:"wrap" img-id:"main" a-rel:"noopener" alt:"A"', nil
+        )
+
+        expect(result[:html_attributes]).to include(
+          "picture-class": "wrap", "img-id": "main", "a-rel": "noopener"
+        )
+      end
+
+      it "does not leak operation params into html attributes" do
+        result = described_class.parse("image.jpg width:800 alt:Test", nil)
+
+        expect(result[:html_attributes]).not_to have_key(:width)
+      end
     end
 
     context "value type parsing" do

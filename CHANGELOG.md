@@ -13,6 +13,14 @@
   `img` attribute set and normalizes its keys to strings; `loading:eager`
   is respected and the `modal="false"` control option no longer leaks as
   a literal attribute.
+- Element-prefixed attributes in `{% imgflow %}` markup
+  (`picture-class:`, `source-*:`, `a-*:`, `parent-*:`, `img-*:`) are no
+  longer silently dropped. `Parser.extract_html_attributes` only kept
+  the scalar attribute whitelist, so prefixed keys never reached the
+  tag — breaking the documented element-attribute syntax and the Jekyll
+  Picture Tag compatibility attributes (`img-class:`/`picture-class:`)
+  emitted by `PictureTagAdaptor`. `img-*` keys are now stripped of the
+  prefix into the `<img>` attribute set.
 
 ## [0.4.5] - 2026-11-10
 

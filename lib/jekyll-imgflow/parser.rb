@@ -158,7 +158,9 @@ module JekyllImgFlow
     end
 
     def self.extract_html_attributes(options)
-      options.slice(*HTML_ATTRIBUTES)
+      options.slice(*HTML_ATTRIBUTES).merge(
+        options.select { |k, _v| k.to_s.match?(/\A(?:img|picture|source|a|parent)-/) }
+      )
     end
 
     def self.extract_image_path(options, markup)

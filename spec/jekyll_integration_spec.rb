@@ -201,6 +201,18 @@ RSpec.describe "Jekyll Integration", :integration, :system do
         expect(result).to include('loading="lazy"')
       end
 
+      it "honours element-prefixed attributes from tag markup" do
+        markup = "#{test_image_name} width:800 " \
+                 'img-id:"main" picture-class:"wrap" alt:"Crater"'
+        tag = Jekyll::ImgflowTag.send(:new, "imgflow", markup, tokens)
+        result = tag.render(context)
+        img_tag = result[/<img[^>]*>/]
+
+        expect(result).to include('<picture class="wrap">')
+        expect(img_tag).to include('id="main"')
+        expect(img_tag.scan(" alt=").size).to eq(1)
+      end
+
       it "processes image and generates output file" do
         tag = Jekyll::ImgflowTag.send(:new, "imgflow",
                                       "#{test_image_name} width:800 format:webp", tokens)
