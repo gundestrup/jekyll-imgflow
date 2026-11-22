@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Development dependencies: `webmock` 3.34.0 → 3.38.0, `rubocop` 1.92.2 → 1.92.3.
+
 ## [0.4.6] - 2026-11-16
 
 ### Added
