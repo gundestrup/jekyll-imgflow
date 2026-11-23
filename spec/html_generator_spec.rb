@@ -387,7 +387,7 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
                        alt: "Test Image" }
       html = JekyllImgFlow::HtmlGenerator.generate(test_results, symbol_attrs, "img", context,
                                                    config)
-      img_tag = html[/<img[^>]*>/]
+      img_tag = html[/<img[^<>]*>/]
 
       expect(img_tag.scan(" alt=").size).to eq(1)
       expect(img_tag.scan(" loading=").size).to eq(1)
@@ -599,8 +599,8 @@ RSpec.describe "JekyllImgFlow::HtmlGenerator", :unit do
       results = [image_rel.sub(".jpg", ".avif"), image_rel]
       html = JekyllImgFlow::HtmlGenerator.generate(results, {}, "picture", context, config)
 
-      expect(html).to match(/<img [^>]*width="200"[^>]*>/)
-      expect(html).to match(/<img [^>]*height="133"[^>]*>/)
+      expect(html).to match(/<img [^<>]*width="200"[^<>]*>/)
+      expect(html).to match(/<img [^<>]*height="133"[^<>]*>/)
     end
 
     it "emits intrinsic width and height on data_img markup" do

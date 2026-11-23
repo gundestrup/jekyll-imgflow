@@ -6,6 +6,12 @@
 
 - Development dependencies: `webmock` 3.34.0 → 3.38.0, `rubocop` 1.92.2 → 1.92.3.
 
+### Fixed
+
+- Spec regexes `[^>]` → `[^<>]` in `html_generator_spec` — closes the
+  `rb/polynomial-redos` CodeQL finding (quadratic scan on `<img` repeats);
+  `<` cannot appear inside a tag, so matching is equivalent and linear.
+
 ## [0.4.6] - 2026-11-16
 
 ### Added
