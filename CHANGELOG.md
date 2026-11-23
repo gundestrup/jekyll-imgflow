@@ -23,7 +23,6 @@
 - `docs/usage/tag-options.md`: element-scoped attribute table
   (`img-*:`/`picture-*:`/`source-*:`/`a-*:`/`parent-*:`).
 
-
 ### Fixed
 
 - `{% imgflow %}` no longer emits duplicated attributes on the generated
@@ -190,7 +189,6 @@
 - Removed the stale "980 examples" test count from agent steering
   files — counts that change on their own shouldn't be restated.
 
-
 ### Fixed
 
 - `markup:` was parsed into `raw_options` but never surfaced as
@@ -230,7 +228,6 @@
   `TestEnvironment.site_url`.
 - `Config#assign_core_config` now iterates a `CORE_CONFIG_DEFAULTS`
   key→default map instead of repeating `@x = cfg[...] || DEFAULT` lines.
-
 
 ### Fixed
 
@@ -290,7 +287,6 @@
   conversion/description, `CropTag#process`, and `ResizeTag#process` into
   smaller focused helper methods without changing behavior.
 
-
 ### Fixed
 
 - Weserv provider now handles SVG files without explicit pixel dimensions
@@ -311,7 +307,6 @@
   synchronization. GitHub Actions continues to publish CI findings through
   `SEMGREP_APP_TOKEN`, while CodeFactor analyzes the repository through its
   GitHub integration.
-
 
 ### Fixed
 
@@ -344,7 +339,6 @@
 
 ## [0.3.2] - 2026-09-09
 
-
 ### Fixed
 
 - **Modal full-size variants** — modal links now generate optimized variants at
@@ -360,7 +354,6 @@
   format selection.
 
 ## [0.3.1] - 2026-09-09
-
 
 ### Fixed
 
@@ -392,7 +385,6 @@
 
 ## [0.2.0] - 2026-09-08
 
-
 ### Fixed
 
 - **Specialized and default versions only produced a single format** — `{% imgflow %}` tags without an explicit `format:`/`formats:` parameter generated only one output file (falling back to the original extension, e.g. `.jpg`) and rendered a simple `<img>` tag instead of a `<picture>` element. `process_variants` now expands to all configured formats (`avif`, `webp`, `png`, `jpg`) when no format is specified, so both default-width and specialized versions produce a `<picture>` with `<source>` tags for modern formats and an `<img>` fallback. Explicit `format:` and `formats:` selections (e.g. `format:avif`, `formats:avif,png`, `formats:webp,jpg`) are respected for both default and specialized widths.
@@ -417,7 +409,6 @@
 - `TestEnvironment` module (`spec/support/test_environment.rb`) centralizes provider lists, port allocation, and test configuration previously inlined in `spec_helper.rb`, eliminating duplicated constants and port-collision bugs in parallel test runs.
 - `spec/support/provider_integration_helper.rb` extracted shared provider integration test setup (prebuilt sites, server lifecycle, fixture selection) from `spec_helper.rb`.
 - `spec/docker_service_status_spec.rb` adds 23 unit tests for `DockerServiceStatus` covering service path mapping, readiness/failed state detection, compose record parsing (single/array/newline-delimited/invalid JSON), HTTP status (200/503/connection refused/EOF/timeout), container status, and wait/timeout behavior.
-
 
 ### Fixed
 
@@ -498,7 +489,6 @@
 - **Project branding assets** — moved the full logo and icon to `docs/assets/images/` with project-specific names for GitHub documentation and the next RubyGems release.
 - README branding now uses the repository logo, and the gemspec defines a stable `icon_uri` for the `0.1.10` release.
 
-
 ### Fixed
 
 - Release script now stages tracked changes only, preventing unrelated untracked files from being included in a release commit.
@@ -518,7 +508,6 @@
 - Tests for quoted image paths, site-root paths, and exact originals-relative path resolution.
 - Real-world integration coverage for preserving nested output directories and validating generated HTML paths.
 
-
 ### Fixed
 
 - **Generated post path compatibility** — image references that already include the configured originals directory, such as `assets/images/originals/subdir/photo.jpg`, are now resolved as site-root paths instead of incorrectly prepending the originals directory a second time.
@@ -531,7 +520,6 @@
 
 - **VS Code companion extension** — added the `jekyll-imgflow-vscode` companion extension. It provides image filename autocomplete for `{% imgflow %}` tags in Markdown and Liquid files, auto-discovers `imgflow.originals` from `_config.yml`, and watches the originals directory for changes.
 - Tests for nested original image resolution, custom `originals` directories, and preserved output directory structure.
-
 
 ### Fixed
 
@@ -561,7 +549,6 @@
 - Updated README.md, docs/installation.md, docs/ARCHITECTURE.md, docs/usage/tags.md with new config format, defaults table, and format priority documentation.
 - Removed 113 unused test fixture images (9.6 MB → 352 KB), keeping only the 12 used by the regression test.
 
-
 ### Fixed
 
 - **Optimized images wiped from `_site` on rebuild (v0.1.6 bug)** — images were written directly to `_site/` which Jekyll clears at the start of each build. Fixed by writing to the source directory and registering generated files as `Jekyll::StaticFile` objects during the `pre_render` hook, so Jekyll copies them to `_site` during its write phase. This works on the first build (previously required two builds).
@@ -584,7 +571,6 @@
 - `BuildTimeProcessor` now filters out animated GIFs early in `find_original_images`, so no default versions are queued for them — avoiding unnecessary work and manifest clutter.
 - Test fixtures for animated GIF (`ang-head-animation.gif`) and static single-frame GIF (`static-single-frame.gif`).
 - Test coverage for the animated GIF detection and skip behavior (11 new examples).
-
 
 ### Fixed
 
@@ -621,7 +607,6 @@
 - `provider_implementation_coverage_spec.rb` now builds `all_providers` from the full provider registry instead of `backend_priority`, so installed CLI tools (Sharp, ImageMagick, Libvips) are tested even when an HTTP provider is selected.
 - Tightened provider URL generation for resize, crop, and smartcrop operations across imgproxy, weserv, and flyimg.
 
-
 ### Fixed
 
 - imgproxy resize now allows upscaling (`enlarge=1`) and preserves exact-fill dimensions.
@@ -654,7 +639,6 @@
 - Improved code style with 128+ auto-corrections
 - Standardized project structure and configuration
 - Enhanced development workflow with quality gates
-
 
 ### Fixed
 
