@@ -7,7 +7,7 @@
     "audit": "node scripts/npm-audit.mjs"
   },
   "devDependencies": {
-    "markdownlint-cli2": "0.24.1",
+    "markdownlint-cli2": "0.24.2",
     "sharp-cli": "6.1.0"
   },
   "overrides": {
