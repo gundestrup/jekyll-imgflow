@@ -5,6 +5,7 @@
 ### Changed
 
 - Development dependencies: `webmock` 3.34.0 → 3.38.0, `rubocop` 1.92.2 → 1.92.3.
+- npm `markdownlint-cli2` 0.24.1 → 0.24.2.
 
 ### Fixed
 
