@@ -45,7 +45,7 @@ RSpec.describe "Production Mode Workflow with Optimized Testing", :external, :in
     end
 
     after do
-      WebMock.disable_net_connect!
+      WebMock.disable_net_connect!(allow_localhost: true)
     end
 
     describe "Production Mode Behavior" do

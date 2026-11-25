@@ -10,6 +10,12 @@
 
 ### Fixed
 
+- WebMock allow-list leak: `production_mode_spec` /
+  `provider_real_world_integration_spec` after-hooks now call
+  `disable_net_connect!(allow_localhost: true)` — a bare `disable_net_connect!`
+  wiped the spec_helper localhost allowance, so `provider_registry_spec`'s
+  real-HTTP probes raised `NetConnectNotAllowedError` whenever the files
+  co-located in a parallel_rspec worker (intermittent suite flake).
 - Spec regexes `[^>]` → `[^<>]` in `html_generator_spec` — closes the
   `rb/polynomial-redos` CodeQL finding (quadratic scan on `<img` repeats);
   `<` cannot appear inside a tag, so matching is equivalent and linear.

@@ -25,7 +25,7 @@ RSpec.describe "Provider Real-World Integration with TestPictures Validation", :
   end
 
   after(:all) do
-    WebMock.disable_net_connect!
+    WebMock.disable_net_connect!(allow_localhost: true)
   end
 
   # ------------------------------------------------------------------
